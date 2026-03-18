@@ -12,45 +12,27 @@ edition     = "2021"
 tauri-build = { version = "1", features = [] }
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
+# IMPORTANT: Cargo.toml features MUST mirror the allowlist in tauri.conf.json.
+# tauri-build enforces this at compile time and exits 1 if they diverge.
+#
+# tauri.conf.json allowlist mapping → Cargo feature:
+#   shell.open    + shell.sidecar  → shell-open, shell-sidecar
+#   dialog.open   + dialog.save   → dialog-open, dialog-save
+#   fs.readFile   + fs.writeFile  → fs-read-file, fs-write-file
+#   window.all: true              → window-all   (NOT individual window-* flags)
 [dependencies]
 tauri = { version = "1", features = [
+    "shell-open",
+    "shell-sidecar",
     "dialog-open",
     "dialog-save",
     "fs-read-file",
     "fs-write-file",
-    "shell-sidecar",
-    "shell-open",
-    "window-close",
-    "window-hide",
-    "window-maximize",
-    "window-minimize",
-    "window-show",
+    "window-all",        # matches "window": { "all": true } in tauri.conf.json
     "system-tray",
 ] }
 serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# ── Note on Linux webkit2gtk compatibility ────────────────────────────────────
-#
-# Tauri 1.x uses wry 0.21.x/0.24.x which does not import webkit2gtk::prelude
-# in its Linux WebKit module.  On Ubuntu 22.04 with libwebkit2gtk-4.0 ≥ 2.40,
-# this causes E0599 "method not found" errors for SettingsExt methods during
-# compilation of the wry crate itself.
-#
-# Pinning the webkit2gtk Rust crate version does NOT fix this — the missing
-# import is in wry's source, which we cannot modify.  The webkit2gtk crate
-# version merely determines which wry version Cargo resolves to; all wry 0.21.x
-# and 0.24.x versions have the same missing import.
-#
-# Current workaround: the CI compile check runs on macOS (WKWebView, no GTK).
-# The Linux release build uses tauri-apps/tauri-action@v0 which has its own
-# dependency management and may handle this differently.
-#
-# Long-term fix: migrate to Tauri 2.x (wry 0.39+, webkit2gtk 0.20+).
-# See ROADMAP: https://tauri.app/blog/tauri-2-0-0-released/
-#
-# ─────────────────────────────────────────────────────────────────────────────
-
 [features]
-# This feature is used for development builds.
 custom-protocol = ["tauri/custom-protocol"]
