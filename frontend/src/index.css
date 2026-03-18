@@ -1,0 +1,63 @@
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  --bg-0:        #0f1117;
+  --bg-1:        #161b27;
+  --bg-2:        #1e2535;
+  --bg-3:        #252e42;
+  --border:      #2e3a52;
+  --text-0:      #e8ecf4;
+  --text-1:      #a0aec0;
+  --text-2:      #64748b;
+  --accent:      #4f9cf9;
+  --accent-dark: #1d4ed8;
+  --success:     #10b981;
+  --warn:        #f59e0b;
+  --danger:      #ef4444;
+  --radius:      8px;
+  --shadow:      0 4px 24px rgba(0,0,0,.45);
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  background: var(--bg-0);
+  color: var(--text-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-1); }
+::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-2); }
+
+/* ── Utilities ──────────────────────────────────────────────────────────── */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mono     { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 11px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600;
+  background: var(--bg-3); color: var(--text-1);
+}
+.badge.accent  { background: #1d3a6e; color: var(--accent); }
+.badge.success { background: #064e3b; color: var(--success); }
+
+button {
+  cursor: pointer; border: none; border-radius: var(--radius);
+  font-size: 12px; font-weight: 500;
+  transition: opacity .15s, background .15s;
+}
+button:hover  { opacity: .88; }
+button:active { opacity: .75; }
+
+input, select {
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text-0); border-radius: var(--radius);
+  padding: 6px 10px; font-size: 12px; outline: none;
+  transition: border-color .15s;
+}
+input:focus, select:focus { border-color: var(--accent); }
