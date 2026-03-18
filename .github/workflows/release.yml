@@ -21,6 +21,22 @@
 #   APPLE_TEAM_ID                10-char team ID
 #   WINDOWS_CERTIFICATE          base64-encoded .pfx
 #   WINDOWS_CERTIFICATE_PASSWORD password for the .pfx
+#
+# ── Why beforeBuildCommand is overridden to "" ────────────────────────────────
+# tauri.conf.json sets:
+#   "beforeBuildCommand": "npm run build --prefix ../frontend"
+# That path (../frontend) is relative to src-tauri/ and works correctly when
+# running `cargo tauri build` locally from the repo root (Tauri CLI resolves
+# the path from src-tauri/).
+#
+# tauri-apps/tauri-action@v0 runs the beforeBuildCommand from the repo root,
+# making ../frontend resolve one level ABOVE the repo — a path that doesn't
+# exist on the runner (ENOENT on frontend/package.json).
+#
+# Fix: we build the React frontend ourselves in an explicit CI step before
+# calling tauri-action, then pass --config to override beforeBuildCommand to
+# an empty string so tauri-action does not attempt to rebuild the already-
+# built frontend dist.
 
 name: Release
 
@@ -65,9 +81,6 @@ jobs:
     runs-on: ${{ matrix.platform }}
     name: Build – ${{ matrix.rust_target }}
 
-    # ── Job-level env: evaluate secret presence here (allowed), then check  ──
-    # ── the resulting env var in step if: conditions (secrets context is     ──
-    # ── NOT available in step if: expressions — GitHub security restriction).──
     env:
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
 
@@ -101,6 +114,9 @@ jobs:
         run: npm ci
         working-directory: frontend
 
+      # Build the frontend dist explicitly here.
+      # tauri-action's beforeBuildCommand is overridden to "" below so it
+      # does not attempt to rebuild (and fail due to the ../frontend path issue).
       - name: Build React frontend
         run: npm run build
         working-directory: frontend
@@ -151,10 +167,7 @@ jobs:
             libssl-dev \
             libgtk-3-dev
 
-      # ── macOS codesigning (skipped when APPLE_CERTIFICATE secret absent) ──
-      # secrets context is forbidden in step if: expressions.
-      # Pattern: evaluate secret != '' in job-level env: → store as HAS_APPLE_CERT
-      # → check env.HAS_APPLE_CERT in the step if: (env context is always allowed).
+      # ── macOS codesigning (skipped when APPLE_CERTIFICATE secret is absent) ─
       - name: Import macOS certificate
         if: matrix.platform == 'macos-latest' && env.HAS_APPLE_CERT == 'true'
         env:
@@ -203,4 +216,8 @@ jobs:
             | Linux | `.AppImage` / `.deb` |
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.rust_target }}
+          # Override beforeBuildCommand to empty — the frontend dist was already
+          # built in the "Build React frontend" step above.  Without this override
+          # tauri-action runs beforeBuildCommand from the repo root, making the
+          # ../frontend path in tauri.conf.json resolve outside the repo (ENOENT).
+          args: --target ${{ matrix.rust_target }} --config '{"build":{"beforeBuildCommand":""}}'
