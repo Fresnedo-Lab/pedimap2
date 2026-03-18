@@ -65,6 +65,12 @@ jobs:
     runs-on: ${{ matrix.platform }}
     name: Build – ${{ matrix.rust_target }}
 
+    # ── Job-level env: evaluate secret presence here (allowed), then check  ──
+    # ── the resulting env var in step if: conditions (secrets context is     ──
+    # ── NOT available in step if: expressions — GitHub security restriction).──
+    env:
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -145,12 +151,12 @@ jobs:
             libssl-dev \
             libgtk-3-dev
 
-      # ── macOS codesigning (skipped when secrets are absent) ───────────────
-      # FIX: secrets context must be inside ${{ }} — bare `if:` block scalars
-      # (using |) do not evaluate the secrets context, causing the workflow
-      # parser to reject the file with "Unrecognized named-value: 'secrets'".
+      # ── macOS codesigning (skipped when APPLE_CERTIFICATE secret absent) ──
+      # secrets context is forbidden in step if: expressions.
+      # Pattern: evaluate secret != '' in job-level env: → store as HAS_APPLE_CERT
+      # → check env.HAS_APPLE_CERT in the step if: (env context is always allowed).
       - name: Import macOS certificate
-        if: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE != '' }}
+        if: matrix.platform == 'macos-latest' && env.HAS_APPLE_CERT == 'true'
         env:
           APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
