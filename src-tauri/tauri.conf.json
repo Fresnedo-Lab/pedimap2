@@ -55,9 +55,9 @@
       ],
       "identifier":       "org.fresnedo-lab.pedimap2",
       "copyright":        "© 2025 Fresnedo-Lab. MIT License.",
-      "category":         "Science",
-      "shortDescription": "Pedigree visualisation for plant breeders",
-      "longDescription":  "Pedimap 2 is a modern multiplatform desktop application for visualising genetic and phenotypic data in plant breeding pedigrees. Successor to Pedimap 1.x (Voorrips et al. 2012, J. Hered.).",
+      "category":         "Education",
+      "shortDescription": "Pedigree visualization for plant breeders",
+      "longDescription":  "Pedimap 2 is a modern multiplatform desktop application for visualizing genetic and phenotypic data in plant breeding pedigrees. Successor to Pedimap 1.x (Voorrips et al. 2012, J. Hered.).",
       "externalBin":      ["../backend/dist/pedimap-backend"],
       "resources":        [],
 
