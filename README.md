@@ -14,7 +14,7 @@
 | Feature | Description |
 |---------|-------------|
 | **Interactive pedigree DAG** | Pan, zoom, drag — vis-network powered canvas |
-| **Trait colouring** | Continuous gradient or qualitative palette per phenotype |
+| **Trait coloring** | Continuous gradient or qualitative palette per phenotype |
 | **Subpopulation builder** | Focal individual + ancestors / descendants / siblings |
 | **Click-to-inspect** | Full detail card: parents, traits, SSR markers, stats |
 | **`.dat` / `.pmp` import** | Full backward compatibility with original Pedimap datasets |
@@ -37,7 +37,7 @@ Download the latest installer for your platform from the
 | Linux x86_64           | `pedimap2_*_amd64.AppImage` |
 
 > **macOS note:** On first launch, right-click the app → Open to bypass Gatekeeper
-> (unsigned build). For signed/notarised builds, set the `APPLE_*` secrets in your fork.
+> (unsigned build). For signed/notarized builds, set the `APPLE_*` secrets in your fork.
 >
 > **Linux note:** Mark the AppImage executable before running:
 > `chmod +x pedimap2_*.AppImage && ./pedimap2_*.AppImage`
@@ -78,7 +78,7 @@ Download the latest installer for your platform from the
 |------------|----------|---------|
 | Python     | ≥ 3.10   | [python.org](https://python.org) |
 | Node.js    | ≥ 18     | [nodejs.org](https://nodejs.org) |
-| Rust       | stable   | `curl https://sh.rustup.rs -sSf | sh` |
+| Rust       | stable   | `curl https://sh.rustup.rs -sSf \| sh` |
 | Tauri CLI  | ≥ 1.6    | `cargo install tauri-cli` |
 
 ```bash
@@ -93,9 +93,9 @@ pip install -r backend/requirements.txt
 cd frontend && npm install && cd ..
 
 # 4. Dev mode (hot-reload)
-#    Terminal A:
+#    Terminal A — Python backend:
 cd backend && python api.py
-#    Terminal B:
+#    Terminal B — Tauri dev window:
 cargo tauri dev
 ```
 
@@ -116,8 +116,8 @@ cargo tauri build
 # Installers appear in:  src-tauri/target/release/bundle/
 ```
 
-Or just push a version tag — the GitHub Actions release workflow will build
-all three platforms automatically:
+Or push a version tag to trigger the GitHub Actions release workflow, which
+builds all platforms automatically:
 
 ```bash
 git tag v2.0.1 && git push origin v2.0.1
@@ -131,7 +131,7 @@ git tag v2.0.1 && git push origin v2.0.1
 | Extension | Description |
 |-----------|-------------|
 | `.dat`    | Original Pedimap data file (pedigree + traits + markers + IBD) |
-| `.pmp`    | Pedimap project file (references a `.dat`, adds subpop metadata) |
+| `.pmp`    | Pedimap project file (references a `.dat`, adds subpopulation metadata) |
 | `.json`   | Pedimap 2 native JSON format |
 
 ### Output
@@ -144,12 +144,22 @@ git tag v2.0.1 && git push origin v2.0.1
 
 ## 🗺 Roadmap
 
-- [ ] IBD probability chromosome strip visualisation
+### Planned features
+- [ ] IBD probability chromosome strip visualization
 - [ ] BrAPI integration (pull pedigrees from BreedBase / GRIN)
 - [ ] Multi-trait comparison view
 - [ ] Export to SVG / PDF
 - [ ] Automatic update delivery (Tauri updater)
-- [ ] macOS notarisation in CI
+- [ ] macOS notarization in CI
+
+### Framework migration
+- [ ] **Migrate to Tauri 2.x** — Tauri 2.0 was released in October 2024 and
+      introduces a rewritten plugin system, improved security model, and full
+      mobile support (iOS / Android). It also ships with wry 0.39+ and
+      webkit2gtk 0.20+, which permanently resolves the Linux webkit2gtk
+      compilation incompatibility present in Tauri 1.x. Migration is planned
+      as the next major infrastructure update. See the official guide at
+      https://tauri.app/blog/tauri-2-0-0-released/ for details.
 
 ---
 
@@ -161,7 +171,7 @@ If you use Pedimap 2 in published research, please cite:
 > visualization of genetic and phenotypic data in pedigrees. *J. Hered.* 103:903–907.
 > doi:10.1093/jhered/ess060
 
-> Fresnedo-Lab (2025) Pedimap 2: modern multiplatform pedigree visualisation for
+> Fresnedo-Lab (2025) Pedimap 2: modern multiplatform pedigree visualization for
 > plant breeding. https://github.com/Fresnedo-Lab/pedimap2
 
 ---
@@ -175,5 +185,6 @@ MIT — see [LICENSE](LICENSE).
 ## Acknowledgements
 
 Pedimap 2 is a ground-up reimplementation inspired by the original Pedimap 1.x
-by Roeland Voorrips, Marco Bink and Eric van de Weg (Wageningen University & Research).
-We gratefully acknowledge their foundational work and the Pedimap community.
+by Roeland Voorrips, Marco Bink, and Eric van de Weg (Wageningen University &
+Research). We gratefully acknowledge their foundational work and the Pedimap
+community.

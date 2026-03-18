@@ -13,7 +13,7 @@ maintained by [Fresnedo-Lab](https://github.com/Fresnedo-Lab).
 |------------|-----------|---------|
 | Python     | ≥ 3.10    | [python.org](https://www.python.org) |
 | Node.js    | ≥ 18      | [nodejs.org](https://nodejs.org) |
-| Rust       | stable    | `curl https://sh.rustup.rs -sSf | sh` |
+| Rust       | stable    | `curl https://sh.rustup.rs -sSf \| sh` |
 | Tauri CLI  | ≥ 1.6     | `cargo install tauri-cli` |
 
 ### 1 — Clone the repository
@@ -59,7 +59,8 @@ pedimap2/
 │   ├── pmp_parser.py         .dat / .pmp format parser
 │   ├── sample_data.py        Demo apple breeding dataset
 │   ├── requirements.txt      Python dependencies
-│   └── pedimap_backend.spec  PyInstaller bundle spec
+│   ├── pedimap_backend.spec  PyInstaller bundle spec
+│   └── tests/                Unit tests (pytest)
 │
 ├── frontend/                 React 18 + TypeScript frontend
 │   ├── src/
@@ -106,13 +107,36 @@ pedimap2/
 
 ---
 
+## Writing tests
+
+Backend tests live in `backend/tests/` and run with pytest. Add a new file
+`test_<feature>.py` for each area you are testing. Keep tests focused and
+independent — each test function should set up its own data rather than
+relying on global state.
+
+```bash
+# Run all backend tests locally
+pip install pytest
+python -m pytest backend/tests/ -v --tb=short
+```
+
+---
+
 ## Releasing a new version
 
-1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
+1. Bump the version in `frontend/package.json`, `src-tauri/Cargo.toml`, and
+   `src-tauri/tauri.conf.json` — all three must match.
 2. Commit: `git commit -m "chore: bump version to vX.Y.Z"`
-3. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
-4. The `release.yml` workflow will automatically build installers for all
-   platforms and create a GitHub Release draft.
+3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`
+4. The `release.yml` workflow builds installers for all platforms and creates
+   a GitHub Release draft automatically.
+
+---
+
+## Spelling convention
+
+All documentation and code comments in this repository use **American English**
+(e.g. *visualization*, *coloring*, *notarized*, *artifact*).
 
 ---
 
@@ -125,5 +149,5 @@ and this repository:
 > visualization of genetic and phenotypic data in pedigrees. *J. Hered.* 103:903–907.
 > doi:10.1093/jhered/ess060
 
-> Fresnedo-Lab (2025) Pedimap 2: multiplatform pedigree visualisation.
+> Fresnedo-Lab (2025) Pedimap 2: multiplatform pedigree visualization.
 > https://github.com/Fresnedo-Lab/pedimap2
