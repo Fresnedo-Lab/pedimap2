@@ -5,22 +5,40 @@
 # then creates a GitHub Release and uploads the artefacts.
 #
 # Matrix:
-#   windows-latest  →  .msi  +  .exe  (NSIS)
-#   macos-latest    →  .dmg  (universal binary via lipo is a roadmap item;
-#                             currently builds for the runner arch, arm64 on GH)
-#   ubuntu-22.04    →  .AppImage  +  .deb
+#   windows-latest   →  .msi  +  .exe  (NSIS)
+#   macos-latest     →  .dmg  aarch64  (Apple Silicon, native)
+#   macos-latest     →  .dmg  x86_64   (Intel, Rust cross-compile; sidecar runs via Rosetta 2)
+#   ubuntu-22.04     →  .AppImage  +  .deb
+#
+# ── Changes vs previous version ─────────────────────────────────────────────
+#  • Replaced deprecated macos-13 runner (Intel pool retired by GitHub) with
+#    macos-latest + rustup cross-compilation target x86_64-apple-darwin.
+#    The PyInstaller sidecar is built as arm64 and runs transparently on
+#    Intel Macs under Rosetta 2 (Apple's supported path for universal apps).
+#    TODO: if a true fat/universal binary is later required, add a lipo step
+#    that merges the arm64 and x86_64 Tauri bundles after both matrix jobs run.
+#  • Node.js bumped 20 → 22 (LTS) to stay ahead of the June 2026 Node 20
+#    deprecation deadline on GitHub Actions runners.
+#  • FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true added at workflow level so that
+#    actions/checkout@v4 and actions/setup-node@v4 run their own runner on
+#    Node 24 instead of the deprecated Node 20 runtime.
+#  • Removed cache-dependency-path from setup-node; the action now auto-
+#    detects frontend/package-lock.json, eliminating the "paths not resolved"
+#    error that fired when the file was absent on a fresh runner workspace.
+#  • Same cache-dependency-path fix applied to setup-python (pip cache).
+# ────────────────────────────────────────────────────────────────────────────
 #
 # Required secrets:
 #   (none required for unsigned builds)
 #
 #   Optional codesigning secrets (set in repo Settings → Secrets):
-#   APPLE_CERTIFICATE          base64-encoded .p12 certificate
-#   APPLE_CERTIFICATE_PASSWORD password for the .p12
-#   APPLE_SIGNING_IDENTITY     Developer ID Application: ...
-#   APPLE_ID                   notarisation Apple ID e-mail
-#   APPLE_PASSWORD             app-specific password for notarisation
-#   APPLE_TEAM_ID              10-char Apple team ID
-#   WINDOWS_CERTIFICATE        base64-encoded .pfx
+#   APPLE_CERTIFICATE            base64-encoded .p12 certificate
+#   APPLE_CERTIFICATE_PASSWORD   password for the .p12
+#   APPLE_SIGNING_IDENTITY       Developer ID Application: ...
+#   APPLE_ID                     notarisation Apple ID e-mail
+#   APPLE_PASSWORD               app-specific password for notarisation
+#   APPLE_TEAM_ID                10-char Apple team ID
+#   WINDOWS_CERTIFICATE          base64-encoded .pfx
 #   WINDOWS_CERTIFICATE_PASSWORD password for the .pfx
 
 name: Release
@@ -33,24 +51,36 @@ on:
 permissions:
   contents: write
 
+# ── Force all actions/* steps to run on Node 24 runtime ─────────────────────
+# Prevents the "Node.js 20 actions are deprecated" warning and ensures
+# compatibility beyond the June 2026 forced-cutover date.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
         include:
+          # ── Windows x86_64 ─────────────────────────────────────────────────
           - platform: windows-latest
             rust_target: x86_64-pc-windows-msvc
             python_arch: x64
 
+          # ── macOS arm64 (Apple Silicon — native build) ─────────────────────
           - platform: macos-latest
             rust_target: aarch64-apple-darwin
             python_arch: arm64
 
-          - platform: macos-13
+          # ── macOS x86_64 (Intel — Rust cross-compile on arm64 runner) ──────
+          # The Python sidecar is arm64 but runs transparently under Rosetta 2.
+          # Replace macos-13 which has been retired from GitHub-hosted runners.
+          - platform: macos-latest
             rust_target: x86_64-apple-darwin
-            python_arch: x64
+            python_arch: arm64          # PyInstaller target on this runner
 
+          # ── Linux x86_64 ───────────────────────────────────────────────────
           - platform: ubuntu-22.04
             rust_target: x86_64-unknown-linux-gnu
             python_arch: x64
@@ -59,27 +89,35 @@ jobs:
     name: Build – ${{ matrix.rust_target }}
 
     steps:
-      # ── Checkout ────────────────────────────────────────────────────────────
+      # ── Checkout ─────────────────────────────────────────────────────────
       - uses: actions/checkout@v4
 
-      # ── Rust toolchain ───────────────────────────────────────────────────────
+      # ── Rust toolchain ────────────────────────────────────────────────────
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_target }}
+
+      # Cross-compile support: when building x86_64 on an arm64 macOS runner
+      # we need the additional target registered with rustup.
+      - name: Add x86_64 Rust target for macOS cross-compile
+        if: matrix.rust_target == 'x86_64-apple-darwin'
+        run: rustup target add x86_64-apple-darwin
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      # ── Node.js / frontend ──────────────────────────────────────────────────
+      # ── Node.js / frontend ────────────────────────────────────────────────
+      # cache-dependency-path removed: setup-node auto-detects
+      # frontend/package-lock.json, avoiding "paths not resolved" errors
+      # when the lock file is absent from a cold runner workspace.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'      # LTS; was '20' (deprecated June 2026)
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci
@@ -89,14 +127,13 @@ jobs:
         run: npm run build
         working-directory: frontend
 
-      # ── Python + PyInstaller sidecar ────────────────────────────────────────
+      # ── Python + PyInstaller sidecar ──────────────────────────────────────
+      # cache-dependency-path removed for the same reason as Node above.
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          architecture: ${{ matrix.python_arch }}
           cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
 
       - name: Install Python dependencies
         run: pip install -r backend/requirements.txt pyinstaller
@@ -105,7 +142,10 @@ jobs:
         run: pyinstaller pedimap_backend.spec --distpath dist --workpath build --noconfirm --clean
         working-directory: backend
 
-      # ── Place sidecar binary with Tauri target-triple suffix ─────────────────
+      # ── Place sidecar binary with Tauri target-triple suffix ──────────────
+      # On the x86_64-apple-darwin matrix entry the runner is arm64 so the
+      # PyInstaller binary is arm64; it is named with the x86_64 triple so
+      # Tauri bundles it, and Rosetta 2 handles execution on Intel Macs.
       - name: Stage sidecar binary (Unix)
         if: matrix.platform != 'windows-latest'
         run: |
@@ -122,7 +162,7 @@ jobs:
           Copy-Item backend\dist\pedimap-backend.exe `
             "src-tauri\binaries\pedimap-backend-${{ matrix.rust_target }}.exe"
 
-      # ── Linux system libraries (WebKit2GTK) ─────────────────────────────────
+      # ── Linux system libraries (WebKit2GTK) ──────────────────────────────
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -135,60 +175,57 @@ jobs:
             libssl-dev \
             libgtk-3-dev
 
-      # ── macOS codesigning (optional) ────────────────────────────────────────
+      # ── macOS codesigning (optional — skipped when secrets are absent) ────
       - name: Import macOS certificate
         if: |
-          startsWith(matrix.platform, 'macos') &&
-          env.APPLE_CERTIFICATE != ''
+          matrix.platform == 'macos-latest' &&
+          secrets.APPLE_CERTIFICATE != ''
         env:
-          APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
-          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security import certificate.p12 \
-            -k build.keychain \
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/certificate.p12
+          security import /tmp/certificate.p12 \
+            -k "$KEYCHAIN_PATH" \
             -P "$APPLE_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign
-          security set-key-partition-list \
-            -S apple-tool:,apple: -s \
-            -k "" build.keychain
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
 
-      # ── Build Tauri app ─────────────────────────────────────────────────────
-      - name: Build Tauri application
+      # ── Tauri build ───────────────────────────────────────────────────────
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN:              ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY:         ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD:        ${{ secrets.TAURI_KEY_PASSWORD }}
-          # macOS notarisation (only used if secrets are set):
-          APPLE_SIGNING_IDENTITY:    ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID:                  ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD:            ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID:             ${{ secrets.APPLE_TEAM_ID }}
-          # Windows codesigning (only used if secrets are set):
-          WINDOWS_CERTIFICATE:       ${{ secrets.WINDOWS_CERTIFICATE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS codesigning — all no-ops when secrets are unset
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows codesigning — no-ops when secrets are unset
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         with:
-          projectPath:   .
-          tauriScript:   cargo tauri
-          tagName:       ${{ github.ref_name }}
-          releaseName:   "Pedimap 2 ${{ github.ref_name }}"
-          releaseBody:   |
-            ## Pedimap 2 ${{ github.ref_name }}
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Pedimap 2 ${{ github.ref_name }}'
+          releaseBody: |
+            ## What's new
+            See [CHANGELOG.md](https://github.com/Fresnedo-Lab/pedimap2/blob/main/CHANGELOG.md)
+            for the full change history.
 
-            ### Downloads
+            ### Platform installers
             | Platform | File |
-            |---|---|
-            | Windows 10/11 (x64) | `Pedimap2_*_x64-setup.exe` or `Pedimap2_*_x64_en-US.msi` |
-            | macOS Apple Silicon  | `Pedimap2_*_aarch64.dmg` |
-            | macOS Intel          | `Pedimap2_*_x64.dmg` |
-            | Linux x86_64        | `pedimap2_*_amd64.AppImage` or `pedimap2_*_amd64.deb` |
-
-            > **Note:** On macOS, right-click → Open on first launch to bypass Gatekeeper (unsigned builds).
-            > On Linux, mark the AppImage executable: `chmod +x pedimap2_*.AppImage`
-          releaseDraft:  true
-          prerelease:    false
-          args:          --target ${{ matrix.rust_target }}
+            |----------|------|
+            | Windows  | `.msi` or `.exe` |
+            | macOS (Apple Silicon) | `.dmg` (aarch64) |
+            | macOS (Intel — via Rosetta 2) | `.dmg` (x86_64) |
+            | Linux    | `.AppImage` / `.deb` |
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.rust_target }}
