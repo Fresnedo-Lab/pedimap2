@@ -1,42 +1,36 @@
 # .github/workflows/release.yml
 # ================================
 # Triggered on every push of a version tag (v*.*.*).
-# Builds native installers for all platforms in parallel,
+# Builds native installers for Windows and macOS in parallel,
 # then creates a GitHub Release draft and uploads the artifacts.
 #
-# Matrix:
+# ── Platform matrix ──────────────────────────────────────────────────────────
 #   windows-latest   →  .msi  +  .exe  (NSIS)
 #   macos-latest     →  .dmg  aarch64  (Apple Silicon, native)
-#   macos-latest     →  .dmg  x86_64   (Intel, Rust cross-compile; sidecar runs via Rosetta 2)
-#   ubuntu-22.04     →  .AppImage  +  .deb
+#   macos-latest     →  .dmg  x86_64   (Intel, Rust cross-compile)
+#
+# ── Linux status ─────────────────────────────────────────────────────────────
+#   Linux is temporarily excluded from the release matrix.
+#   Root cause: Tauri 1.x bundles wry 0.24.x, which calls webkit2gtk Settings
+#   methods without importing the SettingsExt trait.  On Ubuntu 22.04 runners
+#   with libwebkit2gtk-4.0 ≥ 2.40, the webkit2gtk Rust bindings generate code
+#   where these methods require an explicit trait import that wry doesn't have.
+#   This is a known Tauri 1.x incompatibility with no available patch.
+#   Fix: migrate to Tauri 2.x (wry 0.39+, webkit2gtk 0.20+).
+#   Tracked in: https://github.com/Fresnedo-Lab/pedimap2/blob/main/README.md#roadmap
+#
+# ── externalBin path note ─────────────────────────────────────────────────────
+#   tauri.conf.json declares: "externalBin": ["../backend/dist/pedimap-backend"]
+#   tauri-build resolves that relative to src-tauri/ and appends the target
+#   triple, so it looks for:  backend/dist/pedimap-backend-{triple}
+#   The staging steps below copy the PyInstaller binary to that exact path.
+#   (src-tauri/binaries/ is for shell.sidecar, NOT externalBin — different feature.)
 #
 # Required secrets: none (for unsigned builds)
-#
 # Optional codesigning secrets (Settings → Secrets → Actions):
-#   APPLE_CERTIFICATE            base64-encoded .p12 certificate
-#   APPLE_CERTIFICATE_PASSWORD   password for the .p12
-#   APPLE_SIGNING_IDENTITY       Developer ID Application: ...
-#   APPLE_ID                     notarization Apple ID email
-#   APPLE_PASSWORD               app-specific password for notarization
-#   APPLE_TEAM_ID                10-char team ID
-#   WINDOWS_CERTIFICATE          base64-encoded .pfx
-#   WINDOWS_CERTIFICATE_PASSWORD password for the .pfx
-#
-# ── Why beforeBuildCommand is overridden to "" ────────────────────────────────
-# tauri.conf.json sets:
-#   "beforeBuildCommand": "npm run build --prefix ../frontend"
-# That path (../frontend) is relative to src-tauri/ and works correctly when
-# running `cargo tauri build` locally from the repo root (Tauri CLI resolves
-# the path from src-tauri/).
-#
-# tauri-apps/tauri-action@v0 runs the beforeBuildCommand from the repo root,
-# making ../frontend resolve one level ABOVE the repo — a path that doesn't
-# exist on the runner (ENOENT on frontend/package.json).
-#
-# Fix: we build the React frontend ourselves in an explicit CI step before
-# calling tauri-action, then pass --config to override beforeBuildCommand to
-# an empty string so tauri-action does not attempt to rebuild the already-
-# built frontend dist.
+#   APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD / APPLE_SIGNING_IDENTITY
+#   APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID
+#   WINDOWS_CERTIFICATE / WINDOWS_CERTIFICATE_PASSWORD
 
 name: Release
 
@@ -72,11 +66,6 @@ jobs:
           - platform: macos-latest
             rust_target: x86_64-apple-darwin
             python_arch: arm64
-
-          # ── Linux x86_64 ───────────────────────────────────────────────────
-          - platform: ubuntu-22.04
-            rust_target: x86_64-unknown-linux-gnu
-            python_arch: x64
 
     runs-on: ${{ matrix.platform }}
     name: Build – ${{ matrix.rust_target }}
@@ -114,9 +103,6 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      # Build the frontend dist explicitly here.
-      # tauri-action's beforeBuildCommand is overridden to "" below so it
-      # does not attempt to rebuild (and fail due to the ../frontend path issue).
       - name: Build React frontend
         run: npm run build
         working-directory: frontend
@@ -137,35 +123,27 @@ jobs:
         run: pyinstaller pedimap_backend.spec --distpath dist --workpath build --noconfirm --clean
         working-directory: backend
 
-      # ── Stage sidecar binary ──────────────────────────────────────────────
+      # ── Stage sidecar binary at the externalBin path ──────────────────────
+      # tauri.conf.json: "externalBin": ["../backend/dist/pedimap-backend"]
+      # tauri-build resolves ../backend/dist/ relative to src-tauri/, appends
+      # the target triple, and checks the resulting path exists:
+      #   backend/dist/pedimap-backend-{triple}          (Unix)
+      #   backend/dist/pedimap-backend-{triple}.exe      (Windows)
+      # PyInstaller already outputs to backend/dist/pedimap-backend[.exe],
+      # so we just create the triple-suffixed copy in the same directory.
       - name: Stage sidecar binary (Unix)
         if: matrix.platform != 'windows-latest'
         run: |
-          mkdir -p src-tauri/binaries
           cp backend/dist/pedimap-backend \
-             "src-tauri/binaries/pedimap-backend-${{ matrix.rust_target }}"
-          chmod +x "src-tauri/binaries/pedimap-backend-${{ matrix.rust_target }}"
+             "backend/dist/pedimap-backend-${{ matrix.rust_target }}"
+          chmod +x "backend/dist/pedimap-backend-${{ matrix.rust_target }}"
 
       - name: Stage sidecar binary (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force src-tauri/binaries | Out-Null
           Copy-Item backend\dist\pedimap-backend.exe `
-            "src-tauri\binaries\pedimap-backend-${{ matrix.rust_target }}.exe"
-
-      # ── Linux system libraries ────────────────────────────────────────────
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.0-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            libgtk-3-dev
+            "backend\dist\pedimap-backend-${{ matrix.rust_target }}.exe"
 
       # ── macOS codesigning (skipped when APPLE_CERTIFICATE secret is absent) ─
       - name: Import macOS certificate
@@ -187,6 +165,9 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
       # ── Tauri build ───────────────────────────────────────────────────────
+      # beforeBuildCommand is overridden to "" because the frontend dist was
+      # already built above; tauri-action runs beforeBuildCommand from the repo
+      # root where --prefix ../frontend resolves outside the repo (ENOENT).
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -213,11 +194,12 @@ jobs:
             | Windows  | `.msi` or `.exe` |
             | macOS (Apple Silicon) | `.dmg` (aarch64) |
             | macOS (Intel — via Rosetta 2) | `.dmg` (x86_64) |
-            | Linux | `.AppImage` / `.deb` |
+
+            > **Linux:** Native `.AppImage` / `.deb` installers are temporarily
+            > unavailable due to a Tauri 1.x / webkit2gtk incompatibility on
+            > current Ubuntu runners. Linux support will be restored with the
+            > planned migration to Tauri 2.x. See the
+            > [roadmap](https://github.com/Fresnedo-Lab/pedimap2#roadmap) for details.
           releaseDraft: true
           prerelease: false
-          # Override beforeBuildCommand to empty — the frontend dist was already
-          # built in the "Build React frontend" step above.  Without this override
-          # tauri-action runs beforeBuildCommand from the repo root, making the
-          # ../frontend path in tauri.conf.json resolve outside the repo (ENOENT).
           args: --target ${{ matrix.rust_target }} --config '{"build":{"beforeBuildCommand":""}}'
