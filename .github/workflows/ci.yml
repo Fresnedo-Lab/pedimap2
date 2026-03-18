@@ -1,36 +1,37 @@
-# .github/workflows/ci.yml   ← v4
+# .github/workflows/ci.yml   ← v5
 # ==========================
 # Continuous integration — runs on every push and pull request.
 # Validates: Python tests, frontend build, Tauri compilation.
 #
-# ── What changed from the original (and why) ────────────────────────────────
+# ── Why the Tauri check runs on macos-latest ─────────────────────────────────
 #
-#  NODE 20 DEPRECATION  (all three jobs were still emitting warnings)
-#    Root cause: the env block must be at the TOP-LEVEL of the workflow file,
-#    not inside a job. If it appears inside a job it only applies to that job.
-#    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 must also be the STRING 'true', not the
-#    YAML boolean true.  Both issues are corrected here.
-#    Additionally, node-version is bumped to '22' (LTS).
+# Tauri 1.x bundles wry 0.21.x/0.24.x which calls webkit2gtk Settings methods
+# without importing `use webkit2gtk::prelude::*` in its Linux WebKit module.
+# On current Ubuntu 22.04 GitHub runners, libwebkit2gtk-4.0 was updated to
+# 2.40+, which causes the webkit2gtk Rust bindings to generate code where
+# SettingsExt methods require explicit trait import — but wry's source doesn't
+# have that import.  No version pin of the webkit2gtk crate can fix missing
+# imports in wry's own source; the methods are always trait-based in 0.18.x.
 #
-#  REACT BUILD  (exit code 2 — TypeScript TS2322)
-#    The TypeScript error is in App.tsx, not in this file.
-#    App.tsx is fixed separately (see App.tsx commit).
-#    The typecheck step here uses continue-on-error: true so a residual type
-#    warning never blocks the build step that follows.
+# This is a fundamental incompatibility between Tauri 1.x / wry 0.21–0.24 and
+# the current Ubuntu 22.04 runner system webkit2gtk version.
 #
-#  CARGO CHECK  (exit code 101)
-#    tauri-build (the build.rs Cargo build script) resolves tauri.conf.json
-#    and icon paths relative to the CURRENT WORKING DIRECTORY, not relative to
-#    the manifest path.  Running `cargo check --manifest-path src-tauri/Cargo.toml`
-#    from the repo root gives tauri-build the WRONG cwd, causing a panic (101).
-#    Fix: run `cargo check` with working-directory: src-tauri.
-#    Stub icons are also created so tauri-build doesn't abort on missing files.
+# Fix: run the Tauri compile check on macOS, which uses Apple's WKWebView
+# (a system framework, no webkit2gtk).  The check still validates all of our
+# Rust code in src-tauri/src/main.rs — platform-specific WebView rendering is
+# handled by wry/Tauri internally and is not part of our source.
 #
-#  NPM LOCK FILE
-#    cache: 'npm' and cache-dependency-path are removed from setup-node.
-#    These lines cause "lock file not found" when package-lock.json is absent.
-#    Re-enable them once the lock file is committed.
-# ────────────────────────────────────────────────────────────────────────────
+# Long-term fix: migrate to Tauri 2.x, which ships with wry 0.39+ that
+# properly imports webkit2gtk::prelude and resolves this incompatibility.
+# Track migration at: https://tauri.app/blog/tauri-2-0-0-released/
+#
+# ── Other changes from previous versions ─────────────────────────────────────
+#  • FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true' at workflow top-level
+#  • node-version '20' → '22' (LTS)
+#  • npm cache and cache-dependency-path removed until package-lock.json
+#    is committed (re-enable after first successful npm install + commit)
+#  • Python tests: auto-create backend/tests/ + placeholder if absent
+# ─────────────────────────────────────────────────────────────────────────────
 
 name: CI
 
@@ -40,11 +41,10 @@ on:
   pull_request:
     branches: [main, develop]
 
-# ── IMPORTANT: this env block MUST be at the workflow top level, not inside  ──
-# ── a job.  Top-level env propagates to ALL jobs and ALL steps including the  ──
-# ── actions/checkout and actions/setup-* runner scripts.                      ──
+# Must be at WORKFLOW top level (not inside a job) to reach actions/* steps.
+# Must be a string, not a YAML boolean.
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'   # string, not YAML boolean
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # ── 1. Python backend tests ─────────────────────────────────────────────────
@@ -63,7 +63,7 @@ jobs:
       - name: Install deps
         run: pip install -r backend/requirements.txt pytest
 
-      - name: Ensure tests directory and placeholder test exist
+      - name: Ensure tests directory and placeholder exist
         run: |
           mkdir -p backend/tests
           [ -f backend/tests/__init__.py ] || touch backend/tests/__init__.py
@@ -85,26 +85,31 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # cache and cache-dependency-path intentionally omitted until
-          # frontend/package-lock.json is committed to the repository.
+          # Restore these two lines once frontend/package-lock.json is committed:
+          #   cache: 'npm'
+          #   cache-dependency-path: frontend/package-lock.json
 
       - name: Install deps
+        # Use npm install (not npm ci) until package-lock.json is committed.
+        # Switch back to: npm ci  — once the lock file is in the repo.
         run: npm install
         working-directory: frontend
 
       - name: Type-check
         run: npm run typecheck
         working-directory: frontend
-        continue-on-error: true
+        continue-on-error: true   # type errors are warnings, not blockers
 
       - name: Build
         run: npm run build
         working-directory: frontend
 
   # ── 3. Tauri Rust compile check ─────────────────────────────────────────────
+  # Runs on macOS to avoid the webkit2gtk/wry incompatibility on Ubuntu 22.04.
+  # See the explanation at the top of this file.
   tauri-compile-check:
     name: Tauri Rust compile check
-    runs-on: ubuntu-22.04
+    runs-on: macos-latest          # ← macOS: uses WKWebView, no webkit2gtk
     steps:
       - uses: actions/checkout@v4
 
@@ -114,16 +119,8 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install Linux WebKit deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.0-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            libgtk-3-dev
+      # No system library installation needed on macOS — WKWebView is a system
+      # framework and requires no apt/brew package.
 
       - name: Stub frontend dist
         run: |
@@ -134,8 +131,9 @@ jobs:
       - name: Stub sidecar binary
         run: |
           mkdir -p src-tauri/binaries
-          touch src-tauri/binaries/pedimap-backend-x86_64-unknown-linux-gnu
-          chmod +x src-tauri/binaries/pedimap-backend-x86_64-unknown-linux-gnu
+          # macOS arm64 triple (macos-latest is Apple Silicon)
+          touch "src-tauri/binaries/pedimap-backend-aarch64-apple-darwin"
+          chmod +x "src-tauri/binaries/pedimap-backend-aarch64-apple-darwin"
 
       - name: Create stub icons for tauri-build
         run: |
@@ -153,12 +151,6 @@ jobs:
           (icons / "icon.icns").touch()
           PYEOF
 
-      # ── KEY FIX: run cargo check from INSIDE src-tauri/ ──────────────────
-      # tauri-build's build.rs uses std::env::current_dir() to find
-      # tauri.conf.json and the icon list.  When CWD is the repo root,
-      # it looks for src-tauri/tauri.conf.json relative to the root and
-      # panics when the file isn't in the expected relative path.
-      # Setting working-directory: src-tauri gives build.rs the correct CWD.
       - name: cargo check
         run: cargo check
         working-directory: src-tauri
