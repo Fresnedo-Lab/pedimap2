@@ -1,6 +1,6 @@
 # 🌿 Pedimap 2
 
-> **Modern multiplatform pedigree visualisation for plant breeders.**
+> **Modern multiplatform pedigree visualization for plant breeders.**
 > Spiritual successor to [Pedimap 1.x](https://www.wur.nl/en/Research-Results/Research-Institutes/plant-research/biometris/software/Pedimap.htm) (Voorrips *et al.* 2012, *J. Hered.*).
 
 [![CI](https://github.com/Fresnedo-Lab/pedimap2/actions/workflows/ci.yml/badge.svg)](https://github.com/Fresnedo-Lab/pedimap2/actions/workflows/ci.yml)
