@@ -1,23 +1,20 @@
-# .github/workflows/ci.yml   ← v6
+# .github/workflows/ci.yml   ← v7  (post lock-file commit)
 # ==========================
 # Continuous integration — runs on every push and pull request.
 # Validates: Python tests, frontend build, Tauri compilation.
 #
-# ── Changelog ────────────────────────────────────────────────────────────────
-#  v6  Fix sidecar stub path.
-#      tauri.conf.json declares externalBin: ["../backend/dist/pedimap-backend"]
-#      tauri-build resolves this relative to src-tauri/ and appends the target
-#      triple, so it checks for:
-#        <repo-root>/backend/dist/pedimap-backend-aarch64-apple-darwin
-#      Previous versions stubbed the file at src-tauri/binaries/ (wrong dir).
-#      The binaries/ directory is used by Tauri's sidecar COMMAND feature;
-#      externalBin uses the raw path from tauri.conf.json directly.
+# Prerequisites for this version:
+#   • frontend/package-lock.json committed  → npm ci + cache enabled
+#   • backend/tests/ committed              → no auto-generation needed
 #
-#  v5  Moved tauri compile check to macos-latest (avoids webkit2gtk/wry bug).
-#  v4  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 at workflow top-level (not job level).
-#      node-version 20 → 22. npm cache removed until lock file is committed.
-#  v3  Python tests: auto-create backend/tests/ + placeholder.
-#      cargo check runs with working-directory: src-tauri.
+# ── Changelog ────────────────────────────────────────────────────────────────
+#  v7  npm install → npm ci; npm cache re-enabled now that package-lock.json
+#      is committed. backend/tests/ placeholder generation removed (files are
+#      now committed permanently). American English throughout.
+#  v6  Stub externalBin at backend/dist/ (not src-tauri/binaries/).
+#  v5  Tauri compile check moved to macos-latest (webkit2gtk/wry workaround).
+#  v4  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 at workflow top-level; Node 22.
+#  v3  cargo check runs with working-directory: src-tauri.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: CI
@@ -48,15 +45,6 @@ jobs:
       - name: Install deps
         run: pip install -r backend/requirements.txt pytest
 
-      - name: Ensure tests directory and placeholder exist
-        run: |
-          mkdir -p backend/tests
-          [ -f backend/tests/__init__.py ] || touch backend/tests/__init__.py
-          if [ ! -f backend/tests/test_smoke.py ]; then
-            printf 'def test_placeholder():\n    assert True\n' \
-              > backend/tests/test_smoke.py
-          fi
-
       - name: Run unit tests
         run: python -m pytest backend/tests/ -v --tb=short
 
@@ -70,12 +58,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # Restore once frontend/package-lock.json is committed:
-          #   cache: 'npm'
-          #   cache-dependency-path: frontend/package-lock.json
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install deps
-        run: npm install      # switch to: npm ci  once lock file is committed
+        run: npm ci
         working-directory: frontend
 
       - name: Type-check
@@ -88,7 +75,9 @@ jobs:
         working-directory: frontend
 
   # ── 3. Tauri Rust compile check ─────────────────────────────────────────────
-  # Runs on macos-latest — avoids the webkit2gtk/wry incompatibility on Ubuntu.
+  # Runs on macos-latest to avoid the webkit2gtk / wry 0.24.x incompatibility
+  # on Ubuntu 22.04.  See Cargo.toml for the full explanation.
+  # Long-term fix: migrate to Tauri 2.x (wry 0.39+, webkit2gtk 0.20+).
   tauri-compile-check:
     name: Tauri Rust compile check
     runs-on: macos-latest
@@ -107,16 +96,9 @@ jobs:
           echo '<!doctype html><html><body></body></html>' \
             > frontend/dist/index.html
 
-      # ── Stub the externalBin sidecar ────────────────────────────────────────
-      # tauri.conf.json declares:
-      #   "externalBin": ["../backend/dist/pedimap-backend"]
-      #
-      # tauri-build resolves that path relative to src-tauri/ and appends the
-      # Rust target triple, producing:
-      #   <repo-root>/backend/dist/pedimap-backend-aarch64-apple-darwin
-      #
-      # The file must exist at that exact location for tauri-build to pass its
-      # path-existence check.  A zero-byte file is sufficient for compile-only.
+      # tauri.conf.json declares externalBin: ["../backend/dist/pedimap-backend"]
+      # tauri-build resolves relative to src-tauri/ and appends the target triple.
+      # A zero-byte file at the resolved path is sufficient for a compile check.
       - name: Stub externalBin sidecar
         run: |
           mkdir -p backend/dist
