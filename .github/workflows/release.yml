@@ -4,28 +4,26 @@
 # Builds native installers for Windows and macOS in parallel,
 # then creates a GitHub Release draft and uploads the artifacts.
 #
-# ── Platform matrix ──────────────────────────────────────────────────────────
-#   windows-latest   →  .msi  +  .exe  (NSIS)
-#   macos-latest     →  .dmg  aarch64  (Apple Silicon, native)
-#   macos-latest     →  .dmg  x86_64   (Intel, Rust cross-compile)
+# ── macOS signing strategy ───────────────────────────────────────────────────
+# When APPLE_CERTIFICATE secret is absent, tauri-action must be told to skip
+# signing entirely.  Passing APPLE_SIGNING_IDENTITY="-" (ad-hoc) is not
+# sufficient: Tauri 1.x checks for the APPLE_CERTIFICATE env var first and
+# attempts keychain setup regardless of the identity value, failing with
+# "failed to import keychain certificate" when the variable is empty.
+#
+# Fix: a "Prepare build config" step writes one of two JSON configs to
+# GITHUB_OUTPUT depending on whether a certificate is available:
+#   • With cert:    {"build":{"beforeBuildCommand":""}}
+#   • Without cert: {"build":{"beforeBuildCommand":""},
+#                   "tauri":{"bundle":{"macOS":{"signingIdentity":null}}}}
+# Setting signingIdentity to null in the config suppresses all signing
+# attempts at the bundler level, bypassing the keychain check entirely.
+# The resulting .app is unsigned and users must right-click → Open on first
+# launch to bypass Gatekeeper.
 #
 # ── Linux status ─────────────────────────────────────────────────────────────
-#   Temporarily excluded: Tauri 1.x / wry 0.24.x incompatibility with
-#   webkit2gtk on Ubuntu 22.04 runners. Fix: migrate to Tauri 2.x.
-#
-# ── macOS signing ────────────────────────────────────────────────────────────
-#   When APPLE_CERTIFICATE secret is absent, APPLE_SIGNING_IDENTITY is set to
-#   "-" (ad-hoc signing). This tells codesign to sign without a certificate,
-#   producing an unsigned .app that runs after right-click → Open on first
-#   launch (Gatekeeper bypass for unsigned builds).
-#   Without this, passing an empty APPLE_SIGNING_IDENTITY causes Tauri to
-#   attempt certificate import and fail with "failed to import keychain cert".
-#
-# Required secrets: none (for unsigned builds)
-# Optional codesigning secrets (Settings → Secrets → Actions):
-#   APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD / APPLE_SIGNING_IDENTITY
-#   APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID
-#   WINDOWS_CERTIFICATE / WINDOWS_CERTIFICATE_PASSWORD
+# Excluded: Tauri 1.x / wry 0.24.x incompatibility with webkit2gtk on Ubuntu
+# 22.04 runners. Fix: migrate to Tauri 2.x.
 
 name: Release
 
@@ -46,17 +44,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ── Windows x86_64 ─────────────────────────────────────────────────
           - platform: windows-latest
             rust_target: x86_64-pc-windows-msvc
             python_arch: x64
 
-          # ── macOS arm64 (Apple Silicon — native build) ─────────────────────
           - platform: macos-latest
             rust_target: aarch64-apple-darwin
             python_arch: arm64
 
-          # ── macOS x86_64 (Intel — Rust cross-compile on arm64 runner) ──────
           - platform: macos-latest
             rust_target: x86_64-apple-darwin
             python_arch: arm64
@@ -118,8 +113,6 @@ jobs:
         working-directory: backend
 
       # ── Stage sidecar at the externalBin path ─────────────────────────────
-      # tauri.conf.json: "externalBin": ["../backend/dist/pedimap-backend"]
-      # tauri-build resolves relative to src-tauri/ → backend/dist/pedimap-backend-{triple}
       - name: Stage sidecar binary (Unix)
         if: matrix.platform != 'windows-latest'
         run: |
@@ -153,6 +146,24 @@ jobs:
             -T /usr/bin/codesign
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
+      # ── Prepare build config ──────────────────────────────────────────────
+      # Writes the --config JSON to GITHUB_OUTPUT as `tauri_config`.
+      # When no Apple certificate is available, signingIdentity is set to null
+      # in the config, which suppresses all signing attempts at the bundler
+      # level before Tauri can check for APPLE_CERTIFICATE and fail.
+      - name: Prepare build config
+        id: build-config
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "macos-latest" ] && \
+             [ "${{ env.HAS_APPLE_CERT }}" != "true" ]; then
+            echo 'tauri_config={"build":{"beforeBuildCommand":""},"tauri":{"bundle":{"macOS":{"signingIdentity":null}}}}' \
+              >> "$GITHUB_OUTPUT"
+          else
+            echo 'tauri_config={"build":{"beforeBuildCommand":""}}' \
+              >> "$GITHUB_OUTPUT"
+          fi
+
       # ── Tauri build ───────────────────────────────────────────────────────
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -160,11 +171,7 @@ jobs:
           GITHUB_TOKEN:                 ${{ secrets.GITHUB_TOKEN }}
           APPLE_CERTIFICATE:            ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD:   ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          # When no real certificate exists, use "-" (ad-hoc signing) so
-          # codesign does not attempt to import a non-existent certificate.
-          # An empty string causes "failed to import keychain certificate".
-          # Ad-hoc signed apps run fine after right-click → Open on first launch.
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_SIGNING_IDENTITY:       ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID:                     ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD:               ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID:                ${{ secrets.APPLE_TEAM_ID }}
@@ -193,4 +200,4 @@ jobs:
             > See the [roadmap](https://github.com/Fresnedo-Lab/pedimap2#roadmap).
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.rust_target }} --config '{"build":{"beforeBuildCommand":""}}'
+          args: --target ${{ matrix.rust_target }} --config '${{ steps.build-config.outputs.tauri_config }}'
