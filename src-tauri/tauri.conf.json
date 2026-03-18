@@ -18,10 +18,10 @@
     "allowlist": {
       "all": false,
       "shell": {
-        "all":      false,
-        "open":     true,
-        "sidecar":  true,
-        "execute":  false
+        "all":     false,
+        "open":    true,
+        "sidecar": true,
+        "execute": false
       },
       "dialog": {
         "all":  false,
@@ -45,7 +45,7 @@
     },
 
     "bundle": {
-      "active":     true,
+      "active":           true,
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -64,6 +64,13 @@
       ],
 
       "resources": [],
+
+      "updater": {
+        "active":    false,
+        "dialog":    true,
+        "pubkey":    "",
+        "endpoints": []
+      },
 
       "windows": {
         "certificateThumbprint": null,
@@ -88,16 +95,17 @@
         "exceptionDomain":      "",
         "signingIdentity":      null,
         "providerShortName":    null,
-        "entitlements":         null,
-        "dmg": {
-          "background":   null,
-          "windowSize":   { "width": 660, "height": 400 },
-          "windowOrigin": { "x": 100, "y": 100 },
-          "iconSize":     80,
-          "iconPositions": {
-            "Pedimap 2":    { "x": 180, "y": 170 },
-            "Applications": { "x": 480, "y": 170 }
-          }
+        "entitlements":         null
+      },
+
+      "dmg": {
+        "background":   null,
+        "windowSize":   { "width": 660, "height": 400 },
+        "windowOrigin": { "x": 100, "y": 100 },
+        "iconSize":     80,
+        "iconPositions": {
+          "Pedimap 2":    { "x": 180, "y": 170 },
+          "Applications": { "x": 480, "y": 170 }
         }
       },
 
@@ -111,13 +119,6 @@
 
       "rpm": {
         "epoch": 0
-      },
-
-      "updater": {
-        "active":    false,
-        "dialog":    true,
-        "pubkey":    "",
-        "endpoints": []
       }
     },
 
