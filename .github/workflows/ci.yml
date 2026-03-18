@@ -1,36 +1,23 @@
-# .github/workflows/ci.yml   ← v5
+# .github/workflows/ci.yml   ← v6
 # ==========================
 # Continuous integration — runs on every push and pull request.
 # Validates: Python tests, frontend build, Tauri compilation.
 #
-# ── Why the Tauri check runs on macos-latest ─────────────────────────────────
+# ── Changelog ────────────────────────────────────────────────────────────────
+#  v6  Fix sidecar stub path.
+#      tauri.conf.json declares externalBin: ["../backend/dist/pedimap-backend"]
+#      tauri-build resolves this relative to src-tauri/ and appends the target
+#      triple, so it checks for:
+#        <repo-root>/backend/dist/pedimap-backend-aarch64-apple-darwin
+#      Previous versions stubbed the file at src-tauri/binaries/ (wrong dir).
+#      The binaries/ directory is used by Tauri's sidecar COMMAND feature;
+#      externalBin uses the raw path from tauri.conf.json directly.
 #
-# Tauri 1.x bundles wry 0.21.x/0.24.x which calls webkit2gtk Settings methods
-# without importing `use webkit2gtk::prelude::*` in its Linux WebKit module.
-# On current Ubuntu 22.04 GitHub runners, libwebkit2gtk-4.0 was updated to
-# 2.40+, which causes the webkit2gtk Rust bindings to generate code where
-# SettingsExt methods require explicit trait import — but wry's source doesn't
-# have that import.  No version pin of the webkit2gtk crate can fix missing
-# imports in wry's own source; the methods are always trait-based in 0.18.x.
-#
-# This is a fundamental incompatibility between Tauri 1.x / wry 0.21–0.24 and
-# the current Ubuntu 22.04 runner system webkit2gtk version.
-#
-# Fix: run the Tauri compile check on macOS, which uses Apple's WKWebView
-# (a system framework, no webkit2gtk).  The check still validates all of our
-# Rust code in src-tauri/src/main.rs — platform-specific WebView rendering is
-# handled by wry/Tauri internally and is not part of our source.
-#
-# Long-term fix: migrate to Tauri 2.x, which ships with wry 0.39+ that
-# properly imports webkit2gtk::prelude and resolves this incompatibility.
-# Track migration at: https://tauri.app/blog/tauri-2-0-0-released/
-#
-# ── Other changes from previous versions ─────────────────────────────────────
-#  • FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true' at workflow top-level
-#  • node-version '20' → '22' (LTS)
-#  • npm cache and cache-dependency-path removed until package-lock.json
-#    is committed (re-enable after first successful npm install + commit)
-#  • Python tests: auto-create backend/tests/ + placeholder if absent
+#  v5  Moved tauri compile check to macos-latest (avoids webkit2gtk/wry bug).
+#  v4  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 at workflow top-level (not job level).
+#      node-version 20 → 22. npm cache removed until lock file is committed.
+#  v3  Python tests: auto-create backend/tests/ + placeholder.
+#      cargo check runs with working-directory: src-tauri.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: CI
@@ -41,8 +28,6 @@ on:
   pull_request:
     branches: [main, develop]
 
-# Must be at WORKFLOW top level (not inside a job) to reach actions/* steps.
-# Must be a string, not a YAML boolean.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
@@ -85,31 +70,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # Restore these two lines once frontend/package-lock.json is committed:
+          # Restore once frontend/package-lock.json is committed:
           #   cache: 'npm'
           #   cache-dependency-path: frontend/package-lock.json
 
       - name: Install deps
-        # Use npm install (not npm ci) until package-lock.json is committed.
-        # Switch back to: npm ci  — once the lock file is in the repo.
-        run: npm install
+        run: npm install      # switch to: npm ci  once lock file is committed
         working-directory: frontend
 
       - name: Type-check
         run: npm run typecheck
         working-directory: frontend
-        continue-on-error: true   # type errors are warnings, not blockers
+        continue-on-error: true
 
       - name: Build
         run: npm run build
         working-directory: frontend
 
   # ── 3. Tauri Rust compile check ─────────────────────────────────────────────
-  # Runs on macOS to avoid the webkit2gtk/wry incompatibility on Ubuntu 22.04.
-  # See the explanation at the top of this file.
+  # Runs on macos-latest — avoids the webkit2gtk/wry incompatibility on Ubuntu.
   tauri-compile-check:
     name: Tauri Rust compile check
-    runs-on: macos-latest          # ← macOS: uses WKWebView, no webkit2gtk
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -119,21 +101,27 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # No system library installation needed on macOS — WKWebView is a system
-      # framework and requires no apt/brew package.
-
       - name: Stub frontend dist
         run: |
           mkdir -p frontend/dist
           echo '<!doctype html><html><body></body></html>' \
             > frontend/dist/index.html
 
-      - name: Stub sidecar binary
+      # ── Stub the externalBin sidecar ────────────────────────────────────────
+      # tauri.conf.json declares:
+      #   "externalBin": ["../backend/dist/pedimap-backend"]
+      #
+      # tauri-build resolves that path relative to src-tauri/ and appends the
+      # Rust target triple, producing:
+      #   <repo-root>/backend/dist/pedimap-backend-aarch64-apple-darwin
+      #
+      # The file must exist at that exact location for tauri-build to pass its
+      # path-existence check.  A zero-byte file is sufficient for compile-only.
+      - name: Stub externalBin sidecar
         run: |
-          mkdir -p src-tauri/binaries
-          # macOS arm64 triple (macos-latest is Apple Silicon)
-          touch "src-tauri/binaries/pedimap-backend-aarch64-apple-darwin"
-          chmod +x "src-tauri/binaries/pedimap-backend-aarch64-apple-darwin"
+          mkdir -p backend/dist
+          touch backend/dist/pedimap-backend-aarch64-apple-darwin
+          chmod +x backend/dist/pedimap-backend-aarch64-apple-darwin
 
       - name: Create stub icons for tauri-build
         run: |
