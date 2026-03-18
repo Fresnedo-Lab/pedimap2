@@ -58,19 +58,8 @@
       "category":         "Science",
       "shortDescription": "Pedigree visualisation for plant breeders",
       "longDescription":  "Pedimap 2 is a modern multiplatform desktop application for visualising genetic and phenotypic data in plant breeding pedigrees. Successor to Pedimap 1.x (Voorrips et al. 2012, J. Hered.).",
-
-      "externalBin": [
-        "../backend/dist/pedimap-backend"
-      ],
-
-      "resources": [],
-
-      "updater": {
-        "active":    false,
-        "dialog":    true,
-        "pubkey":    "",
-        "endpoints": []
-      },
+      "externalBin":      ["../backend/dist/pedimap-backend"],
+      "resources":        [],
 
       "windows": {
         "digestAlgorithm": "sha256",
@@ -93,11 +82,10 @@
       },
 
       "dmg": {
-        "background":                  null,
-        "windowSize":                  { "width": 660, "height": 400 },
-        "windowPosition":              { "x": 100, "y": 100 },
-        "appPosition":                 { "x": 180, "y": 170 },
-        "applicationFolderPosition":   { "x": 480, "y": 170 }
+        "windowSize":                { "width": 660, "height": 400 },
+        "windowPosition":            { "x": 100,    "y": 100 },
+        "appPosition":               { "x": 180,    "y": 170 },
+        "applicationFolderPosition": { "x": 480,    "y": 170 }
       },
 
       "deb": {
@@ -107,6 +95,13 @@
       "appimage": {
         "bundleMediaFramework": true
       }
+    },
+
+    "updater": {
+      "active":    false,
+      "dialog":    true,
+      "pubkey":    "",
+      "endpoints": []
     },
 
     "security": {
