@@ -3,12 +3,21 @@
 // Root component for Pedimap 2.
 // Layout:  TopBar | [Sidebar | Canvas | DetailPanel]
 //
-// Fix (v2): wrapped loadGraph and handleSubpop in arrow functions when used as
-// onClick handlers. Both are async functions whose real signatures don't match
-// MouseEventHandler<HTMLButtonElement>. Passing them directly causes TS2322:
-//   Type '(trait?: string) => Promise<void>' is not assignable to
-//   type 'MouseEventHandler<HTMLButtonElement>'
-// The wrapper `() => fn()` satisfies the handler type and discards the event.
+// Fixes applied in this version
+// ──────────────────────────────
+// TS2322  PedigreeCanvas.Props.graph is typed as `GraphData` (non-nullable).
+//         graphData state is `GraphData | null`.  The original ternary
+//           graphLoading ? <Spinner/> : <PedigreeCanvas graph={graphData}/>
+//         does NOT narrow the null — TypeScript still widens graphData back to
+//         `GraphData | null` inside the else branch.  The fix is to add
+//         `|| !graphData` to the condition so TypeScript narrows the type:
+//           graphLoading || !graphData ? <Spinner/> : <PedigreeCanvas graph={graphData}/>
+//                                                                              ^^^^^^^^^
+//                                                            narrowed to GraphData here
+//
+// TS2322  onClick={loadGraph} and onClick={handleSubpop} — async functions
+//         whose optional-string / void signatures don't match MouseEventHandler.
+//         Wrapped in arrow functions: onClick={() => loadGraph()}  etc.
 
 import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
@@ -202,8 +211,6 @@ export default function App() {
         )}
 
         {selectedId && (
-          // FIX: was onClick={handleSubpop} — async fn doesn't match
-          // MouseEventHandler. Wrapped in arrow to discard the MouseEvent arg.
           <button onClick={() => handleSubpop()}
             style={{ background: "#1d3a6e", color: "#4f9cf9", padding: "5px 12px" }}>
             🔍 Subpop: {selectedId}
@@ -211,10 +218,6 @@ export default function App() {
         )}
 
         {selectedId && graphData && graphData.nodes.length < (indList?.length ?? 0) && (
-          // FIX: was onClick={loadGraph} — (trait?: string) => Promise<void>
-          // doesn't match MouseEventHandler because a MouseEvent would be
-          // forwarded as the `trait` string argument. Arrow wrapper fixes both
-          // the type error and prevents accidental [object MouseEvent] trait lookup.
           <button onClick={() => loadGraph()}
             style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
             Show All
@@ -270,13 +273,15 @@ export default function App() {
           </div>
         </div>
 
-        {/* Canvas */}
+        {/* Canvas ── FIX: guard is `graphLoading || !graphData` so TypeScript  */}
+        {/* narrows graphData to `GraphData` (not null) in the else branch,     */}
+        {/* satisfying PedigreeCanvas's non-nullable `graph: GraphData` prop.   */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-          {graphLoading
+          {graphLoading || !graphData
             ? <Spinner />
             : (
               <PedigreeCanvas
-                graph={graphData}
+                graph={graphData}          // ← GraphData here, null excluded
                 colorMap={colorMap}
                 selected={selectedId}
                 onSelect={handleSelect}

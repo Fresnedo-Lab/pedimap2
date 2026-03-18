@@ -1,6 +1,6 @@
 [package]
-name    = "pedimap2"
-version = "2.0.0"
+name        = "pedimap2"
+version     = "2.0.0"
 description = "Pedimap 2.0 – multiplatform pedigree visualisation for plant breeding"
 authors     = ["Fresnedo-Lab <https://github.com/Fresnedo-Lab>"]
 license     = "MIT"
@@ -29,6 +29,27 @@ tauri = { version = "1", features = [
 ] }
 serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# ── Linux-only: pin webkit2gtk to 0.18.1 ─────────────────────────────────────
+#
+# Problem: wry 0.24.x (the WebView crate used by Tauri 1.6) was written against
+# webkit2gtk = "0.18.1".  Cargo's dependency resolver can legally pick any
+# "0.18.x" release, and as of early 2025 it resolves to 0.18.2.
+#
+# webkit2gtk 0.18.2 changed its API: methods like set_enable_webgl(),
+# set_enable_webaudio(), set_user_agent(), etc. are now gated behind an
+# explicit `use webkit2gtk::SettingsExt;` import that wry 0.24.x does NOT have.
+# This causes seven E0599 "method not found" errors and exit code 101.
+#
+# Fix: declare webkit2gtk as a DIRECT Linux dependency pinned to exactly
+# "=0.18.1".  Cargo's resolver honours the most restrictive version spec across
+# the whole dependency graph, so this overrides the transitive "0.18" range
+# that wry declares and forces the entire tree to use 0.18.1.
+#
+# This pin can be removed once the project upgrades to Tauri 2.x (which ships
+# with wry 0.39+ and webkit2gtk 0.20+, resolving this incompatibility).
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "=0.18.1"
 
 [features]
 # This feature is used for development builds.
