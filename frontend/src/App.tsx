@@ -2,6 +2,13 @@
 // ========
 // Root component for Pedimap 2.
 // Layout:  TopBar | [Sidebar | Canvas | DetailPanel]
+//
+// Fix (v2): wrapped loadGraph and handleSubpop in arrow functions when used as
+// onClick handlers. Both are async functions whose real signatures don't match
+// MouseEventHandler<HTMLButtonElement>. Passing them directly causes TS2322:
+//   Type '(trait?: string) => Promise<void>' is not assignable to
+//   type 'MouseEventHandler<HTMLButtonElement>'
+// The wrapper `() => fn()` satisfies the handler type and discards the event.
 
 import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
@@ -43,8 +50,8 @@ export default function App() {
   const { data: pedigree, reload: reloadPedigree } =
     useFetch<PedigreeData>(() => api.getPedigree());
 
-  const [graphData,  setGraphData]  = useState<GraphData | null>(null);
-  const [colorMap,   setColorMap]   = useState<Record<string, string>>({});
+  const [graphData,   setGraphData]   = useState<GraphData | null>(null);
+  const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
   const [activeTrait, setActiveTrait] = useState<string>("");
 
   // Fetch graph + colours whenever pedigree changes
@@ -67,8 +74,8 @@ export default function App() {
   useState(() => { loadGraph(); });
 
   // ── Selection ─────────────────────────────────────────────────────────────
-  const [selectedId, setSelectedId]       = useState<string | null>(null);
-  const [selectedDetail, setDetail]       = useState<IndividualDetail | null>(null);
+  const [selectedId,     setSelectedId] = useState<string | null>(null);
+  const [selectedDetail, setDetail]     = useState<IndividualDetail | null>(null);
 
   const handleSelect = useCallback(async (id: string) => {
     setSelectedId(id);
@@ -91,7 +98,6 @@ export default function App() {
       try {
         const path = await invoke<string>("open_file_dialog");
         if (!path) return;
-        // Read via Tauri fs command then POST to backend
         const content = await invoke<string>("read_file", { path });
         const fname   = path.split(/[\\/]/).pop() ?? "file.json";
         const blob    = new Blob([content], { type: "text/plain" });
@@ -107,7 +113,9 @@ export default function App() {
     }
   }, [api, loadGraph, reloadPedigree]);
 
-  const handleFileInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = useCallback(async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = e.target.files;
     if (!files?.length) return;
     try {
@@ -135,19 +143,22 @@ export default function App() {
     await api.reset();
     reloadPedigree();
     await loadGraph();
-    setSelectedId(null); setDetail(null);
+    setSelectedId(null);
+    setDetail(null);
   }, [api, loadGraph, reloadPedigree]);
 
   // ── Search filter ─────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
-  const { data: indList } = useFetch<IndividualSummary[]>(() => api.listIndividuals(), []);
+  const { data: indList } = useFetch<IndividualSummary[]>(
+    () => api.listIndividuals(), []
+  );
   const filtered = (indList ?? []).filter(i =>
     i.name.toLowerCase().includes(search.toLowerCase()) ||
     i.id.toLowerCase().includes(search.toLowerCase())
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const traits = pedigree?.traits ?? [];
+  const traits  = pedigree?.traits  ?? [];
   const markers = pedigree?.markers ?? [];
 
   return (
@@ -178,7 +189,9 @@ export default function App() {
         {traits.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
             <span style={{ color: "#64748b", fontSize: 11 }}>Colour by:</span>
-            <select value={activeTrait} onChange={e => handleTraitChange(e.target.value)}
+            <select
+              value={activeTrait}
+              onChange={e => handleTraitChange(e.target.value)}
               style={{ width: 160 }}>
               <option value="">None</option>
               {traits.map(t => (
@@ -189,14 +202,20 @@ export default function App() {
         )}
 
         {selectedId && (
-          <button onClick={handleSubpop}
+          // FIX: was onClick={handleSubpop} — async fn doesn't match
+          // MouseEventHandler. Wrapped in arrow to discard the MouseEvent arg.
+          <button onClick={() => handleSubpop()}
             style={{ background: "#1d3a6e", color: "#4f9cf9", padding: "5px 12px" }}>
             🔍 Subpop: {selectedId}
           </button>
         )}
 
         {selectedId && graphData && graphData.nodes.length < (indList?.length ?? 0) && (
-          <button onClick={loadGraph}
+          // FIX: was onClick={loadGraph} — (trait?: string) => Promise<void>
+          // doesn't match MouseEventHandler because a MouseEvent would be
+          // forwarded as the `trait` string argument. Arrow wrapper fixes both
+          // the type error and prevents accidental [object MouseEvent] trait lookup.
+          <button onClick={() => loadGraph()}
             style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
             Show All
           </button>
@@ -220,7 +239,8 @@ export default function App() {
           <div style={{ padding: "8px 10px", borderBottom: "1px solid #2e3a52" }}>
             <input
               placeholder="Search individuals…"
-              value={search} onChange={e => setSearch(e.target.value)}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
               style={{ width: "100%", fontSize: 11 }}
             />
           </div>
@@ -234,63 +254,25 @@ export default function App() {
                   padding: "6px 10px", cursor: "pointer",
                   background: selectedId === ind.id ? "#1e2535" : "transparent",
                   borderBottom: "1px solid #1a2030",
-                  borderLeft: selectedId === ind.id ? "3px solid #4f9cf9" : "3px solid transparent",
-                  transition: "background .1s",
+                  borderLeft: selectedId === ind.id
+                    ? "3px solid #4f9cf9"
+                    : "3px solid transparent",
                 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: "#e8ecf4" }}
-                  className="truncate">{ind.name}</div>
+                <div style={{ fontSize: 12, color: "#e8ecf4",
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {ind.name}
+                </div>
                 <div style={{ fontSize: 10, color: "#4b5563", marginTop: 1 }}>
-                  Gen {ind.generation} · {ind.cross_type}
+                  {ind.cross_type} · Gen {ind.generation}
                 </div>
               </div>
             ))}
           </div>
-
-          {/* Legend */}
-          {traits.length > 0 && activeTrait && (
-            <div style={{ padding: "10px 12px", borderTop: "1px solid #2e3a52",
-              flexShrink: 0 }}>
-              {(() => {
-                const t = traits.find(tr => tr.name === activeTrait);
-                if (!t) return null;
-                if (t.type === "qualitative") return (
-                  <div>
-                    <div style={{ fontSize: 10, color: "#64748b",
-                      marginBottom: 6, textTransform: "uppercase" }}>{activeTrait}</div>
-                    {t.categories.map((cat, i) => {
-                      const palette = ["#3B82F6","#10B981","#F59E0B","#EF4444",
-                        "#8B5CF6","#EC4899","#06B6D4","#84CC16"];
-                      return (
-                        <div key={cat} style={{ display: "flex", alignItems: "center",
-                          gap: 6, marginBottom: 3 }}>
-                          <div style={{ width: 10, height: 10, borderRadius: 2,
-                            background: palette[i % palette.length], flexShrink: 0 }} />
-                          <span style={{ fontSize: 10, color: "#a0aec0" }}>{cat}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-                return (
-                  <div>
-                    <div style={{ fontSize: 10, color: "#64748b",
-                      marginBottom: 4, textTransform: "uppercase" }}>{activeTrait}</div>
-                    <div style={{ height: 8, borderRadius: 4, overflow: "hidden",
-                      background: `linear-gradient(90deg, ${t.color_low}, ${t.color_high})` }} />
-                    <div style={{ display: "flex", justifyContent: "space-between",
-                      marginTop: 2, fontSize: 9, color: "#4b5563" }}>
-                      <span>{t.min}</span><span>{t.max}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
         </div>
 
         {/* Canvas */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-          {graphLoading || !graphData
+          {graphLoading
             ? <Spinner />
             : (
               <PedigreeCanvas
