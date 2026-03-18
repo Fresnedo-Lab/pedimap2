@@ -10,21 +10,16 @@
 #   macos-latest     →  .dmg  x86_64   (Intel, Rust cross-compile)
 #
 # ── Linux status ─────────────────────────────────────────────────────────────
-#   Linux is temporarily excluded from the release matrix.
-#   Root cause: Tauri 1.x bundles wry 0.24.x, which calls webkit2gtk Settings
-#   methods without importing the SettingsExt trait.  On Ubuntu 22.04 runners
-#   with libwebkit2gtk-4.0 ≥ 2.40, the webkit2gtk Rust bindings generate code
-#   where these methods require an explicit trait import that wry doesn't have.
-#   This is a known Tauri 1.x incompatibility with no available patch.
-#   Fix: migrate to Tauri 2.x (wry 0.39+, webkit2gtk 0.20+).
-#   Tracked in: https://github.com/Fresnedo-Lab/pedimap2/blob/main/README.md#roadmap
+#   Temporarily excluded: Tauri 1.x / wry 0.24.x incompatibility with
+#   webkit2gtk on Ubuntu 22.04 runners. Fix: migrate to Tauri 2.x.
 #
-# ── externalBin path note ─────────────────────────────────────────────────────
-#   tauri.conf.json declares: "externalBin": ["../backend/dist/pedimap-backend"]
-#   tauri-build resolves that relative to src-tauri/ and appends the target
-#   triple, so it looks for:  backend/dist/pedimap-backend-{triple}
-#   The staging steps below copy the PyInstaller binary to that exact path.
-#   (src-tauri/binaries/ is for shell.sidecar, NOT externalBin — different feature.)
+# ── macOS signing ────────────────────────────────────────────────────────────
+#   When APPLE_CERTIFICATE secret is absent, APPLE_SIGNING_IDENTITY is set to
+#   "-" (ad-hoc signing). This tells codesign to sign without a certificate,
+#   producing an unsigned .app that runs after right-click → Open on first
+#   launch (Gatekeeper bypass for unsigned builds).
+#   Without this, passing an empty APPLE_SIGNING_IDENTITY causes Tauri to
+#   attempt certificate import and fail with "failed to import keychain cert".
 #
 # Required secrets: none (for unsigned builds)
 # Optional codesigning secrets (Settings → Secrets → Actions):
@@ -62,7 +57,6 @@ jobs:
             python_arch: arm64
 
           # ── macOS x86_64 (Intel — Rust cross-compile on arm64 runner) ──────
-          # PyInstaller sidecar is arm64; runs transparently under Rosetta 2.
           - platform: macos-latest
             rust_target: x86_64-apple-darwin
             python_arch: arm64
@@ -123,14 +117,9 @@ jobs:
         run: pyinstaller pedimap_backend.spec --distpath dist --workpath build --noconfirm --clean
         working-directory: backend
 
-      # ── Stage sidecar binary at the externalBin path ──────────────────────
+      # ── Stage sidecar at the externalBin path ─────────────────────────────
       # tauri.conf.json: "externalBin": ["../backend/dist/pedimap-backend"]
-      # tauri-build resolves ../backend/dist/ relative to src-tauri/, appends
-      # the target triple, and checks the resulting path exists:
-      #   backend/dist/pedimap-backend-{triple}          (Unix)
-      #   backend/dist/pedimap-backend-{triple}.exe      (Windows)
-      # PyInstaller already outputs to backend/dist/pedimap-backend[.exe],
-      # so we just create the triple-suffixed copy in the same directory.
+      # tauri-build resolves relative to src-tauri/ → backend/dist/pedimap-backend-{triple}
       - name: Stage sidecar binary (Unix)
         if: matrix.platform != 'windows-latest'
         run: |
@@ -145,7 +134,7 @@ jobs:
           Copy-Item backend\dist\pedimap-backend.exe `
             "backend\dist\pedimap-backend-${{ matrix.rust_target }}.exe"
 
-      # ── macOS codesigning (skipped when APPLE_CERTIFICATE secret is absent) ─
+      # ── macOS certificate import (only when secret is present) ────────────
       - name: Import macOS certificate
         if: matrix.platform == 'macos-latest' && env.HAS_APPLE_CERT == 'true'
         env:
@@ -165,21 +154,22 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
       # ── Tauri build ───────────────────────────────────────────────────────
-      # beforeBuildCommand is overridden to "" because the frontend dist was
-      # already built above; tauri-action runs beforeBuildCommand from the repo
-      # root where --prefix ../frontend resolves outside the repo (ENOENT).
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN:                    ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE:               ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD:      ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY:          ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID:                        ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD:                  ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID:                   ${{ secrets.APPLE_TEAM_ID }}
-          WINDOWS_CERTIFICATE:             ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD:    ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          GITHUB_TOKEN:                 ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE:            ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD:   ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # When no real certificate exists, use "-" (ad-hoc signing) so
+          # codesign does not attempt to import a non-existent certificate.
+          # An empty string causes "failed to import keychain certificate".
+          # Ad-hoc signed apps run fine after right-click → Open on first launch.
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_ID:                     ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD:               ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID:                ${{ secrets.APPLE_TEAM_ID }}
+          WINDOWS_CERTIFICATE:          ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Pedimap 2 ${{ github.ref_name }}'
@@ -195,11 +185,12 @@ jobs:
             | macOS (Apple Silicon) | `.dmg` (aarch64) |
             | macOS (Intel — via Rosetta 2) | `.dmg` (x86_64) |
 
-            > **Linux:** Native `.AppImage` / `.deb` installers are temporarily
-            > unavailable due to a Tauri 1.x / webkit2gtk incompatibility on
-            > current Ubuntu runners. Linux support will be restored with the
-            > planned migration to Tauri 2.x. See the
-            > [roadmap](https://github.com/Fresnedo-Lab/pedimap2#roadmap) for details.
+            > **macOS note:** These are unsigned builds. On first launch,
+            > right-click the app → Open to bypass Gatekeeper.
+
+            > **Linux:** Temporarily unavailable due to a Tauri 1.x / webkit2gtk
+            > incompatibility. Will be restored with the Tauri 2.x migration.
+            > See the [roadmap](https://github.com/Fresnedo-Lab/pedimap2#roadmap).
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.rust_target }} --config '{"build":{"beforeBuildCommand":""}}'
