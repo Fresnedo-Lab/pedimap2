@@ -1,0 +1,18 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for Pedimap 2 desktop",
+  "local": true,
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [{ "name": "pedimap-backend", "sidecar": true }]
+    },
+    "shell:allow-open",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file"
+  ]
+}

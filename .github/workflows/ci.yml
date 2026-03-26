@@ -96,14 +96,18 @@ jobs:
           echo '<!doctype html><html><body></body></html>' \
             > frontend/dist/index.html
 
-      # tauri.conf.json declares externalBin: ["../backend/dist/pedimap-backend"]
-      # tauri-build resolves relative to src-tauri/ and appends the target triple.
-      # A zero-byte file at the resolved path is sufficient for a compile check.
-      - name: Stub externalBin sidecar
+      # tauri.conf.json declares externalBin: ["binaries/pedimap-backend"]
+      # tauri-build resolves that to src-tauri/binaries/pedimap-backend-{triple}.
+      # The triple is derived from the runner's own toolchain so this step works
+      # on any OS without hardcoding (aarch64-apple-darwin, x86_64-unknown-linux-gnu,
+      # x86_64-pc-windows-msvc). A zero-byte executable is sufficient for cargo check.
+      - name: Stub sidecar binary
+        shell: bash
         run: |
-          mkdir -p backend/dist
-          touch backend/dist/pedimap-backend-aarch64-apple-darwin
-          chmod +x backend/dist/pedimap-backend-aarch64-apple-darwin
+          mkdir -p src-tauri/binaries
+          TRIPLE=$(rustc -vV | sed -n 's|host: ||p')
+          touch "src-tauri/binaries/pedimap-backend-${TRIPLE}"
+          chmod +x "src-tauri/binaries/pedimap-backend-${TRIPLE}"
 
       - name: Create stub icons for tauri-build
         run: |

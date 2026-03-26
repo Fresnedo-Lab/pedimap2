@@ -72,7 +72,7 @@ let _backendUrl: string | null = null;
 async function resolveBackendUrl(): Promise<string> {
   if (_backendUrl) return _backendUrl;
   try {
-    const { invoke } = await import("@tauri-apps/api/tauri");
+    const { invoke } = await import("@tauri-apps/api/core");
     _backendUrl = await invoke<string>("get_backend_url");
   } catch {
     _backendUrl = "http://127.0.0.1:5173";

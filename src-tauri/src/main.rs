@@ -1,24 +1,24 @@
 // src-tauri/src/main.rs
 // =====================
-// Pedimap 2.0 — Tauri application entry point.
+// Pedimap 2.0 — Tauri 2 application entry point.
 //
 // Responsibilities:
 //   1. Spawn the Python FastAPI backend as a sidecar on startup
 //   2. Expose Tauri commands for native OS operations
-//   3. Kill the sidecar cleanly on app exit
+//   3. Kill the sidecar cleanly when the main window is closed
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::Mutex;
-use tauri::{
-    api::{dialog, process::Command},
-    AppHandle, Manager, RunEvent, State, Window,
-};
+use tauri::{AppHandle, Manager, RunEvent, State, WindowEvent};
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::ShellExt;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared state – holds the child process handle for the Python sidecar
+// Shared state — holds the child process handle for the Python sidecar
 // ─────────────────────────────────────────────────────────────────────────────
-struct BackendProcess(Mutex<Option<tauri::api::process::CommandChild>>);
+struct BackendProcess(Mutex<Option<CommandChild>>);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tauri commands
@@ -27,40 +27,32 @@ struct BackendProcess(Mutex<Option<tauri::api::process::CommandChild>>);
 /// URL that the React frontend uses to reach the FastAPI backend.
 #[tauri::command]
 fn get_backend_url() -> String {
-    "http://127.0.0.1:5173".to_string()
+    "http://127.0.0.1:8765".to_string()
 }
 
-/// Open a native file-picker.  Returns the selected path or "".
+/// Open a native file-picker. Returns the selected path or "".
 #[tauri::command]
-async fn open_file_dialog(_window: Window) -> Result<String, String> {
-    let (tx, rx) = std::sync::mpsc::channel::<String>();
-    dialog::FileDialogBuilder::new()
+async fn open_file_dialog(app: AppHandle) -> Result<String, String> {
+    let path = app
+        .dialog()
+        .file()
         .add_filter("Pedigree files", &["json", "dat", "pmp"])
-        .add_filter("All files",      &["*"])
-        .pick_file(move |path| {
-            let _ = tx.send(
-                path.map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            );
-        });
-    rx.recv().map_err(|e| e.to_string())
+        .add_filter("All files", &["*"])
+        .blocking_pick_file();
+    Ok(path.map(|p| p.to_string()).unwrap_or_default())
 }
 
-/// Open a native save dialog.  Returns the chosen destination path or "".
+/// Open a native save dialog. Returns the chosen destination path or "".
 #[tauri::command]
-async fn save_file_dialog(_window: Window) -> Result<String, String> {
-    let (tx, rx) = std::sync::mpsc::channel::<String>();
-    dialog::FileDialogBuilder::new()
+async fn save_file_dialog(app: AppHandle) -> Result<String, String> {
+    let path = app
+        .dialog()
+        .file()
         .add_filter("Pedigree JSON", &["json"])
-        .add_filter("Pedimap Data",  &["dat"])
+        .add_filter("Pedimap Data", &["dat"])
         .set_file_name("pedigree.json")
-        .save_file(move |path| {
-            let _ = tx.send(
-                path.map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            );
-        });
-    rx.recv().map_err(|e| e.to_string())
+        .blocking_save_file();
+    Ok(path.map(|p| p.to_string()).unwrap_or_default())
 }
 
 /// Read a UTF-8 file from disk and return its contents.
@@ -86,14 +78,14 @@ fn app_version() -> String {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn spawn_backend(app: &AppHandle) {
-    match Command::new_sidecar("pedimap-backend") {
+    match app.shell().sidecar("pedimap-backend") {
         Err(e) => eprintln!("[pedimap] Failed to locate sidecar: {e}"),
         Ok(cmd) => match cmd.spawn() {
             Err(e) => eprintln!("[pedimap] Failed to spawn sidecar: {e}"),
             Ok((_rx, child)) => {
                 let state: State<BackendProcess> = app.state();
                 *state.0.lock().unwrap() = Some(child);
-                eprintln!("[pedimap] Python backend started on port 5173");
+                eprintln!("[pedimap] Python backend started on port 8765");
             }
         },
     }
@@ -101,20 +93,8 @@ fn spawn_backend(app: &AppHandle) {
 
 fn kill_backend(app: &AppHandle) {
     let state: State<BackendProcess> = app.state();
-
-    // FIX for E0597: extract the Option<CommandChild> into its own binding
-    // so the MutexGuard temporary is dropped at the end of this statement —
-    // before `state` itself goes out of scope at the closing `}`.
-    //
-    // The original code:
-    //   if let Some(child) = state.0.lock().unwrap().take() { ... }
-    // kept the MutexGuard alive until the *end of the enclosing block*, which
-    // is the same point where `state` is dropped.  Rust's borrow checker
-    // requires the guard (which borrows from `state`) to be released first.
-    //
-    // Splitting into two statements makes the drop order explicit:
-    //   1. lock() → guard created, take() extracts the child → guard dropped ✓
-    //   2. if let  → uses only `child`, no borrow of `state` remaining ✓
+    // Extract the child before dropping the MutexGuard so the borrow of
+    // `state` ends before `state` itself is released.
     let child = state.0.lock().unwrap().take();
     if let Some(child) = child {
         let _ = child.kill();
@@ -128,6 +108,10 @@ fn kill_backend(app: &AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(BackendProcess(Mutex::new(None)))
         .setup(|app| {
             spawn_backend(&app.handle());
@@ -144,8 +128,15 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            if let RunEvent::ExitRequested { .. } = event {
-                kill_backend(app_handle);
+            if let RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::CloseRequested { .. },
+                ..
+            } = event
+            {
+                if label == "main" {
+                    kill_backend(app_handle);
+                }
             }
         });
 }

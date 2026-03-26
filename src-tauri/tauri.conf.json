@@ -1,136 +1,116 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
-
   "build": {
-    "beforeDevCommand":   "npm run dev --prefix ../frontend",
+    "beforeDevCommand": "npm run dev --prefix ../frontend",
     "beforeBuildCommand": "npm run build --prefix ../frontend",
-    "devPath":            "http://localhost:5174",
-    "distDir":            "../frontend/dist",
-    "withGlobalTauri":    false
+    "frontendDist": "../frontend/dist",
+    "devUrl": "http://localhost:5174"
   },
-
-  "package": {
-    "productName": "Pedimap 2",
-    "version":     "2.0.0"
-  },
-
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "all":     false,
-        "open":    true,
-        "sidecar": true,
-        "execute": false
-      },
-      "dialog": {
-        "all":  false,
-        "open": true,
-        "save": true
-      },
-      "fs": {
-        "all":       false,
-        "readFile":  true,
-        "writeFile": true,
-        "scope":     ["$HOME/**", "$APPDATA/**", "$DOCUMENT/**", "$DESKTOP/**"]
-      },
-      "window": {
-        "all":      true,
-        "close":    true,
-        "maximize": true,
-        "minimize": true,
-        "hide":     true,
-        "show":     true
-      }
-    },
-
-    "bundle": {
-      "active":           true,
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier":       "org.fresnedo-lab.pedimap2",
-      "copyright":        "© 2025 Fresnedo-Lab. MIT License.",
-      "category":         "Education",
-      "shortDescription": "Pedigree visualization for plant breeders",
-      "longDescription":  "Pedimap 2 is a modern multiplatform desktop application for visualizing genetic and phenotypic data in plant breeding pedigrees. Successor to Pedimap 1.x (Voorrips et al. 2012, J. Hered.).",
-      "externalBin":      ["../backend/dist/pedimap-backend"],
-      "resources":        [],
-
-      "windows": {
-        "digestAlgorithm": "sha256",
-        "timestampUrl":    "",
-        "wix": {
-          "language": ["en-US"]
-        },
-        "nsis": {
-          "installMode": "currentUser",
-          "languages":   ["English"]
-        }
-      },
-
-      "macOS": {
-        "frameworks":           [],
-        "minimumSystemVersion": "10.15",
-        "signingIdentity":      null,
-        "providerShortName":    null,
-        "entitlements":         null
-      },
-
-      "dmg": {
-        "windowSize":                { "width": 660, "height": 400 },
-        "windowPosition":            { "x": 100,    "y": 100 },
-        "appPosition":               { "x": 180,    "y": 170 },
-        "applicationFolderPosition": { "x": 480,    "y": 170 }
-      },
-
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
       "deb": {
         "depends": []
       },
-
       "appimage": {
         "bundleMediaFramework": true
       }
     },
-
+    "copyright": "© 2025 Fresnedo-Lab. MIT License.",
+    "category": "Education",
+    "shortDescription": "Pedigree visualization for plant breeders",
+    "longDescription": "Pedimap 2 is a modern multiplatform desktop application for visualizing genetic and phenotypic data in plant breeding pedigrees. Successor to Pedimap 1.x (Voorrips et al. 2012, J. Hered.).",
+    "externalBin": [
+      "binaries/pedimap-backend"
+    ],
+    "resources": [],
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": [
+          "en-US"
+        ]
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "English"
+        ]
+      }
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null,
+      "dmg": {
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "windowPosition": {
+          "x": 100,
+          "y": 100
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        }
+      }
+    },
+    "createUpdaterArtifacts": "v1Compatible"
+  },
+  "productName": "Pedimap 2",
+  "mainBinaryName": "Pedimap 2",
+  "version": "2.0.0",
+  "identifier": "com.fresnedobreedinglab.pedimap2",
+  "plugins": {
     "updater": {
-      "active":    false,
-      "dialog":    true,
-      "pubkey":    "",
+      "pubkey": "",
       "endpoints": []
-    },
-
-    "security": {
-      "csp": "default-src 'self' http://127.0.0.1:5173; connect-src http://127.0.0.1:5173; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'"
-    },
-
+    }
+  },
+  "app": {
+    "withGlobalTauri": false,
     "windows": [
       {
-        "title":           "Pedimap 2",
-        "label":           "main",
-        "width":           1280,
-        "height":          800,
-        "minWidth":        900,
-        "minHeight":       600,
-        "resizable":       true,
-        "fullscreen":      false,
-        "decorations":     true,
-        "transparent":     false,
-        "alwaysOnTop":     false,
-        "fileDropEnabled": true,
-        "center":          true,
-        "focus":           true
+        "title": "Pedimap 2",
+        "label": "main",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "dragDropEnabled": true,
+        "center": true,
+        "focus": true,
+        "useHttpsScheme": true
       }
     ],
-
-    "systemTray": {
-      "iconPath":        "icons/32x32.png",
-      "iconAsTemplate":  true,
+    "trayIcon": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true,
       "menuOnLeftClick": false
+    },
+    "security": {
+      "csp": "default-src 'self' http://127.0.0.1:5173; connect-src ipc: http://ipc.localhost http://127.0.0.1:5173; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'"
     }
   }
 }

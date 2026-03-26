@@ -20,7 +20,7 @@
 //         Wrapped in arrow functions: onClick={() => loadGraph()}  etc.
 
 import { useState, useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
+import { invoke } from "@tauri-apps/api/core";
 import {
   useApi, useFetch,
   type GraphData, type PedigreeData,
