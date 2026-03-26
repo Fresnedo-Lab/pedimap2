@@ -1,29 +1,25 @@
 # .github/workflows/release.yml
 # ================================
 # Triggered on every push of a version tag (v*.*.*).
-# Builds native installers for Windows and macOS in parallel,
+# Builds native installers for Windows, macOS, and Linux in parallel,
 # then creates a GitHub Release draft and uploads the artifacts.
 #
 # ── macOS signing strategy ───────────────────────────────────────────────────
-# When APPLE_CERTIFICATE secret is absent, tauri-action must be told to skip
-# signing entirely.  Passing APPLE_SIGNING_IDENTITY="-" (ad-hoc) is not
-# sufficient: Tauri 1.x checks for the APPLE_CERTIFICATE env var first and
-# attempts keychain setup regardless of the identity value, failing with
-# "failed to import keychain certificate" when the variable is empty.
+# Step-level `if:` conditions cannot read secrets directly, so HAS_APPLE_CERT
+# is set as a job-level env var that mirrors whether APPLE_CERTIFICATE is set.
 #
-# Fix: a "Prepare build config" step writes one of two JSON configs to
-# GITHUB_OUTPUT depending on whether a certificate is available:
+# When no certificate is available, the --config JSON override sets
+# bundle.macOS.signingIdentity to null, suppressing all signing and
+# notarization attempts at the bundler level before Tauri can attempt
+# keychain setup and fail:
 #   • With cert:    {"build":{"beforeBuildCommand":""}}
 #   • Without cert: {"build":{"beforeBuildCommand":""},
-#                   "tauri":{"bundle":{"macOS":{"signingIdentity":null}}}}
-# Setting signingIdentity to null in the config suppresses all signing
-# attempts at the bundler level, bypassing the keychain check entirely.
-# The resulting .app is unsigned and users must right-click → Open on first
-# launch to bypass Gatekeeper.
+#                   "bundle":{"macOS":{"signingIdentity":null}}}
+# (Tauri 2 config: signingIdentity lives at bundle.macOS, not tauri.bundle.macOS)
 #
 # ── Linux status ─────────────────────────────────────────────────────────────
-# Excluded: Tauri 1.x / wry 0.24.x incompatibility with webkit2gtk on Ubuntu
-# 22.04 runners. Fix: migrate to Tauri 2.x.
+# Re-enabled for Tauri 2: webkit2gtk-4.1 is available on Ubuntu 22.04 and the
+# wry 0.54 / webkit2gtk ABI mismatch that blocked Tauri 1.x is resolved.
 
 name: Release
 
@@ -56,6 +52,10 @@ jobs:
             rust_target: x86_64-apple-darwin
             python_arch: arm64
 
+          - platform: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+            python_arch: x64
+
     runs-on: ${{ matrix.platform }}
     name: Build – ${{ matrix.rust_target }}
 
@@ -64,6 +64,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # ── Linux system dependencies ──────────────────────────────────────────
+      # libwebkit2gtk-4.1-dev is required by Tauri 2 / wry 0.54 on Ubuntu 22.04.
+      # The older 4.0 package is not compatible.
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
 
       # ── Rust toolchain ────────────────────────────────────────────────────
       - name: Install Rust stable
@@ -112,20 +125,24 @@ jobs:
         run: pyinstaller pedimap_backend.spec --distpath dist --workpath build --noconfirm --clean
         working-directory: backend
 
-      # ── Stage sidecar at the externalBin path ─────────────────────────────
+      # ── Stage sidecar at src-tauri/binaries/ ──────────────────────────────
+      # tauri.conf.json: externalBin = ["binaries/pedimap-backend"]
+      # tauri-build resolves that to: src-tauri/binaries/pedimap-backend-{triple}
       - name: Stage sidecar binary (Unix)
         if: matrix.platform != 'windows-latest'
         run: |
+          mkdir -p src-tauri/binaries
           cp backend/dist/pedimap-backend \
-             "backend/dist/pedimap-backend-${{ matrix.rust_target }}"
-          chmod +x "backend/dist/pedimap-backend-${{ matrix.rust_target }}"
+             "src-tauri/binaries/pedimap-backend-${{ matrix.rust_target }}"
+          chmod +x "src-tauri/binaries/pedimap-backend-${{ matrix.rust_target }}"
 
       - name: Stage sidecar binary (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force -Path src-tauri\binaries | Out-Null
           Copy-Item backend\dist\pedimap-backend.exe `
-            "backend\dist\pedimap-backend-${{ matrix.rust_target }}.exe"
+            "src-tauri\binaries\pedimap-backend-${{ matrix.rust_target }}.exe"
 
       # ── macOS certificate import (only when secret is present) ────────────
       - name: Import macOS certificate
@@ -147,17 +164,17 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
       # ── Prepare build config ──────────────────────────────────────────────
-      # Writes the --config JSON to GITHUB_OUTPUT as `tauri_config`.
-      # When no Apple certificate is available, signingIdentity is set to null
-      # in the config, which suppresses all signing attempts at the bundler
-      # level before Tauri can check for APPLE_CERTIFICATE and fail.
+      # Suppresses beforeBuildCommand (frontend already built above).
+      # On unsigned macOS builds, also sets signingIdentity to null so Tauri
+      # skips keychain setup entirely — avoids "failed to import certificate".
+      # Note: Tauri 2 config path is bundle.macOS (not tauri.bundle.macOS).
       - name: Prepare build config
         id: build-config
         shell: bash
         run: |
           if [ "${{ matrix.platform }}" = "macos-latest" ] && \
              [ "${{ env.HAS_APPLE_CERT }}" != "true" ]; then
-            echo 'tauri_config={"build":{"beforeBuildCommand":""},"tauri":{"bundle":{"macOS":{"signingIdentity":null}}}}' \
+            echo 'tauri_config={"build":{"beforeBuildCommand":""},"bundle":{"macOS":{"signingIdentity":null}}}' \
               >> "$GITHUB_OUTPUT"
           else
             echo 'tauri_config={"build":{"beforeBuildCommand":""}}' \
@@ -168,15 +185,13 @@ jobs:
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN:                 ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE:            ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD:   ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY:       ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID:                     ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD:               ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID:                ${{ secrets.APPLE_TEAM_ID }}
-          WINDOWS_CERTIFICATE:          ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          GITHUB_TOKEN:               ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY:     ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID:                   ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD:             ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID:              ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Pedimap 2 ${{ github.ref_name }}'
@@ -186,18 +201,15 @@ jobs:
             for the full change history.
 
             ### Platform installers
-            | Platform | File |
-            |----------|------|
-            | Windows  | `.msi` or `.exe` |
+            | Platform | Files |
+            |----------|-------|
+            | Windows | `.msi` (WiX) · `.exe` (NSIS) |
             | macOS (Apple Silicon) | `.dmg` (aarch64) |
-            | macOS (Intel — via Rosetta 2) | `.dmg` (x86_64) |
+            | macOS (Intel) | `.dmg` (x86_64) |
+            | Linux | `.AppImage` · `.deb` |
 
-            > **macOS note:** These are unsigned builds. On first launch,
-            > right-click the app → Open to bypass Gatekeeper.
-
-            > **Linux:** Temporarily unavailable due to a Tauri 1.x / webkit2gtk
-            > incompatibility. Will be restored with the Tauri 2.x migration.
-            > See the [roadmap](https://github.com/Fresnedo-Lab/pedimap2#roadmap).
+            > **macOS note:** If the build is unsigned, right-click the app → Open
+            > on first launch to bypass Gatekeeper.
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.rust_target }} --config '${{ steps.build-config.outputs.tauri_config }}'
