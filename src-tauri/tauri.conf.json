@@ -75,7 +75,7 @@
   },
   "productName": "Pedimap 2",
   "mainBinaryName": "Pedimap 2",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "identifier": "com.fresnedobreedinglab.pedimap2",
   "plugins": {
     "updater": {

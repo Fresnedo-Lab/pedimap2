@@ -1,6 +1,6 @@
 [package]
 name        = "pedimap2"
-version     = "2.0.0"
+version     = "2.1.0"
 description = "Pedimap 2.0 – multiplatform pedigree visualisation for plant breeding"
 authors     = ["Fresnedo-Lab <https://github.com/Fresnedo-Lab>"]
 license     = "MIT"
