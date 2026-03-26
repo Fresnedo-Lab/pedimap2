@@ -1,0 +1,84 @@
+# .github/workflows/docs.yml
+# ============================
+# Builds pedimap2-manual.pdf from docs/*.md via pandoc + xelatex.
+#
+# Triggers:
+#   • push to main that touches docs/   → build and upload PDF as artifact
+#   • push of a version tag (v*.*.*)    → build and attach PDF to the release
+#
+# The paths: filter applies only to branch pushes; tag pushes are unfiltered
+# and always trigger the build regardless of which files changed.
+
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  build-pdf:
+    name: Build PDF manual
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Install pandoc and XeLaTeX ─────────────────────────────────────────
+      - name: Install pandoc and TeX Live
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pandoc \
+            texlive-xetex \
+            texlive-fonts-recommended \
+            texlive-latex-extra
+
+      # ── Build PDF ──────────────────────────────────────────────────────────
+      # Chapters are concatenated in order; README.md is used as the title page.
+      - name: Build pedimap2-manual.pdf
+        run: |
+          pandoc \
+            docs/README.md \
+            docs/01_introduction.md \
+            docs/02_installation.md \
+            docs/03_quickstart.md \
+            docs/04_file_formats.md \
+            docs/05_interface.md \
+            docs/06_visualization.md \
+            docs/07_data_export.md \
+            docs/08_advanced.md \
+            docs/09_faq.md \
+            docs/CHANGELOG.md \
+            --pdf-engine=xelatex \
+            --toc \
+            --toc-depth=2 \
+            -V title="Pedimap 2 User Manual" \
+            -V author="Fresnedo-Lab" \
+            -V geometry:margin=2.5cm \
+            -V fontsize=11pt \
+            -V mainfont="DejaVu Serif" \
+            -V sansfont="DejaVu Sans" \
+            -V monofont="DejaVu Sans Mono" \
+            -o pedimap2-manual.pdf
+
+      # ── Upload artifact (every run) ────────────────────────────────────────
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pedimap2-manual
+          path: pedimap2-manual.pdf
+          retention-days: 30
+
+      # ── Attach to GitHub Release (tag pushes only) ─────────────────────────
+      - name: Attach PDF to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pedimap2-manual.pdf
