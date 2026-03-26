@@ -33,6 +33,15 @@ Thumbs.db
 *.sublime-project
 *.sublime-workspace
 
+# ── Apple Developer certificates — never commit these ────────────────────────
+*.p12
+*.cer
+*.pem
+*.pfx
+*.mobileprovision
+.tauri/
+~/.tauri/
+
 # ── CI artefacts ─────────────────────────────────────────────────────────────
 *.AppImage
 *.deb
