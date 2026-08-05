@@ -14,6 +14,44 @@ interface Props {
   onSelect:  (id: string) => void;
 }
 
+// Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
+// currently plumbed to the frontend, so we use its default ("-") here.
+const UNKNOWN_PARENT = "-";
+
+// Build a node hover tooltip as a real DOM element.
+//
+// vis-network renders a string `title` as PLAIN TEXT, so an HTML string shows
+// up as literal "<b>…</b>" markup. Passing an HTMLElement makes it render the
+// element. We build every text node with textContent (never innerHTML), so an
+// individual or trait value containing "<" or "&" cannot break the markup or
+// inject content.
+function buildTooltip(ind: GraphNode): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "pedimap-tooltip";
+
+  const name = document.createElement("strong");
+  name.textContent = ind.label;
+  el.appendChild(name);
+
+  const addRow = (label: string, value: string) => {
+    const row = document.createElement("div");
+    row.textContent = `${label}: ${value}`;
+    el.appendChild(row);
+  };
+
+  const parent = (p?: string | null) => (p && p.length > 0 ? p : UNKNOWN_PARENT);
+
+  addRow("Female parent", parent(ind.female_parent));
+  addRow("Male parent",   parent(ind.male_parent));
+  addRow("Generation",    String(ind.generation));
+
+  for (const [trait, value] of Object.entries(ind.traits ?? {})) {
+    addRow(trait, String(value));
+  }
+
+  return el;
+}
+
 // Cross-type → node shape mapping
 const SHAPE: Record<string, string> = {
   cross:            "ellipse",
@@ -47,7 +85,7 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect }: 
       borderWidth:          n.id === selected ? 3 : 1,
       shape:                SHAPE[n.cross_type] ?? "ellipse",
       font:                 { color: "#e8ecf4", size: 11, face: "Inter, sans-serif" },
-      title:                `<b>${n.label}</b><br/>Gen ${n.generation} · ${n.cross_type}`,
+      title:                buildTooltip(n),
       shadow:               { enabled: true, color: "rgba(0,0,0,.4)", size: 8, x: 2, y: 2 },
     }));
 

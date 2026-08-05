@@ -2,7 +2,7 @@
 // ================
 // Type-safe fetch wrapper.  In the Tauri desktop app the backend URL is
 // retrieved from the Rust command; in plain-browser dev mode it falls
-// back to localhost:5173.
+// back to localhost:8765.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -32,13 +32,16 @@ export interface IndividualDetail {
 }
 
 export interface GraphNode {
-  id:         string;
-  label:      string;
-  x:          number;
-  y:          number;
-  generation: number;
-  cross_type: string;
-  is_focal?:  boolean;
+  id:             string;
+  label:          string;
+  x:              number;
+  y:              number;
+  generation:     number;
+  cross_type:     string;
+  female_parent?: string | null;
+  male_parent?:   string | null;
+  traits?:        Record<string, number | string>;
+  is_focal?:      boolean;
 }
 
 export interface GraphEdge {
@@ -75,7 +78,7 @@ async function resolveBackendUrl(): Promise<string> {
     const { invoke } = await import("@tauri-apps/api/core");
     _backendUrl = await invoke<string>("get_backend_url");
   } catch {
-    _backendUrl = "http://127.0.0.1:5173";
+    _backendUrl = "http://127.0.0.1:8765";
   }
   return _backendUrl!;
 }
@@ -123,7 +126,14 @@ export function useApi(): ApiClient {
     getLayout:      ()   => apiFetch("/api/layout"),
     listIndividuals:()   => apiFetch("/api/individuals"),
     getIndividual:  (id) => apiFetch(`/api/individual/${encodeURIComponent(id)}`),
-    getColorMap:    (t)  => apiFetch(`/api/color/${encodeURIComponent(t)}`),
+    getColorMap:    (t)  => {
+      // Issue 1: a color request must never be issued without a trait name.
+      // The backend route is /api/color/{trait_name}; calling it with an empty
+      // trait produces /api/color/ → 404. Treat empty/null/undefined as "no
+      // coloring" and return the default (empty) map without hitting the API.
+      if (!t) return Promise.resolve<Record<string, string>>({});
+      return apiFetch(`/api/color/${encodeURIComponent(t)}`);
+    },
     buildSubpop:    (p)  => apiFetch("/api/subpop", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,6 +158,7 @@ export function useApi(): ApiClient {
 export function useFetch<T>(
   fetcher: () => Promise<T>,
   deps: unknown[] = [],
+  enabled: boolean = true,
 ): { data: T | null; loading: boolean; error: string | null; reload: () => void } {
   const [data,    setData]    = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,6 +180,62 @@ export function useFetch<T>(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  useEffect(() => { load(); }, [load]);
+  // Issue 2: don't fire until `enabled` is true (backend readiness gate). When
+  // it flips true, the effect re-runs and performs the deferred fetch.
+  useEffect(() => { if (enabled) load(); }, [load, enabled]);
   return { data, loading, error, reload: load };
+}
+
+// ── Backend readiness gate ──────────────────────────────────────────────────
+// The PyInstaller sidecar takes 1–3 s to unpack and start. Poll /api/health
+// until it answers before any other request is allowed to fire.
+
+export type BackendStatus = "starting" | "ready" | "error";
+
+const HEALTH_INTERVAL_MS = 500;
+const HEALTH_TIMEOUT_MS  = 15_000;
+
+export function useBackendHealth(): {
+  status: BackendStatus;
+  lastError: string | null;
+  retry: () => void;
+} {
+  const [status,    setStatus]    = useState<BackendStatus>("starting");
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [attempt,   setAttempt]   = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const started = Date.now();
+
+    setStatus("starting");
+    setLastError(null);
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const base = await resolveBackendUrl();
+        const res  = await fetch(`${base}/api/health`);
+        if (cancelled) return;
+        if (res.ok) { setStatus("ready"); return; }
+        setLastError(`Health check returned HTTP ${res.status}`);
+      } catch (e) {
+        if (cancelled) return;
+        setLastError(e instanceof Error ? e.message : String(e));
+      }
+      // Still not ready: give up after the timeout, otherwise poll again.
+      if (Date.now() - started >= HEALTH_TIMEOUT_MS) {
+        setStatus("error");
+        return;
+      }
+      timer = setTimeout(poll, HEALTH_INTERVAL_MS);
+    };
+
+    void poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [attempt]);
+
+  const retry = useCallback(() => setAttempt(a => a + 1), []);
+  return { status, lastError, retry };
 }

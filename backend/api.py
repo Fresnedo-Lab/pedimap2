@@ -2,7 +2,7 @@
 api.py  –  Pedimap 2.0  FastAPI Backend
 =========================================
 Sidecar process spawned by the Tauri shell.
-Listens on 127.0.0.1:5173.
+Listens on 127.0.0.1:8765.
 """
 import json
 import os
@@ -22,6 +22,23 @@ from sample_data import load_sample_data
 # ── Determine if running as PyInstaller bundle ────────────────────────────────
 IS_FROZEN = getattr(sys, "frozen", False)
 BASE_DIR  = sys._MEIPASS if IS_FROZEN else os.path.dirname(os.path.abspath(__file__))
+
+
+def resource_path(relative: str) -> str:
+    """Resolve a path to a bundled resource.
+
+    Works both in development (relative to this file) and inside a PyInstaller
+    bundle (relative to the extracted _MEIPASS directory). Use this anywhere a
+    bundled file — demo data, static assets — needs to be located at runtime.
+    """
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, relative)
+
+
+# ── Runtime configuration ─────────────────────────────────────────────────────
+# Resolved once at import time so the /api/health endpoint and the __main__
+# entry point report the same port.
+PORT = int(os.environ.get("PEDIMAP_PORT", 8765))
 
 # ── Application ───────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -71,7 +88,7 @@ class SubpopRequest(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": app.version, "port": PORT}
 
 
 @app.get("/api/pedigree")
@@ -130,12 +147,17 @@ def get_graph():
     for ind_id, ind in eng._individuals.items():
         p = pos.get(ind_id, {"x": 0, "y": 0})
         nodes.append({
-            "id":         ind.id,
-            "label":      ind.name,
-            "x":          p["x"],
-            "y":          p["y"],
-            "generation": ind.generation,
-            "cross_type": ind.cross_type.value,
+            "id":            ind.id,
+            "label":         ind.name,
+            "x":             p["x"],
+            "y":             p["y"],
+            "generation":    ind.generation,
+            "cross_type":    ind.cross_type.value,
+            # Included so the frontend can build node hover tooltips without a
+            # second round-trip. Parents are None for founders/unknown parents.
+            "female_parent": ind.female_parent,
+            "male_parent":   ind.male_parent,
+            "traits":        ind.traits,
         })
     edges = [
         {"from": u, "to": v, "role": d.get("role", "unknown")}
@@ -169,12 +191,16 @@ def build_subpop(req: SubpopRequest):
         ind = eng.get(ind_id)
         p   = pos.get(ind_id, {"x": 0, "y": 0})
         nodes.append({
-            "id":         ind_id,
-            "label":      ind.name if ind else ind_id,
-            "x":          p["x"],
-            "y":          p["y"],
-            "generation": eng.generation_of(ind_id),
-            "is_focal":   ind_id == req.focal_id,
+            "id":            ind_id,
+            "label":         ind.name if ind else ind_id,
+            "x":             p["x"],
+            "y":             p["y"],
+            "generation":    eng.generation_of(ind_id),
+            "cross_type":    ind.cross_type.value if ind else "unknown",
+            "female_parent": ind.female_parent if ind else None,
+            "male_parent":   ind.male_parent if ind else None,
+            "traits":        ind.traits if ind else {},
+            "is_focal":      ind_id == req.focal_id,
         })
     for u, v, d in eng.graph.edges(data=True):
         if u in ids and v in ids:
@@ -283,5 +309,14 @@ def reset():
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    port = int(os.environ.get("PEDIMAP_PORT", 5173))
-    uvicorn.run("api:app", host="127.0.0.1", port=port, log_level="warning")
+    # Required for PyInstaller bundles on macOS and Windows: without it, the
+    # frozen executable re-spawns itself instead of starting child processes,
+    # causing process-spawn recursion.
+    import multiprocessing
+    multiprocessing.freeze_support()
+
+    # Pass the app object (not the "api:app" import string): uvicorn resolves an
+    # import string by importing a module named "api" from the filesystem, which
+    # does not exist inside a PyInstaller bundle. Passing the object also means
+    # reload/workers are unavailable — correct for a bundled sidecar.
+    uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")

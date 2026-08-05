@@ -52,3 +52,7 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
 ## Known issues
 - Tauri 1.x had a Linux webkit2gtk ABI mismatch — Tauri 2 resolves this
 - secrets context not available in step-level if: — use job-level env: blocks
+- CSP lives ONLY in src-tauri/tauri.conf.json (app.security.csp). Never add
+  a <meta http-equiv="Content-Security-Policy"> tag to frontend/index.html:
+  in dev the Vite-served page has no CSP header, so a meta tag becomes the
+  sole enforced policy and silently overrides the Tauri config.

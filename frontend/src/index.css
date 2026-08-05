@@ -61,3 +61,30 @@ input, select {
   transition: border-color .15s;
 }
 input:focus, select:focus { border-color: var(--accent); }
+
+/* ── vis-network node tooltips ──────────────────────────────────────────── */
+/* vis-network wraps the tooltip element in a .vis-tooltip box; neutralize its
+   default light styling so our themed .pedimap-tooltip shows through. */
+.vis-tooltip {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.pedimap-tooltip {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text-1);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 280px;
+}
+.pedimap-tooltip strong {
+  display: block;
+  color: var(--text-0);
+  font-weight: 600;
+  margin-bottom: 2px;
+}

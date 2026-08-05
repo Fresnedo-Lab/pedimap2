@@ -4,12 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icons/32x32.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy"
-          content="default-src 'self' http://127.0.0.1:5173;
-                   connect-src http://127.0.0.1:5173;
-                   img-src 'self' data: blob:;
-                   style-src 'self' 'unsafe-inline';
-                   script-src 'self' 'unsafe-eval'" />
+    <!-- No CSP meta tag here by design.
+         Tauri injects the CSP from src-tauri/tauri.conf.json
+         (app.security.csp) into the production build. In dev the page is
+         served by Vite, which sends no CSP header, so a meta tag here would
+         be the ONLY policy in effect and would silently override the Tauri
+         config. Edit the CSP in tauri.conf.json instead. -->
     <title>Pedimap 2</title>
   </head>
   <body>

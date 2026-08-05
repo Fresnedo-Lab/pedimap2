@@ -1,0 +1,11 @@
+{
+  "name": "pedimap2",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Pedimap 2 — multiplatform desktop app for pedigree visualization in plant breeding",
+  "scripts": {
+    "sidecar": "bash scripts/build-sidecar.sh",
+    "app:dev": "npm run sidecar && cargo tauri dev",
+    "app:build": "npm run sidecar && cargo tauri build"
+  }
+}

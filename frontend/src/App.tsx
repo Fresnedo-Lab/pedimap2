@@ -19,10 +19,10 @@
 //         whose optional-string / void signatures don't match MouseEventHandler.
 //         Wrapped in arrow functions: onClick={() => loadGraph()}  etc.
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  useApi, useFetch,
+  useApi, useFetch, useBackendHealth,
   type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
 } from "./hooks/useApi";
@@ -50,14 +50,78 @@ function Spinner() {
   );
 }
 
+// Readiness gate shown in the body until the backend answers /api/health.
+// The top bar / toolbar is always rendered by App, so it stays usable even
+// while this is on screen — the user is never trapped.
+function BackendGate({
+  status, lastError, onRetry,
+}: {
+  status: "starting" | "error";
+  lastError: string | null;
+  onRetry: () => void;
+}) {
+  const [showDetail, setShowDetail] = useState(false);
+
+  if (status === "starting") {
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", gap: 14 }}>
+        <div style={{ width: 36, height: 36, border: "3px solid #252e42",
+          borderTopColor: "#4f9cf9", borderRadius: "50%",
+          animation: "spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <span style={{ color: "#a0aec0", fontSize: 13 }}>
+          Starting Pedimap backend…
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", gap: 14, padding: 24 }}>
+      <div style={{ fontSize: 30 }}>⚠️</div>
+      <div style={{ color: "#e8ecf4", fontSize: 15, fontWeight: 600 }}>
+        Cannot reach the Pedimap backend service.
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={onRetry}
+          style={{ background: "#1d3a6e", color: "#4f9cf9", padding: "6px 16px", fontSize: 13 }}>
+          ↻ Retry
+        </button>
+        <button onClick={() => setShowDetail(s => !s)}
+          style={{ background: "#252e42", color: "#a0aec0", padding: "6px 16px", fontSize: 13 }}>
+          {showDetail ? "Hide details" : "Show details"}
+        </button>
+      </div>
+      {showDetail && (
+        <pre style={{ maxWidth: 520, maxHeight: 180, overflow: "auto",
+          background: "#0b0e14", border: "1px solid #2e3a52", borderRadius: 6,
+          padding: 10, color: "#94a3b8", fontSize: 11, whiteSpace: "pre-wrap",
+          margin: 0 }}>
+          {lastError ?? "No error detail available."}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 
 export default function App() {
   const api = useApi();
 
-  // ── Server data ───────────────────────────────────────────────────────────
+  // ── Backend readiness gate (Issue 2) ──────────────────────────────────────
+  const { status: backendStatus, lastError: backendError, retry: retryBackend } =
+    useBackendHealth();
+  const ready = backendStatus === "ready";
+
+  // Surface failed requests in the UI instead of as unhandled rejections.
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // ── Server data (deferred until the backend is ready) ─────────────────────
   const { data: pedigree, reload: reloadPedigree } =
-    useFetch<PedigreeData>(() => api.getPedigree());
+    useFetch<PedigreeData>(() => api.getPedigree(), [], ready);
 
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
@@ -74,13 +138,25 @@ export default function App() {
       ]);
       setGraphData(g);
       setColorMap(cm);
+      setLoadError(null);
+    } catch (e) {
+      // Issue 3: surface the failure in the UI error banner rather than
+      // letting the rejection go unhandled.
+      setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
       setGraphLoading(false);
     }
   }, [api, activeTrait]);
 
-  // Initialise once
-  useState(() => { loadGraph(); });
+  // Issue 2 + 3: initialise once, only after the backend reports healthy.
+  // loadGraph catches its own errors, so this fire-and-forget call can't reject.
+  const didInit = useRef(false);
+  useEffect(() => {
+    if (ready && !didInit.current) {
+      didInit.current = true;
+      void loadGraph();
+    }
+  }, [ready, loadGraph]);
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selectedId,     setSelectedId] = useState<string | null>(null);
@@ -95,8 +171,14 @@ export default function App() {
   // ── Trait colouring ───────────────────────────────────────────────────────
   const handleTraitChange = useCallback(async (name: string) => {
     setActiveTrait(name);
-    const cm = await api.getColorMap(name);
-    setColorMap(cm);
+    try {
+      // getColorMap returns the default (empty) map when name is "" — no request.
+      const cm = await api.getColorMap(name);
+      setColorMap(cm);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
   }, [api]);
 
   // ── File open ─────────────────────────────────────────────────────────────
@@ -114,8 +196,9 @@ export default function App() {
         await api.loadFile([file]);
         reloadPedigree();
         await loadGraph();
+        setLoadError(null);
       } catch (e) {
-        console.error(e);
+        setLoadError(e instanceof Error ? e.message : String(e));
       }
     } else {
       fileInputRef.current?.click();
@@ -131,8 +214,9 @@ export default function App() {
       await api.loadFile(files);
       reloadPedigree();
       await loadGraph();
+      setLoadError(null);
     } catch (err) {
-      alert(String(err));
+      setLoadError(err instanceof Error ? err.message : String(err));
     }
     e.target.value = "";
   }, [api, loadGraph, reloadPedigree]);
@@ -140,26 +224,36 @@ export default function App() {
   // ── Subpopulation ─────────────────────────────────────────────────────────
   const handleSubpop = useCallback(async () => {
     if (!selectedId) return;
-    const g = await api.buildSubpop({
-      focal_id: selectedId, ancestors: true, descendants: true, siblings: false,
-    });
-    setGraphData(g);
-    const cm = await api.getColorMap(activeTrait);
-    setColorMap(cm);
+    try {
+      const g = await api.buildSubpop({
+        focal_id: selectedId, ancestors: true, descendants: true, siblings: false,
+      });
+      setGraphData(g);
+      const cm = await api.getColorMap(activeTrait);
+      setColorMap(cm);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
   }, [api, selectedId, activeTrait]);
 
   const handleReset = useCallback(async () => {
-    await api.reset();
-    reloadPedigree();
-    await loadGraph();
-    setSelectedId(null);
-    setDetail(null);
+    try {
+      await api.reset();
+      reloadPedigree();
+      await loadGraph();
+      setSelectedId(null);
+      setDetail(null);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
   }, [api, loadGraph, reloadPedigree]);
 
   // ── Search filter ─────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const { data: indList } = useFetch<IndividualSummary[]>(
-    () => api.listIndividuals(), []
+    () => api.listIndividuals(), [], ready
   );
   const filtered = (indList ?? []).filter(i =>
     i.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -231,9 +325,33 @@ export default function App() {
         </span>
       </div>
 
+      {/* ── Error banner (Issue 3) ───────────────────────────────────────── */}
+      {loadError && (
+        <div style={{ background: "#3b1d1d", color: "#fca5a5",
+          padding: "6px 14px", fontSize: 12, borderBottom: "1px solid #5b2a2a",
+          display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ flex: 1 }}>⚠️ {loadError}</span>
+          <button onClick={() => setLoadError(null)}
+            style={{ background: "transparent", color: "#fca5a5", fontSize: 11 }}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* ── Body ─────────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
 
+        {/* Issue 2: gate the workspace on backend readiness. The top bar above
+            stays mounted and enabled in every state, so the user can always
+            Retry, open a file, or reset. */}
+        {!ready ? (
+          <BackendGate
+            status={backendStatus === "error" ? "error" : "starting"}
+            lastError={backendError}
+            onRetry={retryBackend}
+          />
+        ) : (
+        <>
         {/* Sidebar */}
         <div style={{ width: 220, flexShrink: 0, display: "flex",
           flexDirection: "column", background: "#161b27",
@@ -298,6 +416,8 @@ export default function App() {
             onSelectId={handleSelect}
             onClose={() => { setSelectedId(null); setDetail(null); }}
           />
+        )}
+        </>
         )}
       </div>
 
