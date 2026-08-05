@@ -44,7 +44,7 @@ PORT = int(os.environ.get("PEDIMAP_PORT", 8765))
 app = FastAPI(
     title="Pedimap 2.0 API",
     description="REST backend for the Pedimap 2.0 desktop application",
-    version="2.0.0",
+    version="2.1.0",
 )
 
 app.add_middleware(
