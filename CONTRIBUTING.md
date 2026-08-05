@@ -11,10 +11,10 @@ maintained by [Fresnedo-Lab](https://github.com/Fresnedo-Lab).
 
 | Tool       | Version   | Install |
 |------------|-----------|---------|
-| Python     | ≥ 3.10    | [python.org](https://www.python.org) |
-| Node.js    | ≥ 18      | [nodejs.org](https://nodejs.org) |
+| Python     | 3.12      | [python.org](https://www.python.org) |
+| Node.js    | 22        | [nodejs.org](https://nodejs.org) |
 | Rust       | stable    | `curl https://sh.rustup.rs -sSf \| sh` |
-| Tauri CLI  | ≥ 1.6     | `cargo install tauri-cli` |
+| Tauri CLI  | ^2        | `cargo install tauri-cli --version "^2" --locked` |
 
 ### 1 — Clone the repository
 
@@ -25,8 +25,15 @@ cd pedimap2
 
 ### 2 — Install backend dependencies
 
+An isolated virtual environment is required. `npm run app:dev` builds the
+Python sidecar with PyInstaller, which bundles whichever interpreter it runs
+under — so the dependencies (and PyInstaller) must live in `backend/.venv`.
+`scripts/build-sidecar.sh` refuses to run without it.
+
 ```bash
-pip install -r backend/requirements.txt
+python3.12 -m venv backend/.venv
+source backend/.venv/bin/activate          # Windows: backend\.venv\Scripts\activate
+pip install -r backend/requirements.txt pyinstaller
 ```
 
 ### 3 — Install frontend dependencies
@@ -37,15 +44,13 @@ cd frontend && npm install && cd ..
 
 ### 4 — Run in development mode
 
-**Terminal 1 — Python backend:**
 ```bash
-cd backend && python api.py
+npm run app:dev
 ```
 
-**Terminal 2 — Tauri dev window (hot-reload):**
-```bash
-cargo tauri dev
-```
+This builds and stages the Python sidecar, then launches the Tauri dev window
+with hot-reload. The backend runs as a sidecar on `127.0.0.1:8765`; the
+frontend polls `/api/health` and waits for it before issuing other requests.
 
 ---
 
@@ -80,8 +85,9 @@ pedimap2/
 │   ├── release.yml           Cross-platform release CI
 │   └── ci.yml                PR validation CI
 │
-├── build_sidecar.sh          Build Python sidecar (Linux/macOS)
-├── build_sidecar.ps1         Build Python sidecar (Windows)
+├── scripts/
+│   └── build-sidecar.sh      Build + stage the Python sidecar
+├── package.json              Root scripts (sidecar, app:dev, app:build)
 └── README.md
 ```
 

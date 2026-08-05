@@ -7,7 +7,7 @@
 #
 # The resulting binary ends up in dist/pedimap-backend[.exe]
 # It must then be renamed with the Tauri target triple before being placed
-# in src-tauri/binaries/ — see build_sidecar.sh / build_sidecar.ps1.
+# in src-tauri/binaries/ — see scripts/build-sidecar.sh (run via `npm run sidecar`).
 #
 # Target triple examples:
 #   Windows x86_64   pedimap-backend-x86_64-pc-windows-msvc.exe

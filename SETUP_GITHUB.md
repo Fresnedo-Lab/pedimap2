@@ -112,7 +112,7 @@ https://github.com/Fresnedo-Lab/pedimap2/actions/workflows/ci.yml
 
 | Symptom | Fix |
 |---------|-----|
-| `error: sidecar not found` | Make sure `build_sidecar.sh` ran successfully before `cargo tauri build` |
+| `error: sidecar not found` | Make sure the sidecar was built (`npm run sidecar`) before `cargo tauri build` |
 | `WebKit2GTK not found` (Linux CI) | The `ci.yml` installs it automatically; for local builds: `sudo apt install libwebkit2gtk-4.0-dev` |
 | macOS `Unidentified developer` | Right-click the `.app` → Open (first launch only, for unsigned builds) |
 | Windows SmartScreen warning | Click "More info" → "Run anyway" (for unsigned builds) |
