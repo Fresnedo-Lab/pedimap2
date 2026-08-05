@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="512"
+  height="512"
+  role="img"
+  aria-labelledby="pedimap-icon-title">
+
+  <title id="pedimap-icon-title">Pedimap 2.0 Application Icon</title>
+  <desc>Diamond Cross icon for Pedimap 2.0. Three generations of a pedigree converge on the focal variety amber node. Designed to remain legible from 16×16 (favicon) to 1024×1024 (app store).</desc>
+
+  <!-- ═══════════════════════════════════════════
+       PEDIMAP 2.0 — APPLICATION ICON
+       Diamond Cross  ·  512 × 512 px base
+
+       Scales cleanly to:
+         16×16   favicon.ico
+         32×32   browser tab / taskbar
+         48×48   Windows desktop
+         64×64   macOS Finder list
+        128×128  macOS Dock
+        256×256  Windows / Linux large icon
+        512×512  App store / high-DPI
+       1024×1024  macOS App Store
+
+       Color tokens:
+         #E1F5EE  teal-50   grandparent fill
+         #9FE1CB  teal-100  grandparent dot
+         #d4f0e4  teal-75   parent fill
+         #5DCAA5  teal-400  parent dot
+         #1D9E75  teal-600  grandparent stroke / gp→p edges
+         #0F6E56  teal-700  p→v edges / parent stroke
+         #085041  teal-800  background
+         #EF9F27  amber-400 focal fill
+         #FAC775  amber-200 focal mid ring
+         #FCDE5A  amber-100 focal inner highlight
+         #BA7517  amber-600 focal stroke / version text
+       ═══════════════════════════════════════════ -->
+
+  <!-- ── BACKGROUND: rounded square, deep forest green ── -->
+  <!-- rx="92" gives the Apple-style squircle rounding at 512px -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#085041"/>
+
+  <!-- ── subtle vignette ring (depth without gradients) ── -->
+  <rect x="0" y="0" width="512" height="512" rx="112"
+        fill="none" stroke="#04342C" stroke-width="18" opacity="0.5"/>
+
+  <!-- ══════════════════════════════════════════
+       MARK — centered on (256, 270)
+       Designed at icon scale: nodes are large
+       enough to read at 32px rendered size.
+  ════════════════════════════════════════════ -->
+
+  <!-- Generation 0: ancestry hint dashes -->
+  <line x1="116" y1="78"  x2="116" y2="108" stroke="#5DCAA5" stroke-width="5"  stroke-dasharray="7,9"   stroke-linecap="round" opacity="0.7"/>
+  <line x1="196" y1="78"  x2="196" y2="108" stroke="#5DCAA5" stroke-width="5"  stroke-dasharray="7,9"   stroke-linecap="round" opacity="0.7"/>
+  <line x1="316" y1="78"  x2="316" y2="108" stroke="#5DCAA5" stroke-width="5"  stroke-dasharray="7,9"   stroke-linecap="round" opacity="0.7"/>
+  <line x1="396" y1="78"  x2="396" y2="108" stroke="#5DCAA5" stroke-width="5"  stroke-dasharray="7,9"   stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Generation 1→2: grandparent to parent edges -->
+  <line x1="116" y1="130" x2="176" y2="256" stroke="#1D9E75" stroke-width="6"  stroke-linecap="round"/>
+  <line x1="196" y1="130" x2="176" y2="256" stroke="#1D9E75" stroke-width="6"  stroke-linecap="round"/>
+  <line x1="316" y1="130" x2="336" y2="256" stroke="#1D9E75" stroke-width="6"  stroke-linecap="round"/>
+  <line x1="396" y1="130" x2="336" y2="256" stroke="#1D9E75" stroke-width="6"  stroke-linecap="round"/>
+
+  <!-- Generation 2→3: parent to focal variety edges -->
+  <line x1="176" y1="256" x2="256" y2="388" stroke="#5DCAA5" stroke-width="9"  stroke-linecap="round"/>
+  <line x1="336" y1="256" x2="256" y2="388" stroke="#5DCAA5" stroke-width="9"  stroke-linecap="round"/>
+
+  <!-- Generation 1: Grandparent nodes -->
+  <!-- Outer ring -->
+  <circle cx="116" cy="130" r="26" fill="#E1F5EE" stroke="#1D9E75" stroke-width="5.5"/>
+  <circle cx="116" cy="130" r="11" fill="#9FE1CB"/>
+  <circle cx="196" cy="130" r="26" fill="#E1F5EE" stroke="#1D9E75" stroke-width="5.5"/>
+  <circle cx="196" cy="130" r="11" fill="#9FE1CB"/>
+  <circle cx="316" cy="130" r="26" fill="#E1F5EE" stroke="#1D9E75" stroke-width="5.5"/>
+  <circle cx="316" cy="130" r="11" fill="#9FE1CB"/>
+  <circle cx="396" cy="130" r="26" fill="#E1F5EE" stroke="#1D9E75" stroke-width="5.5"/>
+  <circle cx="396" cy="130" r="11" fill="#9FE1CB"/>
+
+  <!-- Generation 2: Parent nodes -->
+  <circle cx="176" cy="256" r="36" fill="#d4f0e4" stroke="#0F6E56" stroke-width="6.5"/>
+  <circle cx="176" cy="256" r="16" fill="#5DCAA5"/>
+  <circle cx="336" cy="256" r="36" fill="#d4f0e4" stroke="#0F6E56" stroke-width="6.5"/>
+  <circle cx="336" cy="256" r="16" fill="#5DCAA5"/>
+
+  <!-- Generation 3: Focal variety node (amber) -->
+  <!-- Outer glow ring -->
+  <circle cx="256" cy="388" r="68" fill="#BA7517" opacity="0.20"/>
+  <!-- Main node -->
+  <circle cx="256" cy="388" r="56" fill="#EF9F27" stroke="#BA7517" stroke-width="7"/>
+  <!-- Mid ring -->
+  <circle cx="256" cy="388" r="28" fill="#FAC775"/>
+  <!-- Inner highlight -->
+  <circle cx="256" cy="388" r="12" fill="#FCDE5A"/>
+
+</svg>

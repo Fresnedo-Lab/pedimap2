@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 520 168"
+  width="520"
+  height="168"
+  role="img"
+  aria-labelledby="pedimap-logo-title">
+
+  <title id="pedimap-logo-title">Pedimap 2.0 — Pedigree Mapping Tool</title>
+  <desc>Horizontal wordmark for Pedimap 2.0. Diamond Cross icon showing three generations of a pedigree converging on the focal variety (amber node), paired with the Pedimap 2.0 wordmark.</desc>
+
+  <!-- ═══════════════════════════════════════════
+       COLOR TOKENS
+       Green ramp  : #E1F5EE · #9FE1CB · #5DCAA5 · #1D9E75 · #0F6E56 · #085041
+       Amber ramp  : #FCDE5A · #FAC775 · #EF9F27 · #BA7517
+       ═══════════════════════════════════════════ -->
+
+  <!-- ── DIAMOND CROSS MARK ── -->
+  <!-- Vertical anchor: mark spans y=14..154, center y=84 -->
+  <!-- Horizontal span: x=22..178, center x=100 -->
+
+  <!-- Generation 0: ancestry hint dashes above grandparents -->
+  <line x1="34"  y1="20"  x2="34"  y2="36"  stroke="#9FE1CB" stroke-width="1.4" stroke-dasharray="2.5,3.5" stroke-linecap="round"/>
+  <line x1="72"  y1="20"  x2="72"  y2="36"  stroke="#9FE1CB" stroke-width="1.4" stroke-dasharray="2.5,3.5" stroke-linecap="round"/>
+  <line x1="128" y1="20"  x2="128" y2="36"  stroke="#9FE1CB" stroke-width="1.4" stroke-dasharray="2.5,3.5" stroke-linecap="round"/>
+  <line x1="166" y1="20"  x2="166" y2="36"  stroke="#9FE1CB" stroke-width="1.4" stroke-dasharray="2.5,3.5" stroke-linecap="round"/>
+
+  <!-- Generation 1→2: grandparent to parent edges -->
+  <line x1="34"  y1="44"  x2="53"  y2="90"  stroke="#1D9E75" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="72"  y1="44"  x2="53"  y2="90"  stroke="#1D9E75" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="128" y1="44"  x2="147" y2="90"  stroke="#1D9E75" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="166" y1="44"  x2="147" y2="90"  stroke="#1D9E75" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- Generation 2→3: parent to focal variety edges -->
+  <line x1="53"  y1="90"  x2="100" y2="140" stroke="#0F6E56" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="147" y1="90"  x2="100" y2="140" stroke="#0F6E56" stroke-width="2.4" stroke-linecap="round"/>
+
+  <!-- Generation 1: Grandparent nodes -->
+  <circle cx="34"  cy="44" r="8.5"  fill="#E1F5EE" stroke="#1D9E75" stroke-width="1.8"/>
+  <circle cx="34"  cy="44" r="3.5"  fill="#9FE1CB"/>
+  <circle cx="72"  cy="44" r="8.5"  fill="#E1F5EE" stroke="#1D9E75" stroke-width="1.8"/>
+  <circle cx="72"  cy="44" r="3.5"  fill="#9FE1CB"/>
+  <circle cx="128" cy="44" r="8.5"  fill="#E1F5EE" stroke="#1D9E75" stroke-width="1.8"/>
+  <circle cx="128" cy="44" r="3.5"  fill="#9FE1CB"/>
+  <circle cx="166" cy="44" r="8.5"  fill="#E1F5EE" stroke="#1D9E75" stroke-width="1.8"/>
+  <circle cx="166" cy="44" r="3.5"  fill="#9FE1CB"/>
+
+  <!-- Generation 2: Parent nodes -->
+  <circle cx="53"  cy="90" r="12"   fill="#d4f0e4" stroke="#0F6E56" stroke-width="2"/>
+  <circle cx="53"  cy="90" r="5.5"  fill="#5DCAA5"/>
+  <circle cx="147" cy="90" r="12"   fill="#d4f0e4" stroke="#0F6E56" stroke-width="2"/>
+  <circle cx="147" cy="90" r="5.5"  fill="#5DCAA5"/>
+
+  <!-- Generation 3: Focal variety node (amber) -->
+  <circle cx="100" cy="140" r="19"  fill="#EF9F27" stroke="#BA7517" stroke-width="2.4"/>
+  <circle cx="100" cy="140" r="9.5" fill="#FAC775"/>
+  <circle cx="100" cy="140" r="4.5" fill="#FCDE5A"/>
+
+  <!-- ── DIVIDER ── -->
+  <line x1="200" y1="22" x2="200" y2="148" stroke="#1D9E75" stroke-width="0.8" opacity="0.30"/>
+
+  <!-- ── WORDMARK ── -->
+  <!-- Primary logotype: "Pedimap" in serif, deep forest green -->
+  <text
+    x="220"
+    y="104"
+    font-family="Georgia, 'Times New Roman', 'Palatino Linotype', serif"
+    font-size="72"
+    font-weight="700"
+    letter-spacing="-1.5"
+    fill="#085041">Pedimap</text>
+
+  <!-- Version tag: "2.0" aligned under wordmark -->
+  <text
+    x="222"
+    y="138"
+    font-family="Georgia, 'Times New Roman', 'Palatino Linotype', serif"
+    font-size="24"
+    font-weight="400"
+    letter-spacing="2"
+    fill="#BA7517">version 2.0</text>
+
+</svg>
