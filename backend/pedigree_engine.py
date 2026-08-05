@@ -23,6 +23,7 @@ class CrossType(str, Enum):
     DOUBLED_HAPLOID  = "dh"
     BACKCROSS        = "backcross"
     OPEN_POLLINATED  = "op"
+    MUTANT           = "mut"
     UNKNOWN          = "unknown"
 
 
@@ -83,6 +84,11 @@ class PedigreeEngine:
         self.markers: List[MarkerMeta] = []
         self.population_name: str = ""
         self.ploidy: int = 2
+        # IBD founder-allele probabilities keyed lg -> position -> individual ->
+        # [homologue vectors]. Populated by the .dat parser; empty otherwise.
+        # No UI consumes it yet, but it is carried through to_dict() so the data
+        # survives a round-trip.
+        self.ibd: Dict[str, Any] = {}
 
     # ── Mutation ──────────────────────────────────────────────────────────────
 
@@ -224,6 +230,7 @@ class PedigreeEngine:
                 }
                 for m in self.markers
             ],
+            "ibd": self.ibd,
         }
 
     @classmethod
@@ -231,6 +238,8 @@ class PedigreeEngine:
         eng = cls()
         eng.population_name = data.get("population", "")
         eng.ploidy = data.get("ploidy", 2)
+        # Round-trip IBD data (emitted by to_dict); absent for non-IBD files.
+        eng.ibd = data.get("ibd", {})
         for t in data.get("traits", []):
             eng.traits.append(TraitMeta(
                 name=t["name"],

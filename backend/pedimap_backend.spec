@@ -40,7 +40,11 @@ a = Analysis(
         + datas_anyio
         + [('pedigree_engine.py', '.')]
         + [('sample_data.py', '.')]
-        + [('pmp_parser.py', '.')] if os.path.exists('pmp_parser.py') else []
+        + [('pmp_parser.py', '.')]
+        # Bundled legacy example datasets — shipped under demo_data/ inside the
+        # binary so /api/demo/* can serve them from the frozen bundle.
+        + [('demo_data/Example.dat', 'demo_data')]
+        + [('demo_data/Example.pmp', 'demo_data')]
     ),
     hiddenimports=(
         hidden_fastapi
@@ -67,6 +71,7 @@ a = Analysis(
             'anyio',
             'anyio._backends._asyncio',
             'h11',
+            'pmp_parser',
             'pydantic',
             'pydantic.deprecated.class_validators',
             'email.mime.text',

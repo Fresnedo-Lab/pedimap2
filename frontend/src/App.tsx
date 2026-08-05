@@ -237,6 +237,19 @@ export default function App() {
     }
   }, [api, selectedId, activeTrait]);
 
+  const handleLoadExample = useCallback(async () => {
+    try {
+      await api.loadDemo("Example");
+      reloadPedigree();
+      await loadGraph();
+      setSelectedId(null);
+      setDetail(null);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [api, loadGraph, reloadPedigree]);
+
   const handleReset = useCallback(async () => {
     try {
       await api.reset();
@@ -287,6 +300,11 @@ export default function App() {
         <button onClick={handleReset}
           style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
           ↺ Demo Data
+        </button>
+
+        <button onClick={handleLoadExample}
+          style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
+          📄 Load Example Data
         </button>
 
         {traits.length > 0 && (

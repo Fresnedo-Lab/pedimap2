@@ -115,6 +115,8 @@ export interface ApiClient {
     siblings?: boolean;
   }):                                      Promise<GraphData>;
   loadFile(files: FileList | File[]):      Promise<{loaded: string; individuals: number}>;
+  listDemo():                              Promise<{datasets: {name: string; description: string}[]}>;
+  loadDemo(name: string):                  Promise<{loaded: string; individuals: number}>;
   reset():                                 Promise<void>;
 }
 
@@ -149,6 +151,8 @@ export function useApi(): ApiClient {
       if (pmp) fd.append("pmp_file", pmp, pmp.name);
       return apiFetch("/api/load", { method: "POST", body: fd });
     },
+    listDemo: ()     => apiFetch("/api/demo/list"),
+    loadDemo: (name) => apiFetch(`/api/demo/load/${encodeURIComponent(name)}`),
     reset: () => apiFetch("/api/reset", { method: "POST" }),
   };
 }

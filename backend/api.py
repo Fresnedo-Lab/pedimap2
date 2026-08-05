@@ -255,6 +255,77 @@ async def load_file(
         raise HTTPException(400, f"Parse error: {exc}")
 
 
+# ── Demo data ─────────────────────────────────────────────────────────────────
+# Bundled legacy Pedimap 1.x example datasets. resource_path() finds them both
+# in development (backend/demo_data/) and inside the frozen sidecar bundle.
+_DEMO_DIR = resource_path("demo_data")
+
+
+def _demo_description(dat_path: str) -> str:
+    """First ';' comment line of the .dat, used as a human-readable blurb."""
+    try:
+        with open(dat_path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                s = line.strip()
+                if s.startswith(";"):
+                    return s.lstrip(";").strip()
+                if s:  # first real content line — no leading comment
+                    break
+    except OSError:
+        pass
+    return ""
+
+
+@app.get("/api/demo/list")
+def demo_list():
+    """Available bundled demo datasets, each with a name and description."""
+    datasets = []
+    try:
+        names = sorted(os.listdir(_DEMO_DIR))
+    except OSError:
+        names = []
+    for fn in names:
+        if fn.lower().endswith(".dat"):
+            name = fn[:-4]
+            desc = _demo_description(os.path.join(_DEMO_DIR, fn)) or f"{name} dataset"
+            datasets.append({"name": name, "description": desc})
+    return {"datasets": datasets}
+
+
+@app.get("/api/demo/load/{name}")
+def demo_load(name: str):
+    """Parse a bundled demo dataset and make it the active pedigree.
+
+    Returns the same acknowledgement shape as POST /api/load; the client then
+    refetches /api/pedigree and /api/graph.
+    """
+    global _engine
+    # Names are simple identifiers — reject anything that could traverse paths.
+    if not name or not all(c.isalnum() or c in "-_" for c in name):
+        raise HTTPException(400, f"Invalid demo dataset name: {name!r}")
+    dat_path = os.path.join(_DEMO_DIR, name + ".dat")
+    if not os.path.exists(dat_path):
+        raise HTTPException(404, f"Demo dataset not found: {name!r}")
+    try:
+        from pmp_parser import PmpParser
+    except ImportError:
+        raise HTTPException(501, "pmp_parser module not available in this build.")
+
+    dat_text = open(dat_path, encoding="utf-8", errors="replace").read()
+    pmp_path = os.path.join(_DEMO_DIR, name + ".pmp")
+    try:
+        if os.path.exists(pmp_path):
+            pmp_text = open(pmp_path, encoding="utf-8", errors="replace").read()
+            result = PmpParser.from_pmp_text(pmp_text, dat_text)
+        else:
+            result = PmpParser.from_dat_text(dat_text)
+    except Exception as exc:
+        raise HTTPException(400, f"Parse error: {exc}")
+
+    _engine = result.engine
+    return {"loaded": name, "individuals": _engine.count()}
+
+
 @app.get("/api/export/json")
 def export_json():
     return JSONResponse(_engine.to_dict())
