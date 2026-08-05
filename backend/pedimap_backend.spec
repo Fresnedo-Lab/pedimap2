@@ -41,6 +41,9 @@ a = Analysis(
         + [('pedigree_engine.py', '.')]
         + [('sample_data.py', '.')]
         + [('pmp_parser.py', '.')]
+        # Single source of truth for the app version, read at runtime by
+        # api._resolve_version() so the backend can't drift from the others.
+        + [('../package.json', '.')]
         # Bundled legacy example datasets — shipped under demo_data/ inside the
         # binary so /api/demo/* can serve them from the frozen bundle.
         + [('demo_data/Example.dat', 'demo_data')]

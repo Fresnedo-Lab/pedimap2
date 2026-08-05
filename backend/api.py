@@ -40,11 +40,34 @@ def resource_path(relative: str) -> str:
 # entry point report the same port.
 PORT = int(os.environ.get("PEDIMAP_PORT", 8765))
 
+
+def _resolve_version() -> str:
+    """Read the app version from package.json — the single source of truth.
+
+    The backend must NOT carry its own version literal that could drift from
+    package.json / Cargo.toml / tauri.conf.json. Reads the bundled copy inside
+    the frozen sidecar (resource_path) and the repo-root file in development.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    for path in (resource_path("package.json"),          # frozen bundle
+                 os.path.join(here, "..", "package.json")):  # dev (repo root)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                version = json.load(fh).get("version")
+            if version:
+                return version
+        except (OSError, ValueError):
+            continue
+    return "0.0.0"  # last resort; indicates the version file was not found
+
+
+__version__ = _resolve_version()
+
 # ── Application ───────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Pedimap 2.0 API",
     description="REST backend for the Pedimap 2.0 desktop application",
-    version="2.1.0",
+    version=__version__,
 )
 
 app.add_middleware(
