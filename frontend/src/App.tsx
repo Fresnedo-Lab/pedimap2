@@ -123,6 +123,9 @@ export default function App() {
   const { data: pedigree, reload: reloadPedigree } =
     useFetch<PedigreeData>(() => api.getPedigree(), [], ready);
 
+  const { data: indList, reload: reloadIndividuals } =
+    useFetch<IndividualSummary[]>(() => api.listIndividuals(), [], ready);
+
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
   const [activeTrait, setActiveTrait] = useState<string>("");
@@ -147,6 +150,16 @@ export default function App() {
       setGraphLoading(false);
     }
   }, [api, activeTrait]);
+
+  // Single refresh of every dataset-scoped endpoint. Any loader that swaps the
+  // active dataset MUST call this instead of refetching an ad-hoc subset, so a
+  // new loader cannot forget an endpoint (e.g. the sidebar's /api/individuals)
+  // and leave a panel showing the previous dataset.
+  const reloadAllData = useCallback(async () => {
+    reloadPedigree();
+    reloadIndividuals();
+    await loadGraph();
+  }, [reloadPedigree, reloadIndividuals, loadGraph]);
 
   // Issue 2 + 3: initialise once, only after the backend reports healthy.
   // loadGraph catches its own errors, so this fire-and-forget call can't reject.
@@ -194,8 +207,7 @@ export default function App() {
         const blob    = new Blob([content], { type: "text/plain" });
         const file    = new File([blob], fname);
         await api.loadFile([file]);
-        reloadPedigree();
-        await loadGraph();
+        await reloadAllData();
         setLoadError(null);
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : String(e));
@@ -203,7 +215,7 @@ export default function App() {
     } else {
       fileInputRef.current?.click();
     }
-  }, [api, loadGraph, reloadPedigree]);
+  }, [api, reloadAllData]);
 
   const handleFileInputChange = useCallback(async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -212,14 +224,13 @@ export default function App() {
     if (!files?.length) return;
     try {
       await api.loadFile(files);
-      reloadPedigree();
-      await loadGraph();
+      await reloadAllData();
       setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
     }
     e.target.value = "";
-  }, [api, loadGraph, reloadPedigree]);
+  }, [api, reloadAllData]);
 
   // ── Subpopulation ─────────────────────────────────────────────────────────
   const handleSubpop = useCallback(async () => {
@@ -240,34 +251,30 @@ export default function App() {
   const handleLoadExample = useCallback(async () => {
     try {
       await api.loadDemo("Example");
-      reloadPedigree();
-      await loadGraph();
+      await reloadAllData();
       setSelectedId(null);
       setDetail(null);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-  }, [api, loadGraph, reloadPedigree]);
+  }, [api, reloadAllData]);
 
   const handleReset = useCallback(async () => {
     try {
       await api.reset();
-      reloadPedigree();
-      await loadGraph();
+      await reloadAllData();
       setSelectedId(null);
       setDetail(null);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-  }, [api, loadGraph, reloadPedigree]);
+  }, [api, reloadAllData]);
 
   // ── Search filter ─────────────────────────────────────────────────────────
+  // (indList is fetched near the top so its reload can join reloadAllData.)
   const [search, setSearch] = useState("");
-  const { data: indList } = useFetch<IndividualSummary[]>(
-    () => api.listIndividuals(), [], ready
-  );
   const filtered = (indList ?? []).filter(i =>
     i.name.toLowerCase().includes(search.toLowerCase()) ||
     i.id.toLowerCase().includes(search.toLowerCase())

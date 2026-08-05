@@ -43,6 +43,10 @@ class TraitMeta:
     categories: List[str] = field(default_factory=list)
     color_low:  str = "#3B82F6"
     color_high: str = "#EF4444"
+    # Per-value color overrides for discrete traits: {category: "#rrggbb"}.
+    # Takes precedence over semantic color-name resolution and the palette,
+    # so a user can reassign any value's color (as Pedimap 1.x allowed).
+    value_colors: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -217,6 +221,7 @@ class PedigreeEngine:
                     "categories": t.categories,
                     "color_low":  t.color_low,
                     "color_high": t.color_high,
+                    "value_colors": t.value_colors,
                 }
                 for t in self.traits
             ],
@@ -249,6 +254,7 @@ class PedigreeEngine:
                 categories=t.get("categories", []),
                 color_low=t.get("color_low", "#3B82F6"),
                 color_high=t.get("color_high", "#EF4444"),
+                value_colors=t.get("value_colors", {}),
             ))
         for m in data.get("markers", []):
             eng.markers.append(MarkerMeta(
@@ -293,14 +299,7 @@ class PedigreeEngine:
         if not meta:
             return "#6B7280"
         if meta.trait_type == TraitType.QUALITATIVE:
-            cats = meta.categories
-            try:
-                idx = cats.index(str(val))
-                palette = ["#3B82F6","#10B981","#F59E0B","#EF4444",
-                           "#8B5CF6","#EC4899","#06B6D4","#84CC16"]
-                return palette[idx % len(palette)]
-            except ValueError:
-                return "#6B7280"
+            return _discrete_color_map(meta).get(str(val), "#6B7280")
         try:
             fval = float(val)
             rng = meta.max_val - meta.min_val
@@ -310,6 +309,74 @@ class PedigreeEngine:
             return _lerp_hex(meta.color_low, meta.color_high, t)
         except (TypeError, ValueError):
             return "#6B7280"
+
+
+# ── Discrete-trait coloring ───────────────────────────────────────────────────
+
+# Known color names -> a representative hex. When a discrete trait value
+# case-insensitively matches one of these, it is drawn in that color (so a
+# "Red" value is red, not whatever the palette happened to assign by position).
+_COLOR_NAMES: Dict[str, str] = {
+    "red":    "#EF4444",
+    "green":  "#22C55E",
+    "yellow": "#EAB308",
+    "blue":   "#3B82F6",
+    "orange": "#F97316",
+    "purple": "#A855F7",
+    "pink":   "#EC4899",
+    "brown":  "#92400E",
+    "white":  "#F8FAFC",
+    "black":  "#111827",
+    "grey":   "#6B7280",
+    "gray":   "#6B7280",
+}
+
+# Fallback categorical palette for values that are not color names.
+_QUAL_PALETTE: List[str] = [
+    "#3B82F6", "#10B981", "#F59E0B", "#EF4444",
+    "#8B5CF6", "#EC4899", "#06B6D4", "#84CC16",
+]
+
+
+def _discrete_color_map(meta: "TraitMeta") -> Dict[str, str]:
+    """Resolve every category of a discrete trait to a color.
+
+    Precedence, per value:
+      1. explicit user override (meta.value_colors)
+      2. semantic color-name match (case-insensitive)
+      3. categorical palette, skipping any color already used above so a
+         non-color value never collides with a resolved one.
+    """
+    result: Dict[str, str] = {}
+    used: set = set()
+
+    overrides = meta.value_colors or {}
+    for cat in meta.categories:
+        if cat in overrides:
+            result[cat] = overrides[cat]
+            used.add(overrides[cat].lower())
+
+    for cat in meta.categories:
+        if cat in result:
+            continue
+        hexv = _COLOR_NAMES.get(str(cat).strip().lower())
+        if hexv:
+            result[cat] = hexv
+            used.add(hexv.lower())
+
+    pi = 0
+    for cat in meta.categories:
+        if cat in result:
+            continue
+        while pi < len(_QUAL_PALETTE) and _QUAL_PALETTE[pi].lower() in used:
+            pi += 1
+        if pi < len(_QUAL_PALETTE):
+            result[cat] = _QUAL_PALETTE[pi]
+            used.add(_QUAL_PALETTE[pi].lower())
+            pi += 1
+        else:
+            result[cat] = "#6B7280"
+    return result
 
 
 def _lerp_hex(c1: str, c2: str, t: float) -> str:

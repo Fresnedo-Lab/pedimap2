@@ -74,6 +74,10 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect }: 
     const nodes = graph.nodes.map((n: GraphNode) => ({
       id:    n.id,
       label: n.label,
+      // Drive the hierarchical layout from the backend's generation field so
+      // all founders share the top row, rather than letting vis-network infer
+      // levels from edge topology (which scattered founders across rows).
+      level: n.generation,
       x:     n.x,
       y:     n.y,
       color: {
