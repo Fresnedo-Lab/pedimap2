@@ -130,8 +130,10 @@ python -m pytest backend/tests/ -v --tb=short
 
 ## Releasing a new version
 
-1. Bump the version in `frontend/package.json`, `src-tauri/Cargo.toml`, and
-   `src-tauri/tauri.conf.json` — all three must match.
+1. Bump the version in all four files — they must match:
+   `package.json`, `frontend/package.json`, `src-tauri/Cargo.toml`,
+   `src-tauri/tauri.conf.json`. (The backend reads its version from the root
+   `package.json`, so `/api/health` follows automatically.)
 2. Commit: `git commit -m "chore: bump version to vX.Y.Z"`
 3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`
 4. The `release.yml` workflow builds installers for all platforms and creates
