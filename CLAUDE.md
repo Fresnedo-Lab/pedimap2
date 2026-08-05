@@ -56,3 +56,21 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   a <meta http-equiv="Content-Security-Policy"> tag to frontend/index.html:
   in dev the Vite-served page has no CSP header, so a meta tag becomes the
   sole enforced policy and silently overrides the Tauri config.
+- Parser emits individuals in topological order (Kahn's algorithm keyed by
+  file-appearance index), not file order. Parents always precede children;
+  sib order within full-sib families is preserved. This changes the order of
+  the `individuals` array in every .dat load and to_dict payload — do not
+  rely on file order anywhere.
+- The original Pedimap 1.x source (github.com/PBR/Pedimap) has NO LICENSE
+  file, so all rights are reserved by default. Use it only as a BEHAVIORAL
+  reference: read it to understand what the original did, then implement
+  independently. Never copy, port, or transliterate its code into this
+  MIT-licensed repo. The examples/ folder contains .dat data files usable as
+  additional parser test fixtures.
+
+## On the horizon
+- .pmp subpopulations and views are parsed only for the population name. The
+  file carries a subpopulation tree, saved Views, notes, and per-view color
+  configuration. Example.pmp defines a "Septer relatives" subpopulation with
+  "Length" and "Color" views — a ready-made demo once the engine has a
+  subpopulation model and the UI has a Population panel.
