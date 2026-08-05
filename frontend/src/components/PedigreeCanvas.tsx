@@ -7,11 +7,32 @@ import { useEffect, useRef, useCallback } from "react";
 import { Network, DataSet } from "vis-network/standalone";
 import type { GraphData, GraphNode, GraphEdge } from "../hooks/useApi";
 
+export type Orientation = "UD" | "LR";
+
 interface Props {
-  graph:     GraphData;
-  colorMap:  Record<string, string>;
-  selected:  string | null;
-  onSelect:  (id: string) => void;
+  graph:       GraphData;
+  colorMap:    Record<string, string>;
+  selected:    string | null;
+  onSelect:    (id: string) => void;
+  orientation: Orientation;   // "UD" = top-to-bottom, "LR" = left-to-right
+}
+
+// Hierarchical-layout config for an orientation. LR stacks same-rank nodes
+// vertically, so long horizontal labels (e.g. "Cox's Orange Pippin") wrap and
+// grow the node box — give LR more nodeSpacing/levelSeparation to avoid overlap.
+function hierarchicalFor(orientation: Orientation) {
+  const lr = orientation === "LR";
+  return {
+    enabled:              true,
+    direction:            orientation,
+    sortMethod:           "directed",
+    levelSeparation:      lr ? 220 : 140,
+    nodeSpacing:          lr ? 180 : 100,
+    treeSpacing:          160,
+    blockShifting:        true,
+    edgeMinimization:     true,
+    parentCentralization: true,
+  };
 }
 
 // Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
@@ -63,7 +84,7 @@ const SHAPE: Record<string, string> = {
   unknown:          "ellipse",
 };
 
-export default function PedigreeCanvas({ graph, colorMap, selected, onSelect }: Props) {
+export default function PedigreeCanvas({ graph, colorMap, selected, onSelect, orientation }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef   = useRef<Network | null>(null);
   const nodesDS      = useRef(new DataSet<any>());
@@ -126,17 +147,9 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect }: 
       edges: { selectionWidth: 2 },
       layout: {
         improvedLayout: false,
-        hierarchical: {
-          enabled:         true,
-          direction:       "UD",
-          sortMethod:      "directed",
-          levelSeparation: 140,
-          nodeSpacing:     100,
-          treeSpacing:     160,
-          blockShifting:   true,
-          edgeMinimization: true,
-          parentCentralization: true,
-        },
+        // Uses the current orientation; on a graph reload this effect re-runs
+        // with the latest orientation, so the choice survives dataset changes.
+        hierarchical: hierarchicalFor(orientation),
       },
       physics: { enabled: false },
       interaction: {
@@ -182,6 +195,21 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect }: 
     nodesDS.current.update(updates);
     if (selected) networkRef.current.selectNodes([selected]);
   }, [colorMap, selected, graph.nodes]);
+
+  // ── Orientation changes: apply in place, preserving selection ─────────────
+  // setOptions + stabilize re-lays out the existing network rather than
+  // destroying/recreating it, so the current selection and node identities
+  // survive the flip (a recreate would reset both).
+  const appliedOrientation = useRef(orientation);
+  useEffect(() => {
+    const net = networkRef.current;
+    if (!net) return;
+    if (appliedOrientation.current === orientation) return; // no-op on mount
+    appliedOrientation.current = orientation;
+    net.setOptions({ layout: { hierarchical: hierarchicalFor(orientation) } });
+    net.stabilize();
+    if (selected) net.selectNodes([selected]);
+  }, [orientation, selected]);
 
   return (
     <div

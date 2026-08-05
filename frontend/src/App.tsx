@@ -26,13 +26,68 @@ import {
   type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
 } from "./hooks/useApi";
-import PedigreeCanvas from "./components/PedigreeCanvas";
+import PedigreeCanvas, { type Orientation } from "./components/PedigreeCanvas";
 import IndividualPanel from "./components/IndividualPanel";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isTauri() {
   return typeof (window as any).__TAURI__ !== "undefined";
+}
+
+// ── Per-view settings ─────────────────────────────────────────────────────────
+// Pedimap 1.x stores display options per view. This mirrors that surface so
+// later options are field additions rather than a refactor. Only `orientation`
+// is wired up today; the rest carry sensible defaults and are not yet read.
+export interface ViewSettings {
+  orientation:      Orientation;                        // 'UD' | 'LR'
+  showCrossSymbols: boolean;
+  crossSymbolSize:  number;
+  generationSpacing: number;
+  sibSpacing:       number;
+  fillColorMode:    "fixed" | "trait";
+  fillColorTrait:   string | null;
+  cellContents:     "name" | "name+markers" | "name+ibd";
+  ibdLinkageGroup:  string | null;
+  selectedMarkers:  string[];
+}
+
+// One view exists today. When the tabbed View system lands, settings become a
+// map keyed by tab id and `activeViewId` becomes stateful — this store already
+// has that shape, so it's a drop-in. The Overview view will default to 'LR'.
+const DEFAULT_VIEW_ID = "view-1";
+
+function defaultViewSettings(): ViewSettings {
+  return {
+    orientation:       "UD",
+    showCrossSymbols:  true,
+    crossSymbolSize:   40,
+    generationSpacing: 140,
+    sibSpacing:        100,
+    fillColorMode:     "fixed",
+    fillColorTrait:    null,
+    cellContents:      "name",
+    ibdLinkageGroup:   null,
+    selectedMarkers:   [],
+  };
+}
+
+function loadViewSettings(): Record<string, ViewSettings> {
+  try {
+    const raw = localStorage.getItem("pedimap.viewSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return parsed as Record<string, ViewSettings>;
+      }
+    }
+    // Migrate the earlier orientation-only key so current users keep their choice.
+    const legacy = localStorage.getItem("pedimap.viewOrientation");
+    if (legacy === "LR" || legacy === "UD") {
+      return { [DEFAULT_VIEW_ID]: { ...defaultViewSettings(), orientation: legacy } };
+    }
+  } catch { /* ignore malformed storage */ }
+  return { [DEFAULT_VIEW_ID]: defaultViewSettings() };
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -129,6 +184,30 @@ export default function App() {
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
   const [activeTrait, setActiveTrait] = useState<string>("");
+
+  // ── Per-view settings (orientation is the only wired field today) ─────────
+  const [viewSettings, setViewSettings] =
+    useState<Record<string, ViewSettings>>(loadViewSettings);
+
+  // Persist the whole map; also drop the migrated legacy key. Survives dataset
+  // reloads (React state) and full page reloads (localStorage).
+  useEffect(() => {
+    try {
+      localStorage.setItem("pedimap.viewSettings", JSON.stringify(viewSettings));
+      localStorage.removeItem("pedimap.viewOrientation");
+    } catch { /* ignore */ }
+  }, [viewSettings]);
+
+  const activeViewId = DEFAULT_VIEW_ID;  // becomes stateful with View tabs
+  const orientation =
+    (viewSettings[activeViewId] ?? defaultViewSettings()).orientation;
+
+  const changeOrientation = useCallback((o: Orientation) => {
+    setViewSettings(prev => ({
+      ...prev,
+      [activeViewId]: { ...(prev[activeViewId] ?? defaultViewSettings()), orientation: o },
+    }));
+  }, [activeViewId]);
 
   // Fetch graph + colours whenever pedigree changes
   const [graphLoading, setGraphLoading] = useState(true);
@@ -314,6 +393,28 @@ export default function App() {
           📄 Load Example Data
         </button>
 
+        {/* Orientation toggle (per view) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
+          <span style={{ color: "#64748b", fontSize: 11 }}>Orientation:</span>
+          <div style={{ display: "flex", border: "1px solid #2e3a52",
+            borderRadius: 6, overflow: "hidden" }}>
+            <button onClick={() => changeOrientation("UD")}
+              title="Top to bottom"
+              style={{ background: orientation === "UD" ? "#1d3a6e" : "#252e42",
+                color: orientation === "UD" ? "#4f9cf9" : "#a0aec0",
+                padding: "5px 10px", borderRadius: 0, fontSize: 11 }}>
+              ↓ Top to bottom
+            </button>
+            <button onClick={() => changeOrientation("LR")}
+              title="Left to right"
+              style={{ background: orientation === "LR" ? "#1d3a6e" : "#252e42",
+                color: orientation === "LR" ? "#4f9cf9" : "#a0aec0",
+                padding: "5px 10px", borderRadius: 0, fontSize: 11 }}>
+              → Left to right
+            </button>
+          </div>
+        </div>
+
         {traits.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
             <span style={{ color: "#64748b", fontSize: 11 }}>Colour by:</span>
@@ -428,6 +529,7 @@ export default function App() {
                 colorMap={colorMap}
                 selected={selectedId}
                 onSelect={handleSelect}
+                orientation={orientation}
               />
             )}
         </div>
