@@ -74,7 +74,10 @@ and precalculated IBD probabilities.
 | Bundled example dataset | ✅ |
 | Individual search and selection | ✅ |
 | Hover details — parents, generation, trait values | ✅ |
+| Details panel — parents, traits, expandable lists of relatives | ✅ |
+| Fit to window — toolbar button or **F** | ✅ |
 | JSON export / import round-trip | ✅ |
+| Legacy `.dat` export — reads back unchanged (API route) | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
 | Update notifications with one-click install (from 2.1.2) | ✅ |
@@ -122,10 +125,13 @@ full specification.
 
 ### Output
 
-| Extension | Route |
-|-----------|-------|
-| `.json` | `/api/export/json` |
-| `.dat` | `/api/export/dat` |
+| Extension | Route | Contents |
+|-----------|-------|----------|
+| `.json` | `/api/export/json` | All Pedimap 2 data, including IBD probabilities and marker color codes |
+| `.dat` | `/api/export/dat` | Header keywords as read, the pedigree with every trait column, `*SELF` / `*DH` / `*MUT` / `*VP` for single-parent descent, markers and IBD. A `.dat` file read in and exported again parses to the same data. |
+
+`.pmp` files are not written. Export is available through these routes only;
+there is no toolbar button for it yet.
 
 ---
 
@@ -176,7 +182,7 @@ The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
 ### Test
 
 ```bash
-cd backend && python -m pytest tests/ -v      # 36 tests
+cd backend && python -m pytest tests/ -v      # 50 tests
 cd frontend && npm run typecheck && npm run build
 cd src-tauri && cargo check
 ```

@@ -15,6 +15,11 @@ export interface IndividualSummary {
   cross_type: string;
 }
 
+export interface RelativeRef {
+  id:   string;
+  name: string;
+}
+
 export interface IndividualDetail {
   id:            string;
   name:          string;
@@ -26,9 +31,10 @@ export interface IndividualDetail {
   traits:        Record<string, number | string>;
   markers:       Record<string, string[]>;
   notes:         string;
-  ancestors:     number;
-  descendants:   number;
-  siblings:      number;
+  // In pedigree order (parents before children).
+  ancestors:     RelativeRef[];
+  descendants:   RelativeRef[];
+  siblings:      RelativeRef[];
 }
 
 export interface GraphNode {

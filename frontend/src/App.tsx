@@ -26,7 +26,9 @@ import {
   type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
 } from "./hooks/useApi";
-import PedigreeCanvas, { type Orientation } from "./components/PedigreeCanvas";
+import PedigreeCanvas, {
+  type Orientation, type PedigreeCanvasHandle,
+} from "./components/PedigreeCanvas";
 import IndividualPanel from "./components/IndividualPanel";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
@@ -214,6 +216,24 @@ export default function App() {
       [activeViewId]: { ...(prev[activeViewId] ?? defaultViewSettings()), orientation: o },
     }));
   }, [activeViewId]);
+
+  // ── Fit to window (toolbar button + F shortcut) ───────────────────────────
+  const canvasRef = useRef<PedigreeCanvasHandle>(null);
+  const fitToWindow = useCallback(() => canvasRef.current?.fit(), []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "f" && e.key !== "F") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Don't steal the key while the user is typing (e.g. in the search box).
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      e.preventDefault();
+      fitToWindow();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fitToWindow]);
 
   // Fetch graph + colours whenever pedigree changes
   const [graphLoading, setGraphLoading] = useState(true);
@@ -421,6 +441,11 @@ export default function App() {
           </div>
         </div>
 
+        <button onClick={fitToWindow} title="Fit to window (F)"
+          style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
+          ⤢ Fit to window
+        </button>
+
         {traits.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
             <span style={{ color: "#64748b", fontSize: 11 }}>Colour by:</span>
@@ -535,6 +560,7 @@ export default function App() {
             ? <Spinner />
             : (
               <PedigreeCanvas
+                ref={canvasRef}
                 graph={graphData}          // ← GraphData here, null excluded
                 colorMap={colorMap}
                 selected={selectedId}
@@ -547,6 +573,7 @@ export default function App() {
         {/* Detail panel */}
         {selectedDetail && (
           <IndividualPanel
+            key={selectedDetail.id}      // collapse relative lists on a new selection
             individual={selectedDetail}
             traits={traits}
             markers={markers}

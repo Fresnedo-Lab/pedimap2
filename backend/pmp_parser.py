@@ -11,13 +11,17 @@ ground-truth conformance fixtures.
 Public API (used by api.py):
     PmpParser.from_dat_text(dat_text)            -> ParseResult
     PmpParser.from_pmp_text(pmp_text, dat_text)  -> ParseResult
-Both return a ParseResult whose ``.engine`` is a populated PedigreeEngine.
+    DatExporter.to_dat_text(engine, ids=None)    -> str
+The parsers return a ParseResult whose ``.engine`` is a populated
+PedigreeEngine; the exporter writes an engine back as ``.dat`` text that
+parses to an identical ``to_dict()``.
 """
 from __future__ import annotations
 
 import heapq
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from decimal import Decimal
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import networkx as nx
 
@@ -154,6 +158,7 @@ class _DatParser:
         self.female_first = True
         self.female_idx = 0
         self.male_idx = 1
+        self.parent_labels: List[str] = ["FEMALE", "MALE"]   # caption cols 2-3 as read
         self.trait_cols: List[Tuple[str, int]] = []   # (name, col index after NAME)
         self.records: List[dict] = []                 # ordered raw individuals
         self.ids: List[str] = []
@@ -166,6 +171,7 @@ class _DatParser:
         self.marker_order: List[str] = []
         self.ibd_positions: Dict[str, List[str]] = {}
         self.observed: Dict[str, Dict[str, List[str]]] = {}
+        self.codes: Dict[str, Dict[str, List[str]]] = {}      # parallel color codes
 
         # ibd
         self.ibd: Dict[str, Dict[str, Dict[str, List[List[float]]]]] = {}
@@ -291,6 +297,7 @@ class _DatParser:
                 "FEMALE/MALE, MOTHER/FATHER, PARENT1/PARENT2 (either order)."
             )
         self.female_first = _PARENT_ALIASES[(pa, pb)]
+        self.parent_labels = [cols[1], cols[2]]
         # physical column indices (0-based, within the whole row incl. NAME at 0)
         self.female_idx = 1 if self.female_first else 2
         self.male_idx = 2 if self.female_first else 1
@@ -374,9 +381,10 @@ class _DatParser:
             toks = _tokenize(cleaned)
             ind = toks[0]
             rest = toks[1:]
-            # rest is (allele, colorcode) pairs; keep allele names only.
+            # rest is (allele, colorcode) pairs.
             alleles = rest[0::2][:self.ploidy]
             self.observed.setdefault(ind, {})[marker] = alleles
+            self.codes.setdefault(ind, {})[marker] = rest[1::2][:self.ploidy]
             self.i += 1
 
     # -- ibd --
@@ -603,10 +611,20 @@ class _DatParser:
                 }
                 for name in self.marker_order
             ],
+            "ibd": self.ibd,
+            "marker_codes": {
+                iid: self.codes[iid] for iid in individuals if iid in self.codes
+            },
+            "dat_meta": {
+                "unknown":        list(self.unknown),
+                "nullhomoz":      self.nullhomoz,
+                "nalleles":       self.nalleles,
+                "parent_columns": list(self.parent_labels),
+                "source_order":   list(self.ids),
+                "ibd_positions":  {lg: list(p) for lg, p in self.ibd_positions.items()},
+            },
         }
-        engine = PedigreeEngine.from_dict(data)
-        engine.ibd = self.ibd
-        return engine
+        return PedigreeEngine.from_dict(data)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -648,3 +666,292 @@ def _pmp_population_name(pmp_text: str) -> Optional[str]:
                 val = line[len("Name"):].strip()
                 return _unquote(val) or None
     return None
+
+
+# ── DAT exporter ──────────────────────────────────────────────────────────────
+
+class DatExportError(ValueError):
+    """Raised when the engine's state cannot be written as a valid .dat file."""
+
+
+# Uniparental procreation types and the keyword written in place of the
+# second parent (the inverse of _UNIPARENTAL).
+_KEYWORD_FOR = {ct: f"*{kw}" for kw, ct in _UNIPARENTAL.items()}
+
+
+def _fmt_number(v: Any) -> str:
+    """Shortest text that reads back as exactly float(v), never in exponent form.
+
+    repr() round-trips but can produce "1e-05", which the .dat number rule
+    rejects, so it is re-rendered positionally through Decimal.
+    """
+    return format(Decimal(repr(float(v))), "f")
+
+
+def _fmt_compact(v: Any) -> str:
+    """Like _fmt_number, but integral values drop the ".0" (map positions, IBD)."""
+    v = float(v)
+    return str(int(v)) if v.is_integer() else _fmt_number(v)
+
+
+def _quote(token: str, what: str) -> str:
+    """Quote a token that would otherwise split on whitespace or start a comment."""
+    if token == "" or re.search(r"[\s;]", token):
+        if '"' in token:
+            raise DatExportError(
+                f"{what} {token!r} contains a double quote and a space or ';', "
+                "which the .dat format cannot represent."
+            )
+        return f'"{token}"'
+    return token
+
+
+def _table(rows: List[List[str]]) -> List[str]:
+    """Left-align columns, two spaces apart, with no trailing whitespace."""
+    if not rows:
+        return []
+    ncols = max(len(r) for r in rows)
+    widths = [max((len(r[c]) for r in rows if c < len(r)), default=0) for c in range(ncols)]
+    return [
+        "  ".join([cell.ljust(widths[c]) for c, cell in enumerate(r[:-1])] + r[-1:]).rstrip()
+        for r in rows
+    ]
+
+
+class DatExporter:
+    @classmethod
+    def to_dat_text(cls, engine: PedigreeEngine, ids: Optional[Iterable[str]] = None) -> str:
+        """Write ``engine`` (or just the individuals in ``ids``) as ``.dat`` text.
+
+        Header keywords use the values read from the source file; the pedigree
+        keeps the original trait columns and row order; single-parent descent is
+        written with *SELF / *DH / *MUT / *VP; names with spaces are quoted; and
+        marker and IBD sections are written when present. For data read from a
+        .dat file, parsing the result gives the same ``to_dict()``.
+
+        When ``ids`` selects a subset, parents outside it are written as unknown.
+        Raises DatExportError if the data cannot be represented in the format.
+        """
+        return _DatWriter(engine, ids).write()
+
+
+class _DatWriter:
+    def __init__(self, engine: PedigreeEngine, ids: Optional[Iterable[str]]) -> None:
+        self.eng = engine
+        meta = engine.dat_meta or {}
+        self.unknown: List[str] = list(meta.get("unknown") or ["-"])
+        self.missing = self.unknown[0]          # first symbol is the display form
+        self.nullhomoz: str = meta.get("nullhomoz") or "$"
+
+        labels = list(meta.get("parent_columns") or [])
+        if len(labels) != 2 or (labels[0].upper(), labels[1].upper()) not in _PARENT_ALIASES:
+            labels = ["FEMALE", "MALE"]
+        self.parent_labels = labels
+        self.female_first = _PARENT_ALIASES[(labels[0].upper(), labels[1].upper())]
+
+        # Row order: the source file's order where known — trait categories are
+        # numbered by first appearance, so this makes them read back identically
+        # — followed by anything added since, in engine order.
+        known = set(engine.all_ids())
+        source = [i for i in meta.get("source_order", []) if i in known]
+        listed = set(source)
+        order = source + [i for i in engine.all_ids() if i not in listed]
+        if ids is not None:
+            wanted = set(ids)
+            stray = wanted - known
+            if stray:
+                raise DatExportError(f"Unknown individual(s): {', '.join(sorted(stray))}.")
+            order = [i for i in order if i in wanted]
+        if not order:
+            raise DatExportError("There are no individuals to export.")
+        self.order = order
+        self.included = set(order)
+
+        # .dat identifies individuals by NAME. For .dat-sourced data id == name;
+        # for other sources (sample data, JSON) use the names when they are
+        # unique, otherwise fall back to the ids.
+        names = [engine.get(i).name for i in order]
+        if all(names) and len(set(names)) == len(names):
+            self.label = {i: engine.get(i).name for i in order}
+        else:
+            self.label = {i: i for i in order}
+
+        # NALLELES as read; data without dat_meta (older JSON) takes it from IBD.
+        self.nalleles = int(meta.get("nalleles") or 0)
+        if not self.nalleles:
+            for by_pos in engine.ibd.values():
+                for rows in by_pos.values():
+                    for homologues in rows.values():
+                        if homologues:
+                            self.nalleles = len(homologues[0])
+                            break
+
+    # -- cells --
+    def _name(self, iid: str) -> str:
+        return _quote(self.label[iid], "Individual name")
+
+    def _ref(self, pid: Optional[str]) -> str:
+        return self._name(pid) if pid in self.included else self.missing
+
+    def _parent_cells(self, ind: Individual) -> Tuple[str, str]:
+        keyword = _KEYWORD_FOR.get(ind.cross_type)
+        if keyword:
+            # Single-parent descent: the parent, then the keyword. A self keeps
+            # its parent in both fields; the others keep it in female_parent.
+            return self._ref(ind.female_parent or ind.male_parent), keyword
+        f, m = self._ref(ind.female_parent), self._ref(ind.male_parent)
+        return (f, m) if self.female_first else (m, f)
+
+    def _trait_cell(self, ind: Individual, trait: TraitMeta) -> str:
+        value = ind.traits.get(trait.name)
+        if value is None:
+            return self.missing
+        if trait.trait_type == TraitType.CONTINUOUS:
+            try:
+                text = _fmt_number(value)
+            except (TypeError, ValueError, ArithmeticError):
+                raise DatExportError(
+                    f"{ind.id}: value {value!r} of continuous trait {trait.name!r} "
+                    "is not a number."
+                ) from None
+        else:
+            text = str(value)
+        if text in self.unknown:
+            raise DatExportError(
+                f"{ind.id}: value {text!r} of trait {trait.name!r} is an UNKNOWN "
+                "symbol and would read back as missing."
+            )
+        return _quote(text, f"Value of trait {trait.name!r}")
+
+    # -- sections --
+    def write(self) -> str:
+        lines = ["; Exported by Pedimap 2", ""]
+        lines += self._header()
+        lines += ["", "PEDIGREE"] + self._pedigree()
+        lines += self._linkage_groups()
+        lines += self._observed_alleles()
+        lines += self._ibd()
+        return "\n".join(lines) + "\n"
+
+    def _header(self) -> List[str]:
+        rows = []
+        if self.eng.population_name:
+            rows.append(["POPULATION", "=", self.eng.population_name])
+        rows += [
+            ["UNKNOWN",   "=", " ".join(self.unknown)],
+            ["NULLHOMOZ", "=", self.nullhomoz],
+            ["NALLELES",  "=", str(self.nalleles)],
+            ["PLOIDY",    "=", str(self.eng.ploidy)],
+        ]
+        return _table(rows)
+
+    def _pedigree(self) -> List[str]:
+        traits = self.eng.traits
+        rows = [["NAME", *self.parent_labels] + [_quote(t.name, "Trait name") for t in traits]]
+        for iid in self.order:
+            ind = self.eng.get(iid)
+            rows.append([self._name(iid), *self._parent_cells(ind)]
+                        + [self._trait_cell(ind, t) for t in traits])
+        return _table(rows)
+
+    def _lg_line(self, lg: str) -> str:
+        return f"LINKAGEGROUP {_quote(lg, 'Linkage group')}" if lg else "LINKAGEGROUP"
+
+    def _linkage_groups(self) -> List[str]:
+        eng = self.eng
+        positions = {lg: list(p) for lg, p in
+                     ((eng.dat_meta or {}).get("ibd_positions") or {}).items()}
+        for lg, by_pos in eng.ibd.items():
+            positions.setdefault(lg, list(by_pos))
+
+        # One LINKAGEGROUP block per run of consecutive markers sharing a group,
+        # so the markers read back in the same order.
+        runs: List[Tuple[str, List[MarkerMeta]]] = []
+        for m in eng.markers:
+            if runs and runs[-1][0] == m.linkage_group:
+                runs[-1][1].append(m)
+            else:
+                runs.append((m.linkage_group, [m]))
+
+        out: List[str] = []
+        done: set = set()
+        for lg, markers in runs:
+            out += ["", self._lg_line(lg), "", "MAP"]
+            out += _table([[_quote(m.name, "Marker name"), _fmt_compact(m.position_cM)]
+                           for m in markers])
+            for m in markers:
+                if not (m.allele_names or m.founder_alleles):
+                    continue
+                out += ["", f"LOCUS {_quote(m.name, 'Marker name')}"]
+                if m.allele_names:
+                    out.append("ALLELENAMES " + " ".join(
+                        _quote(a, "Allele name") for a in m.allele_names))
+                if m.founder_alleles:
+                    out.append("FOUNDERALLELES " + " ".join(
+                        _quote(a, "Allele name") for a in m.founder_alleles))
+            if lg in positions and lg not in done:
+                out += ["", "IBDPOSITIONS " + " ".join(positions[lg])]
+                done.add(lg)
+        # Groups that carry IBD data but no markers (the "IBD only" subset).
+        for lg, pos in positions.items():
+            if lg not in done:
+                out += ["", self._lg_line(lg), "", "IBDPOSITIONS " + " ".join(pos)]
+        return out
+
+    def _observed_alleles(self) -> List[str]:
+        eng = self.eng
+        individuals = [eng.get(i) for i in self.order]
+        present = {mk for ind in individuals for mk in ind.markers}
+        # Map order first, then any marker that only appears in ALLELES data.
+        markers = [m.name for m in eng.markers if m.name in present]
+        for ind in individuals:
+            markers += [mk for mk in ind.markers if mk not in markers]
+        lg_of = {m.name: m.linkage_group for m in eng.markers}
+
+        out: List[str] = []
+        for mk in markers:
+            rows = []
+            for ind in individuals:
+                alleles = ind.markers.get(mk)
+                if alleles is None:
+                    continue
+                codes = list(eng.marker_codes.get(ind.id, {}).get(mk, []))
+                codes += ["0"] * (len(alleles) - len(codes))
+                cells = [self._name(ind.id)]
+                for allele, code in zip(alleles, codes):
+                    cells += [_quote(str(allele), "Allele"), str(code)]
+                rows.append(cells)
+            note = f" ; LG {lg_of[mk]}" if lg_of.get(mk) else ""
+            out += ["", f"ALLELES {_quote(mk, 'Marker name')}{note}"] + _table(rows)
+        return out
+
+    def _ibd(self) -> List[str]:
+        eng = self.eng
+        out: List[str] = []
+        for lg, by_pos in eng.ibd.items():
+            if not lg or re.search(r"\s", lg):
+                raise DatExportError(
+                    f"IBD linkage group {lg!r} cannot be written as an IBDPOSITION annotation."
+                )
+            for pos, by_ind in by_pos.items():
+                absent = [i for i in self.order if i not in by_ind]
+                if absent:
+                    raise DatExportError(
+                        f"IBD data for LG {lg} position {pos} is missing for "
+                        f"{len(absent)} individual(s) (e.g. {absent[0]!r}); every "
+                        "exported individual must appear in every IBD section."
+                    )
+                rows = []
+                for iid, homologues in by_ind.items():   # keep the original row order
+                    if iid not in self.included:
+                        continue
+                    if (len(homologues) != eng.ploidy
+                            or any(len(h) != self.nalleles for h in homologues)):
+                        raise DatExportError(
+                            f"IBD data for {iid!r} (LG {lg}, pos {pos}) is not "
+                            f"{eng.ploidy} x {self.nalleles} probabilities."
+                        )
+                    rows.append([self._name(iid)]
+                                + [_fmt_compact(v) for h in homologues for v in h])
+                out += ["", f"IBDPOSITION {pos} ; LG {lg}"] + _table(rows)
+        return out

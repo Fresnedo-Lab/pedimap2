@@ -93,6 +93,14 @@ class PedigreeEngine:
         # No UI consumes it yet, but it is carried through to_dict() so the data
         # survives a round-trip.
         self.ibd: Dict[str, Any] = {}
+        # Observed-allele color codes keyed individual -> marker -> [codes],
+        # parallel to Individual.markers (which holds the allele names).
+        self.marker_codes: Dict[str, Dict[str, List[str]]] = {}
+        # Details of the source .dat file that the engine model doesn't otherwise
+        # hold — header values (unknown, nullhomoz, nalleles), the parent-column
+        # labels, the original row order and the IBDPOSITIONS lists — so that
+        # DatExporter can write the file back faithfully. Empty for other sources.
+        self.dat_meta: Dict[str, Any] = {}
 
     # ── Mutation ──────────────────────────────────────────────────────────────
 
@@ -109,6 +117,7 @@ class PedigreeEngine:
     def remove_individual(self, ind_id: str) -> None:
         self.graph.remove_node(ind_id)
         del self._individuals[ind_id]
+        self.marker_codes.pop(ind_id, None)
 
     # ── Accessors ─────────────────────────────────────────────────────────────
 
@@ -117,6 +126,11 @@ class PedigreeEngine:
 
     def all_ids(self) -> List[str]:
         return list(self._individuals.keys())
+
+    def in_order(self, ids) -> List[str]:
+        """Return the given ids sorted by the engine's (topological) order."""
+        rank = {iid: k for k, iid in enumerate(self._individuals)}
+        return sorted((i for i in ids if i in rank), key=rank.__getitem__)
 
     def count(self) -> int:
         return len(self._individuals)
@@ -236,6 +250,8 @@ class PedigreeEngine:
                 for m in self.markers
             ],
             "ibd": self.ibd,
+            "marker_codes": self.marker_codes,
+            "dat_meta": self.dat_meta,
         }
 
     @classmethod
@@ -245,6 +261,8 @@ class PedigreeEngine:
         eng.ploidy = data.get("ploidy", 2)
         # Round-trip IBD data (emitted by to_dict); absent for non-IBD files.
         eng.ibd = data.get("ibd", {})
+        eng.marker_codes = data.get("marker_codes", {})
+        eng.dat_meta = data.get("dat_meta", {})
         for t in data.get("traits", []):
             eng.traits.append(TraitMeta(
                 name=t["name"],
