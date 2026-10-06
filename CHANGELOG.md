@@ -5,12 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The release workflow copies the section whose heading matches the release
-version (for example `## [2.1.1]`) into the "What's new" part of the GitHub
+version (for example `## [2.1.2]`) into the "What's new" part of the GitHub
 release notes, so every release needs its own section here before it is tagged.
 
-## [2.1.1] — 2026-10-06
+## [Unreleased]
+
+_2.1.1 was built but never released (macOS backend failed to start)._
 
 ### Fixed
+- **Mac users:** 2.1.0 did not start on Macs; 2.1.2 fixes this. It showed
+  "Cannot reach the Pedimap backend service" and could not load any data.
+  Please download and install 2.1.2 yourself once.
 - **Intel Macs:** version 2.1.0 could not start on Intel Macs. This release
   fixes it; please install it manually.
 - Quitting Pedimap 2 now also stops its background service, which previously
@@ -22,12 +27,14 @@ release notes, so every release needs its own section here before it is tagged.
 
 ### Changed
 - Release downloads now have clear names such as
-  `Pedimap2-2.1.1-macOS-AppleSilicon.dmg`, and every release page starts with
+  `Pedimap2-2.1.2-macOS-AppleSilicon.dmg`, and every release page starts with
   a "Which file do I need?" table.
 - Each release contains files for one version only, plus `SHA256SUMS.txt`
   checksums for verifying downloads.
 - The macOS Intel installer is built on a native Intel machine, and each Mac
   installer is checked to contain only code for its kind of Mac.
+- Before any release is published, every installer is test-started to make
+  sure Pedimap 2's background service actually runs.
 
 ## [2.1.0] — 2026-08-05
 
@@ -69,7 +76,6 @@ release notes, so every release needs its own section here before it is tagged.
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.1...HEAD
-[2.1.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.0...v2.1.1
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.0...HEAD
 [2.1.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/Fresnedo-Lab/pedimap2/releases/tag/v2.0.0

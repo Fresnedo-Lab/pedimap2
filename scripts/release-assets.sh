@@ -223,11 +223,21 @@ bail_if_errors
 # ── 5. Release notes ─────────────────────────────────────────────────────────
 # "What's new" is the CHANGELOG.md section headed "## [VERSION]", up to the
 # next "## [" heading or the link references at the bottom.
-whats_new=$(awk -v heading="## [$VERSION]" '
+# Dry runs happen before [Unreleased] is renamed to [VERSION], so with
+# CHANGELOG_ALLOW_UNRELEASED=true (set by the workflow only for dry runs) a
+# missing [VERSION] section falls back to [Unreleased]. Real releases never do.
+changelog_section() {
+  awk -v heading="## [$1]" '
   index($0, "## [") == 1 { if (found) exit; if (index($0, heading) == 1) { found = 1; next } }
   /^\[[^]]+\]: / { if (found) exit }
   found && $0 != "---" { print }
-' "$CHANGELOG" | sed -e '/./,$!d' | awk '{ lines[NR] = $0 } /./ { last = NR } END { for (i = 1; i <= last; i++) print lines[i] }')
+' "$CHANGELOG" | sed -e '/./,$!d' | awk '{ lines[NR] = $0 } /./ { last = NR } END { for (i = 1; i <= last; i++) print lines[i] }'
+}
+whats_new=$(changelog_section "$VERSION")
+if [ -z "$whats_new" ] && [ "${CHANGELOG_ALLOW_UNRELEASED:-}" = true ]; then
+  whats_new=$(changelog_section Unreleased)
+  [ -n "$whats_new" ] && warn "CHANGELOG.md has no '## [$VERSION]' section yet; dry run uses [Unreleased]. Rename it before tagging."
+fi
 if [ -z "$whats_new" ]; then
   error "CHANGELOG.md has no '## [$VERSION]' section (or it is empty); add one before releasing"
 fi

@@ -12,7 +12,8 @@
 //   dynamic import() behind isTauri(), so they never load outside Tauri.
 //
 // Only versions that contain this check can be told about later releases;
-// users on 2.1.0 or older have to install 2.1.1 manually.
+// users on 2.1.0 or older have to install 2.1.2 manually (2.1.1 was never
+// released).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
@@ -35,7 +36,7 @@ export type UpdateStatus =
 
 export interface UpdaterState {
   status:     UpdateStatus;
-  current:    string | null;   // running version, e.g. "2.1.1"
+  current:    string | null;   // running version, e.g. "2.1.2"
   available:  string | null;   // offered version, e.g. "2.2.0"
   downloaded: number;          // bytes
   total:      number | null;   // bytes, if the server sent Content-Length

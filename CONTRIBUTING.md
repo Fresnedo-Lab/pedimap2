@@ -137,7 +137,7 @@ python -m pytest backend/tests/ -v --tb=short
 ## Releasing a new version
 
 `.github/workflows/release.yml` builds all four targets, renames the
-installers (for example `Pedimap2-2.1.1-macOS-AppleSilicon.dmg`), and creates
+installers (for example `Pedimap2-2.1.2-macOS-AppleSilicon.dmg`), and creates
 a **draft** release. It never adds files to an existing release, and it stops
 if the tag and the version files disagree.
 
@@ -155,6 +155,7 @@ if the tag and the version files disagree.
    `release-preview-vX.Y.Z` artifact and check:
    - the file names match the table in `README.md`;
    - the **Build – macOS Intel** log shows `pedimap-backend architectures: x86_64`;
+   - every build log's **Smoke-test bundled backend** step ends with `PASS`;
    - `latest.json` has the `darwin-*`, `windows-*` and `linux-*` platforms
      (the publish log warns if the optional `linux-x86_64-deb`/`-rpm` keys
      were left out);
@@ -166,20 +167,24 @@ if the tag and the version files disagree.
    them from the draft release page (or `gh release download vX.Y.Z -p '*.dmg'`)
    and run:
    ```bash
-   scripts/verify-macos-dmg.sh Pedimap2-X.Y.Z-macOS-Intel.dmg x86_64
-   scripts/verify-macos-dmg.sh Pedimap2-X.Y.Z-macOS-AppleSilicon.dmg arm64
+   scripts/verify-macos-dmg.sh --run Pedimap2-X.Y.Z-macOS-Intel.dmg x86_64
+   scripts/verify-macos-dmg.sh --run Pedimap2-X.Y.Z-macOS-AppleSilicon.dmg arm64
    ```
-   Both must end with `OK`. If either fails, do not publish; delete the draft
+   Both must end with `PASS: backend X.Y.Z started…`. `--run` starts the
+   signed backend from the DMG (the Intel one under Rosetta on an Apple
+   Silicon Mac); on an Intel Mac, drop `--run` for the Apple Silicon DMG.
+   The build jobs already ran the same smoke test in CI, but this checks the
+   exact files users will download. Finally, open the Apple Silicon app from
+   the DMG and load a `.dat` file. If either fails, do not publish; delete the draft
    (`gh release delete vX.Y.Z --yes`) and fix the build. If you can, also
    launch the app on an Intel Mac and on Windows; after quitting, no
    `pedimap-backend` process should be left running (Activity Monitor /
    Task Manager).
 7. **Publish.** Review the draft and click **Publish release**. Publishing
-   makes it the update that installed copies of Pedimap 2 (2.1.1 and later)
+   makes it the update that installed copies of Pedimap 2 (2.1.2 and later)
    are offered.
-8. **Tell users who can't be updated automatically.** Versions before 2.1.1
-   have no update check, and Intel Mac users of 2.1.0 have no working
-   install. Email them a link to
+8. **Tell users who can't be updated automatically.** Versions before 2.1.2
+   have no update check, and Mac users of 2.1.0 have no working install. Email them a link to
    <https://github.com/Fresnedo-Lab/pedimap2/releases/latest>.
 
 **If a release for the tag already exists**, the workflow stops instead of

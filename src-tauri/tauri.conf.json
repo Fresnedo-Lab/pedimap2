@@ -58,7 +58,7 @@
       "minimumSystemVersion": "10.15",
       "signingIdentity": null,
       "providerShortName": null,
-      "entitlements": null,
+      "entitlements": "Entitlements.plist",
       "dmg": {
         "windowSize": {
           "width": 660,
@@ -81,7 +81,7 @@
   },
   "productName": "Pedimap 2",
   "mainBinaryName": "Pedimap 2",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "identifier": "com.fresnedobreedinglab.pedimap2",
   "plugins": {
     "updater": {

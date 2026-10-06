@@ -23,6 +23,8 @@
 #   • verify-version fails fast unless the tag matches all four version files.
 #   • build runs tauri-action in build-only mode (no tagName/releaseId), so it
 #     uploads nothing to GitHub Releases; bundles travel as workflow artifacts.
+#   • every build then starts the backend exactly as it ships and requires
+#     /api/health to answer with the release version (see "Smoke-test").
 #   • publish renames files from ONE table (scripts/release-assets.sh), writes
 #     SHA256SUMS.txt and the updater manifest latest.json, and creates the
 #     release with the gh CLI. It refuses to touch a release that already
@@ -390,6 +392,101 @@ jobs:
         with:
           args: --target ${{ matrix.rust_target }} --config '${{ steps.build-config.outputs.tauri_config }}'
 
+      # ── Smoke test: start the backend exactly as it ships ─────────────────
+      # File-level checks (names, checksums, architectures) all passed for the
+      # signed 2.1.0 and 2.1.1 Mac builds, yet their backend could not start:
+      # under the hardened runtime macOS refused to load the Python library
+      # PyInstaller unpacks (fixed by src-tauri/Entitlements.plist). So run the
+      # shipped binary itself: the signed one inside the .app on macOS, the one
+      # inside the .deb on Linux, the one inside the .msi on Windows. It must
+      # answer /api/health within 30 s with this release's version, then stop
+      # (SIGTERM, or taskkill on Windows). Runs before "Upload bundles", so a
+      # failing build publishes nothing.
+      - name: Smoke-test bundled backend (macOS)
+        if: matrix.os_family == 'macos'
+        env:
+          VERSION: ${{ needs.verify-version.outputs.version }}
+          BACKEND: src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/Pedimap 2.app/Contents/MacOS/pedimap-backend
+        run: scripts/smoke-test-backend.sh "$BACKEND" "$VERSION" 30
+
+      - name: Smoke-test bundled backend (Linux)
+        if: matrix.os_family == 'linux'
+        env:
+          VERSION: ${{ needs.verify-version.outputs.version }}
+          BUNDLE: src-tauri/target/${{ matrix.rust_target }}/release/bundle
+        run: |
+          shopt -s nullglob
+          debs=("$BUNDLE"/deb/*.deb)
+          if [ ${#debs[@]} -ne 1 ]; then
+            echo "::error::expected exactly one .deb in $BUNDLE/deb, found ${#debs[@]}"
+            exit 1
+          fi
+          root="$RUNNER_TEMP/deb-root"
+          dpkg-deb -x "${debs[0]}" "$root"
+          mapfile -t found < <(find "$root" -type f -name pedimap-backend)
+          if [ ${#found[@]} -ne 1 ]; then
+            echo "::error::expected one pedimap-backend inside ${debs[0]}, found ${#found[@]}"
+            exit 1
+          fi
+          echo "Testing ${found[0]#"$root"} from $(basename "${debs[0]}")"
+          scripts/smoke-test-backend.sh "${found[0]}" "$VERSION" 30
+
+      - name: Smoke-test bundled backend (Windows)
+        if: matrix.os_family == 'windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.verify-version.outputs.version }}
+          BUNDLE: src-tauri/target/${{ matrix.rust_target }}/release/bundle
+        run: |
+          $msi = @(Get-ChildItem (Join-Path $env:BUNDLE 'msi') -Filter *.msi)
+          if ($msi.Count -ne 1) { Write-Host "::error::expected exactly one .msi, found $($msi.Count)"; exit 1 }
+          # Administrative install: unpacks the MSI's files into a folder
+          # without installing anything on the runner.
+          $root = Join-Path $env:RUNNER_TEMP 'msi-root'
+          $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+            '/a', "`"$($msi[0].FullName)`"", '/qn', "TARGETDIR=`"$root`"")
+          if ($p.ExitCode -ne 0) { Write-Host "::error::msiexec /a failed with exit code $($p.ExitCode)"; exit 1 }
+          $exe = @(Get-ChildItem $root -Recurse -Filter pedimap-backend.exe)
+          if ($exe.Count -ne 1) { Write-Host "::error::expected one pedimap-backend.exe in the MSI, found $($exe.Count)"; exit 1 }
+          Write-Host "Testing $($exe[0].FullName.Substring($root.Length)) from $($msi[0].Name)"
+
+          $out = Join-Path $env:RUNNER_TEMP 'backend-stdout.log'
+          $err = Join-Path $env:RUNNER_TEMP 'backend-stderr.log'
+          $proc = Start-Process $exe[0].FullName -PassThru -WindowStyle Hidden `
+            -RedirectStandardOutput $out -RedirectStandardError $err
+          $body = $null
+          $deadline = (Get-Date).AddSeconds(30)
+          while ((Get-Date) -lt $deadline) {
+            try { $body = Invoke-RestMethod -Uri 'http://127.0.0.1:8765/api/health' -TimeoutSec 2; break } catch { }
+            if ($proc.HasExited) { break }
+            Start-Sleep -Milliseconds 500
+          }
+
+          $fail = $null
+          if (-not $body) {
+            $fail = if ($proc.HasExited) { "backend exited during startup (exit code $($proc.ExitCode))" }
+                    else { 'backend did not answer /api/health within 30 s' }
+          } elseif ($body.version -ne $env:VERSION) {
+            $fail = "backend reports version '$($body.version)', expected '$env:VERSION'"
+          } else {
+            Write-Host "health: $($body | ConvertTo-Json -Compress)"
+          }
+
+          # /T also ends the PyInstaller child process.
+          if (-not $proc.HasExited) { taskkill /PID $proc.Id /T /F | Out-Host }
+          Start-Sleep -Seconds 1
+          $left = @(Get-Process pedimap-backend -ErrorAction SilentlyContinue)
+          if (-not $fail -and $left.Count -gt 0) { $fail = "$($left.Count) pedimap-backend process(es) still running after taskkill" }
+
+          if ($fail) {
+            Write-Host "::error::$fail"
+            Write-Host '----- backend stderr -----'; Get-Content $err -Tail 60 -ErrorAction SilentlyContinue
+            Write-Host '----- backend stdout -----'; Get-Content $out -Tail 20 -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Write-Host 'PASS: backend started, answered /api/health with the right version, and stopped'
+          exit 0
+
       # One artifact per target, named after the Rust triple. The artifact name
       # is the first column of the rename table in scripts/release-assets.sh.
       # The raw bundler names are kept; renaming happens once, in publish.
@@ -442,6 +539,9 @@ jobs:
 
       # All naming rules live in the table at the top of the script.
       - name: Rename files, write latest.json and SHA256SUMS.txt
+        env:
+          # Dry runs may precede the CHANGELOG [Unreleased] → [VERSION] rename.
+          CHANGELOG_ALLOW_UNRELEASED: ${{ needs.verify-version.outputs.dry_run }}
         run: scripts/release-assets.sh "$VERSION" incoming release release-notes.md
 
       - name: Summarize

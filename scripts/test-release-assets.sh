@@ -192,6 +192,14 @@ expect_failure missing-msi-signature "$VERSION" "$in" "*_${VERSION}_x64_en-US.ms
 in="$WORK/nochangelog/in"; make_bundles "$in" 9.9.9
 expect_failure no-changelog-section 9.9.9 "$in" "no '## [9.9.9]' section"
 
+echo "Dry run before the CHANGELOG rename"
+in="$WORK/unreleased/in"; make_bundles "$in" 9.9.9
+CHANGELOG_ALLOW_UNRELEASED=true run_case unreleased 9.9.9 "$in"
+check "dry-run fallback: exits 0" [ "$status" -eq 0 ]
+check "dry-run fallback: warns about the missing section" contains "$log" "dry run uses [Unreleased]"
+check "dry-run fallback: notes use the [Unreleased] text" contains "$notes" "2.1.1 was built but never released"
+check "dry-run fallback: notes stop before [2.1.0]" bash -c "! grep -q 'Pedigree orientation toggle' '$notes'"
+
 in="$WORK/badversion/in"; make_bundles "$in" "$VERSION"
 expect_failure bad-version "v$VERSION" "$in" "no leading v"
 
