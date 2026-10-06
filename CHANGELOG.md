@@ -20,7 +20,9 @@ release notes, so every release needs its own section here before it is tagged.
   `<population>_<focal>_subpop.dat`). Parents outside the subpopulation are
   included as founder rows so no pedigree link is lost; choose **Replace
   outside parents with unknown** for a strictly closed set. The file's header
-  notes where it came from and how it was selected.
+  notes where it came from and how it was selected, and records each trait's
+  type, so a discrete trait stays discrete even if the values left in the
+  subpopulation all happen to be numbers.
 
 ### Changed
 - The details panel shows an individual's traits directly under its parents,

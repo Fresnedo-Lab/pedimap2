@@ -71,6 +71,30 @@ _PARENT_ALIASES = {
 }
 
 
+# Pedimap 2 extension: a trait's type declared in a full-line comment,
+#     ; PEDIMAP2 TRAITTYPE <trait name> discrete|continuous
+# Written by DatExporter so a file (e.g. a subset) whose remaining values would
+# be inferred differently still reads back with the original type. Being a
+# comment, other readers such as Pedimap 1.x ignore it.
+_TRAITTYPE_RE = re.compile(r"^\s*;\s*PEDIMAP2\s+TRAITTYPE\s+(.*)$", re.IGNORECASE)
+_DECLARED_TYPE = {"discrete": "qualitative", "qualitative": "qualitative",
+                  "continuous": "continuous"}
+_WRITTEN_TYPE = {TraitType.QUALITATIVE: "discrete", TraitType.CONTINUOUS: "continuous"}
+
+
+def _declared_trait_types(lines: List[str]) -> Dict[str, str]:
+    """{trait name: "qualitative"|"continuous"} from PEDIMAP2 TRAITTYPE comments."""
+    declared: Dict[str, str] = {}
+    for line in lines:
+        m = _TRAITTYPE_RE.match(line)
+        if not m:
+            continue
+        toks = _tokenize(m.group(1))
+        if len(toks) >= 2 and toks[1].lower() in _DECLARED_TYPE:
+            declared[toks[0]] = _DECLARED_TYPE[toks[1].lower()]
+    return declared
+
+
 class DatParseError(ValueError):
     """Raised for any malformed .dat input, with a human-readable message."""
 
@@ -145,6 +169,7 @@ class _DatParser:
         self.lines = text.splitlines()
         self.n = len(self.lines)
         self.i = 0
+        self.declared_types = _declared_trait_types(self.lines)
 
         # header
         self.population: Optional[str] = None
@@ -481,16 +506,25 @@ class _DatParser:
         return f, m, CrossType.CROSS
 
     def _infer_traits(self) -> Dict[str, dict]:
-        """Return {trait_name: TraitMeta-dict} applying the documented rule."""
+        """Return {trait_name: TraitMeta-dict}.
+
+        A PEDIMAP2 TRAITTYPE declaration wins; otherwise (or if a declared
+        "continuous" trait has a non-numeric value) the documented inference
+        rule applies.
+        """
         meta: Dict[str, dict] = {}
         for name, _idx in self.trait_cols:
+            declared = self.declared_types.get(name)
             vals = [r["raw_traits"][name] for r in self.records if name in r["raw_traits"]]
             if not vals:
-                meta[name] = {"name": name, "type": "qualitative", "categories": []}
+                meta[name] = ({"name": name, "type": "continuous"} if declared == "continuous"
+                              else {"name": name, "type": "qualitative", "categories": []})
                 continue
             all_single = all(len(v) == 1 for v in vals)
             any_non_number = any(not _is_number(v) for v in vals)
-            discrete = all_single or any_non_number
+            if declared == "continuous" and any_non_number:
+                declared = None                    # cannot be honored: infer instead
+            discrete = (declared == "qualitative") if declared else (all_single or any_non_number)
             if discrete:
                 cats: List[str] = []
                 for v in vals:
@@ -876,6 +910,10 @@ class _DatWriter:
             else:
                 handled = f"{s['outside']} outside parent(s) replaced with unknown"
             lines.append(f"Individuals: {s['selected']} selected; {handled}")
+        # Record each trait's type so the file reads back with it even if the
+        # values that remain (e.g. in a subset) would be inferred differently.
+        lines += [f"PEDIMAP2 TRAITTYPE {_quote(t.name, 'Trait name')} "
+                  f"{_WRITTEN_TYPE[t.trait_type]}" for t in self.eng.traits]
         return [f"; {line}" for line in lines]
 
     def write(self) -> str:
