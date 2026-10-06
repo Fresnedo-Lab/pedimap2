@@ -219,6 +219,31 @@ classification.
   sign, optional single decimal point). Anything else (letters, mixed
   alphanumerics, multiple dots) is not a number.
 
+### 4.3 Declared trait types (Pedimap 2 extension)
+
+Inference looks only at the values present in the file, so a file that holds
+part of a population can infer a different type than the full population did.
+Example: a discrete trait with values `10`, `20` and `X1` loses its only
+non-numeric value when the `X1` individual is left out, and `10`, `20` alone
+infer as continuous.
+
+To prevent this, Pedimap 2 writes one full-line comment per trait when it
+exports a `.dat` file:
+
+```
+; PEDIMAP2 TRAITTYPE <trait name> discrete|continuous
+```
+
+- `<trait name>` is quoted when it contains spaces (§3.5). The directive
+  keywords and the type are case-insensitive.
+- When a directive names a trait column, its type is used instead of
+  inference. If a trait declared `continuous` has a non-numeric value, the
+  declaration cannot apply and inference decides (§4).
+- Directives for names that are not trait columns are ignored, and files
+  without directives are inferred as before.
+- Because it is a comment (§1.1), readers that do not know the directive,
+  including Pedimap 1.x, ignore it.
+
 ---
 
 ## 5. Topological ordering
@@ -335,6 +360,28 @@ values do not sum to 1 or that has fewer/more than *N* values.
 - Individuals MAY be listed in **any order** within a section; the parser keys
   rows by name (case-sensitive, §3.4), not by position.
 
+### 7.4 IBD data in exported subsets
+
+When Pedimap 2 exports part of a population (for example a subpopulation),
+it keeps the IBD model of the **source population** unchanged:
+
+- `NALLELES`, every `FOUNDERALLELES` list and every `IBDPOSITIONS` list are
+  written exactly as in the source.
+- Each exported individual's IBD rows are written unchanged: the same
+  *N* probabilities per homologue, still summing to 1.
+
+The founder alleles are therefore those of the source population's founders.
+Those founders need not be in the exported file — a subset of descendants
+usually leaves them out — so a file's IBD probabilities **may refer to founder
+alleles whose founders are not present in it**.
+
+- **Pedimap 2** reads such files. §7.3 still holds: every individual *in the
+  file* appears in every IBD section. Founder alleles are identified by their
+  position 1…*N*, not by founder name, and they keep their meaning.
+- **Pedimap 1.x:** compatibility with such files is **untested**. If the
+  original program expects the founder alleles to belong to founders listed
+  in the pedigree, it may reject such a file or show it wrongly.
+
 ---
 
 ## 8. Valid subsets
@@ -393,8 +440,10 @@ specification.
 - [ ] `*SELF`, `*DH`, `*MUT`, `*VP` modeled as procreation-type on the relationship; equal parents ⇒ self.
 - [ ] Names case-sensitive, matched exactly across sections; space-containing names quoted everywhere.
 - [ ] Trait inference by the single-character / non-numeric rule — NOT by float-parseability.
+- [ ] `; PEDIMAP2 TRAITTYPE` comments, when present, set a trait's type; otherwise inference (§4.3).
 - [ ] Topological sort: parents before children; stable sib order; cycle error naming all members.
 - [ ] Marker color codes 0–9 distinct; > 9 gray.
 - [ ] LG annotation delimiter accepts both `;` and `/`.
 - [ ] IBD: homologues sum to 1, no missing data, every individual in every section, any order.
+- [ ] Exported subsets keep the source's founder alleles; IBD rows may refer to founders not in the file (§7.4).
 - [ ] All three valid subsets (§8.1–8.3) parse.

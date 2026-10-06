@@ -91,17 +91,22 @@ async function resolveBackendUrl(): Promise<string> {
 
 // ── Core fetch helper ─────────────────────────────────────────────────────────
 
-async function apiFetch<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
+async function apiResponse(path: string, options?: RequestInit): Promise<Response> {
   const base = await resolveBackendUrl();
   const res  = await fetch(`${base}${path}`, options);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`API ${res.status}: ${body}`);
   }
-  return res.json() as Promise<T>;
+  return res;
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  return (await apiResponse(path, options)).json() as Promise<T>;
+}
+
+async function apiFetchText(path: string, options?: RequestInit): Promise<string> {
+  return (await apiResponse(path, options)).text();
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -123,7 +128,24 @@ export interface ApiClient {
   loadFile(files: FileList | File[]):      Promise<{loaded: string; individuals: number}>;
   listDemo():                              Promise<{datasets: {name: string; description: string}[]}>;
   loadDemo(name: string):                  Promise<{loaded: string; individuals: number}>;
+  exportDat(req?: DatExportRequest):       Promise<string>;
   reset():                                 Promise<void>;
+}
+
+/** The selection behind a displayed subpopulation (as sent to /api/subpop). */
+export interface SubpopSelection {
+  focal_id:    string;
+  ancestors:   boolean;
+  descendants: boolean;
+  siblings:    boolean;
+}
+
+/** Body for POST /api/export/dat. Without ids the whole population is exported. */
+export interface DatExportRequest extends Partial<SubpopSelection> {
+  ids?: string[];
+  // false (default): parents outside `ids` are added as founder rows;
+  // true: they are written as unknown, giving a strictly closed set.
+  replace_outside_parents?: boolean;
 }
 
 export function useApi(): ApiClient {
@@ -159,6 +181,11 @@ export function useApi(): ApiClient {
     },
     listDemo: ()     => apiFetch("/api/demo/list"),
     loadDemo: (name) => apiFetch(`/api/demo/load/${encodeURIComponent(name)}`),
+    exportDat: (req = {}) => apiFetchText("/api/export/dat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    }),
     reset: () => apiFetch("/api/reset", { method: "POST" }),
   };
 }

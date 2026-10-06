@@ -42,16 +42,19 @@ async fn open_file_dialog(app: AppHandle) -> Result<String, String> {
     Ok(path.map(|p| p.to_string()).unwrap_or_default())
 }
 
-/// Open a native save dialog. Returns the chosen destination path or "".
+/// Open a native save dialog suggesting `default_name` (default
+/// "pedigree.json"); the filter matching its extension is listed first so it
+/// is the one preselected. Returns the chosen destination path or "".
 #[tauri::command]
-async fn save_file_dialog(app: AppHandle) -> Result<String, String> {
-    let path = app
-        .dialog()
-        .file()
-        .add_filter("Pedigree JSON", &["json"])
-        .add_filter("Pedimap Data", &["dat"])
-        .set_file_name("pedigree.json")
-        .blocking_save_file();
+async fn save_file_dialog(app: AppHandle, default_name: Option<String>) -> Result<String, String> {
+    let name = default_name.unwrap_or_else(|| "pedigree.json".to_string());
+    let dialog = app.dialog().file();
+    let dialog = if name.to_lowercase().ends_with(".dat") {
+        dialog.add_filter("Pedimap Data", &["dat"]).add_filter("Pedigree JSON", &["json"])
+    } else {
+        dialog.add_filter("Pedigree JSON", &["json"]).add_filter("Pedimap Data", &["dat"])
+    };
+    let path = dialog.set_file_name(name).blocking_save_file();
     Ok(path.map(|p| p.to_string()).unwrap_or_default())
 }
 
