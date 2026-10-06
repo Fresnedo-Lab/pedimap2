@@ -28,6 +28,9 @@ import {
 } from "./hooks/useApi";
 import PedigreeCanvas, { type Orientation } from "./components/PedigreeCanvas";
 import IndividualPanel from "./components/IndividualPanel";
+import UpdateBanner from "./components/UpdateBanner";
+import AboutMenu from "./components/AboutMenu";
+import { useUpdater } from "./hooks/useUpdater";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -170,6 +173,9 @@ export default function App() {
   const { status: backendStatus, lastError: backendError, retry: retryBackend } =
     useBackendHealth();
   const ready = backendStatus === "ready";
+
+  // Update check: once after the backend is ready, plus manual via About.
+  const updater = useUpdater(ready);
 
   // Surface failed requests in the UI instead of as unhandled rejections.
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -449,7 +455,11 @@ export default function App() {
           {pedigree?.population ?? ""}
           {pedigree ? ` · ${graphData?.nodes?.length ?? 0} individuals` : ""}
         </span>
+        <AboutMenu updater={updater} />
       </div>
+
+      {/* ── Update banner (desktop only) ─────────────────────────────────── */}
+      <UpdateBanner updater={updater} />
 
       {/* ── Error banner (Issue 3) ───────────────────────────────────────── */}
       {loadError && (

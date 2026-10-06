@@ -81,12 +81,18 @@ pedimap2/
 │   ├── tauri.conf.json       Bundle config (MSI/DMG/AppImage)
 │   └── icons/                App icons (all sizes)
 │
-├── .github/workflows/
-│   ├── release.yml           Cross-platform release CI
-│   └── ci.yml                PR validation CI
+├── .github/
+│   ├── workflows/
+│   │   ├── release.yml       Cross-platform release (draft + dry run)
+│   │   ├── docs.yml          User manual PDF
+│   │   └── ci.yml            PR validation CI
+│   └── release-notes-template.md
 │
 ├── scripts/
-│   └── build-sidecar.sh      Build + stage the Python sidecar
+│   ├── build-sidecar.sh      Build + stage the Python sidecar
+│   ├── release-assets.sh     Release file names, latest.json, checksums
+│   └── test-release-assets.sh  Offline test for release-assets.sh
+├── CHANGELOG.md              Release history (feeds the release notes)
 ├── package.json              Root scripts (sidecar, app:dev, app:build)
 └── README.md
 ```
@@ -130,14 +136,97 @@ python -m pytest backend/tests/ -v --tb=short
 
 ## Releasing a new version
 
-1. Bump the version in all four files — they must match:
+`.github/workflows/release.yml` builds all four targets, renames the
+installers (for example `Pedimap2-2.1.1-macOS-AppleSilicon.dmg`), and creates
+a **draft** release. It never adds files to an existing release, and it stops
+if the tag and the version files disagree.
+
+1. **Bump the version** in all four files — they must match:
    `package.json`, `frontend/package.json`, `src-tauri/Cargo.toml`,
    `src-tauri/tauri.conf.json`. (The backend reads its version from the root
    `package.json`, so `/api/health` follows automatically.)
-2. Commit: `git commit -m "chore: bump version to vX.Y.Z"`
-3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`
-4. The `release.yml` workflow builds installers for all platforms and creates
-   a GitHub Release draft automatically.
+2. **Update `CHANGELOG.md`**: rename `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD`
+   (or add that section) and update the link references at the bottom. The
+   release notes' "What's new" is copied from this section; the workflow
+   fails if it is missing.
+3. Commit (`git commit -m "chore: bump version to vX.Y.Z"`) and merge to `main`.
+4. **Dry run first.** In GitHub, open **Actions → Release → Run workflow**,
+   pick `main`, and leave **dry_run** checked. When it finishes, download the
+   `release-preview-vX.Y.Z` artifact and check:
+   - the file names match the table in `README.md`;
+   - the **Build – macOS Intel** log shows `pedimap-backend architectures: x86_64`;
+   - `latest.json` has the `darwin-*`, `windows-*` and `linux-*` platforms
+     (the publish log warns if the optional `linux-x86_64-deb`/`-rpm` keys
+     were left out);
+   - `release-notes.md` reads well.
+
+   Nothing is published by a dry run.
+5. **Tag and push:** `git tag -a vX.Y.Z -m "Pedimap 2 X.Y.Z" && git push origin vX.Y.Z`
+6. **Verify both Mac installers from the draft** before publishing. Download
+   them from the draft release page (or `gh release download vX.Y.Z -p '*.dmg'`)
+   and run:
+   ```bash
+   scripts/verify-macos-dmg.sh Pedimap2-X.Y.Z-macOS-Intel.dmg x86_64
+   scripts/verify-macos-dmg.sh Pedimap2-X.Y.Z-macOS-AppleSilicon.dmg arm64
+   ```
+   Both must end with `OK`. If either fails, do not publish; delete the draft
+   (`gh release delete vX.Y.Z --yes`) and fix the build. If you can, also
+   launch the app on an Intel Mac and on Windows; after quitting, no
+   `pedimap-backend` process should be left running (Activity Monitor /
+   Task Manager).
+7. **Publish.** Review the draft and click **Publish release**. Publishing
+   makes it the update that installed copies of Pedimap 2 (2.1.1 and later)
+   are offered.
+8. **Tell users who can't be updated automatically.** Versions before 2.1.1
+   have no update check, and Intel Mac users of 2.1.0 have no working
+   install. Email them a link to
+   <https://github.com/Fresnedo-Lab/pedimap2/releases/latest>.
+
+**If a release for the tag already exists**, the workflow stops instead of
+adding to it. Delete the release (`gh release delete vX.Y.Z --yes`, which
+keeps the tag), then re-run the workflow from the Actions tab.
+
+### Testing the in-app updater before a release
+
+Draft releases need a login to download, so test against a local server
+with a throwaway signing key (never the real one):
+
+1. `cargo tauri signer generate -w ~/.tauri/pedimap-test.key` (prints the
+   public key; also saved as `~/.tauri/pedimap-test.key.pub`).
+2. Build the "new" version and keep its update archive:
+   ```bash
+   npm run sidecar
+   TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/pedimap-test.key)" \
+   cargo tauri build --bundles app --config \
+     '{"version":"9.9.9","plugins":{"updater":{"pubkey":"<contents of .key.pub>"}}}'
+   ```
+   Copy `src-tauri/target/release/bundle/macos/Pedimap 2.app.tar.gz` and its
+   `.sig` into an empty folder, and add a `latest.json` there:
+   ```json
+   {"version":"9.9.9","notes":"test","pub_date":"2026-01-01T00:00:00Z",
+    "platforms":{"darwin-aarch64":{"url":"http://127.0.0.1:8000/Pedimap%202.app.tar.gz",
+                                    "signature":"<contents of the .sig file>"}}}
+   ```
+   Serve it: `python3 -m http.server 8000` (from that folder).
+3. Build the "old" version pointed at the local server, then copy
+   `Pedimap 2.app` to `~/Applications` (the updater must be able to replace it):
+   ```bash
+   TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/pedimap-test.key)" \
+   cargo tauri build --bundles app --config '{"plugins":{"updater":{
+     "pubkey":"<contents of .key.pub>",
+     "endpoints":["http://127.0.0.1:8000/latest.json"],
+     "dangerousInsecureTransportProtocol":true}}}'
+   ```
+4. Launch the old app. Check: the banner offers v9.9.9; **Later** hides it and
+   **ⓘ About → Check for updates** brings it back; **What's new** opens the
+   browser; **Install and restart** shows progress and relaunches as 9.9.9;
+   `pgrep -fl pedimap-backend` lists exactly one backend. Stop the server
+   before clicking Install to see the failure banner with the Releases link.
+   With the server stopped, a manual check shows "Could not check for updates".
+
+**Changing file names** means editing the rename table at the top of
+`scripts/release-assets.sh`, the links in `.github/release-notes-template.md`,
+and the table in `README.md`. Then run `scripts/test-release-assets.sh`.
 
 ---
 

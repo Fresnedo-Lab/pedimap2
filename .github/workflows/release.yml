@@ -1,8 +1,39 @@
 # .github/workflows/release.yml
 # ================================
-# Triggered on every push of a version tag (v*.*.*).
-# Builds native installers for Windows, macOS, and Linux in parallel,
-# then creates a GitHub Release draft and uploads the artifacts.
+# Builds native installers for Windows, macOS (Apple Silicon and Intel) and
+# Linux, gives them names a plant breeder can choose between, and creates a
+# DRAFT GitHub Release for a maintainer to review and publish.
+#
+#   verify-version ─┬─ build (4 targets) ─┬─ publish
+#                   └─ manual (docs.yml) ─┘
+#
+# ── Triggers ─────────────────────────────────────────────────────────────────
+#   • push of a version tag (v1.2.3)        → real run: creates the draft
+#   • workflow_dispatch, dry_run = true     → builds everything, renames, and
+#     (the default)                           uploads the would-be release as a
+#                                             "release-preview-…" workflow
+#                                             artifact. Nothing is published.
+#   • workflow_dispatch, dry_run = false    → real run; only allowed when
+#                                             started from a tag
+#
+# ── Why the release is built this way ────────────────────────────────────────
+# tauri-action used to create the release and upload into it from all four
+# build jobs. It never removes files, so re-running a tag mixed 2.0.0 and 2.1.0
+# installers in one release, under cryptic bundler names. Now:
+#   • verify-version fails fast unless the tag matches all four version files.
+#   • build runs tauri-action in build-only mode (no tagName/releaseId), so it
+#     uploads nothing to GitHub Releases; bundles travel as workflow artifacts.
+#   • publish renames files from ONE table (scripts/release-assets.sh), writes
+#     SHA256SUMS.txt and the updater manifest latest.json, and creates the
+#     release with the gh CLI. It refuses to touch a release that already
+#     exists, so files are never appended.
+#
+# ── macOS Intel ──────────────────────────────────────────────────────────────
+# PyInstaller cannot cross-compile: it bundles the interpreter it runs under.
+# The Intel build previously ran on an arm64 runner with arm64 Python, so the
+# Intel DMG shipped an arm64 backend. It now runs on a native Intel runner
+# (macos-15-intel; macos-13 is retired), and every build checks the sidecar's
+# architecture before bundling it.
 #
 # ── macOS signing strategy ───────────────────────────────────────────────────
 # Step-level `if:` conditions cannot read secrets directly, so HAS_APPLE_CERT
@@ -17,6 +48,13 @@
 #                   "bundle":{"macOS":{"signingIdentity":null}}}
 # (Tauri 2 config: signingIdentity lives at bundle.macOS, not tauri.bundle.macOS)
 #
+# ── Updater ──────────────────────────────────────────────────────────────────
+# tauri.conf.json sets bundle.createUpdaterArtifacts, so each build also writes
+# .sig files (signed with TAURI_SIGNING_PRIVATE_KEY) and, on macOS, an
+# .app.tar.gz update archive. publish turns those into latest.json, which the
+# app fetches from /releases/latest/download/latest.json. Because that URL
+# follows the newest PUBLISHED release, a draft never reaches users.
+#
 # ── Linux status ─────────────────────────────────────────────────────────────
 # Re-enabled for Tauri 2: webkit2gtk-4.1 is available on Ubuntu 22.04 and the
 # wry 0.54 / webkit2gtk ABI mismatch that blocked Tauri 1.x is resolved.
@@ -27,37 +65,138 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: build and rename everything, but upload it as a workflow artifact instead of creating a release'
+        type: boolean
+        default: true
 
 permissions:
-  contents: write
+  contents: read
+
+# Two runs for the same tag must never race to create the same release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
+  # ── 1. Version gate ──────────────────────────────────────────────────────────
+  # The tag is the version users see; the four files are what the app, the
+  # backend and the bundler report. They must agree before anything is built.
+  verify-version:
+    name: Verify version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      dry_run: ${{ steps.check.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag against version files
+        id: check
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+        run: |
+          pkg=$(jq -r .version package.json)
+          frontend=$(jq -r .version frontend/package.json)
+          cargo=$(sed -n '/^\[package\]/,/^\[/ s/^version *= *"\(.*\)".*/\1/p' src-tauri/Cargo.toml)
+          conf=$(jq -r .version src-tauri/tauri.conf.json)
+
+          # Only an explicit dry_run=false on a manual run (or a tag push)
+          # creates a release.
+          if [ "$EVENT_NAME" = workflow_dispatch ] && [ "$DRY_RUN_INPUT" != false ]; then
+            dry_run=true
+          else
+            dry_run=false
+          fi
+
+          if [ "$REF_TYPE" = tag ]; then
+            expected=${REF_NAME#v}
+            source="tag $REF_NAME"
+          elif [ "$dry_run" = true ]; then
+            expected=$pkg
+            source="package.json (dry run on branch $REF_NAME)"
+          else
+            echo "::error::A real release must be started from a version tag, not branch '$REF_NAME'. Re-run with dry_run checked, or push a tag."
+            exit 1
+          fi
+
+          echo "Expected version $expected (from $source)"
+          mismatch=0
+          report=""
+          for entry in "package.json=$pkg" "frontend/package.json=$frontend" \
+                       "src-tauri/Cargo.toml=$cargo" "src-tauri/tauri.conf.json=$conf"; do
+            file=${entry%%=*} found=${entry#*=}
+            if [ "$found" = "$expected" ]; then mark=ok; else mark=MISMATCH; mismatch=1; fi
+            report+=$(printf '  %-28s %-12s %s' "$file" "${found:-<none>}" "$mark")$'\n'
+          done
+          printf '%s' "$report"
+
+          if [ "$mismatch" -ne 0 ]; then
+            echo "::error::Version mismatch: $source expects $expected. Bump all four files to $expected (see CONTRIBUTING.md), commit, and tag again."
+            {
+              echo "### Version mismatch"
+              echo "Expected **$expected** from $source."
+              echo '```'
+              printf '%s' "$report"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "version=$expected" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "Version $expected verified; dry_run=$dry_run" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 2. Native builds ─────────────────────────────────────────────────────────
   build:
+    needs: verify-version
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: windows-latest
+          # sidecar_arch: what the architecture check below must find, in the
+          # vocabulary of the tool used on that OS (PE machine field on Windows,
+          # `lipo -archs` on macOS, `file` on Linux).
+          - name: Windows x64
+            runner: windows-latest
+            os_family: windows
             rust_target: x86_64-pc-windows-msvc
             python_arch: x64
+            sidecar_arch: '0x8664'
 
-          - platform: macos-latest
+          - name: macOS Apple Silicon
+            runner: macos-latest
+            os_family: macos
             rust_target: aarch64-apple-darwin
             python_arch: arm64
+            sidecar_arch: arm64
 
-          - platform: macos-latest
+          # Native Intel runner: PyInstaller can only build for the CPU it runs on.
+          - name: macOS Intel
+            runner: macos-15-intel
+            os_family: macos
             rust_target: x86_64-apple-darwin
-            python_arch: arm64
+            python_arch: x64
+            sidecar_arch: x86_64
 
-          - platform: ubuntu-22.04
+          - name: Linux x86_64
+            runner: ubuntu-22.04
+            os_family: linux
             rust_target: x86_64-unknown-linux-gnu
             python_arch: x64
+            sidecar_arch: x86-64
 
-    runs-on: ${{ matrix.platform }}
-    name: Build – ${{ matrix.rust_target }}
+    runs-on: ${{ matrix.runner }}
+    name: Build – ${{ matrix.name }}
 
     env:
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
@@ -69,7 +208,7 @@ jobs:
       # libwebkit2gtk-4.1-dev is required by Tauri 2 / wry 0.54 on Ubuntu 22.04.
       # The older 4.0 package is not compatible.
       - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.os_family == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -84,14 +223,11 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
-      - name: Add x86_64 Rust target for macOS cross-compile
-        if: matrix.rust_target == 'x86_64-apple-darwin'
-        run: rustup target add x86_64-apple-darwin
-
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          key: ${{ matrix.rust_target }}
 
       # ── Node.js / frontend ────────────────────────────────────────────────
       - name: Setup Node.js
@@ -125,11 +261,59 @@ jobs:
         run: pyinstaller pedimap_backend.spec --distpath dist --workpath build --noconfirm --clean
         working-directory: backend
 
+      # ── Sidecar architecture check ────────────────────────────────────────
+      # A sidecar for the wrong CPU still bundles without error; the app then
+      # opens but its backend never starts. Catch that here, not on a
+      # breeder's Mac. (A universal2 macOS binary passes, since it contains the
+      # target architecture and runs there.)
+      - name: Check sidecar architecture (macOS)
+        if: matrix.os_family == 'macos'
+        env:
+          EXPECTED_ARCH: ${{ matrix.sidecar_arch }}
+        run: |
+          archs=$(lipo -archs backend/dist/pedimap-backend)
+          echo "pedimap-backend architectures: $archs (expected $EXPECTED_ARCH)"
+          case " $archs " in
+            *" $EXPECTED_ARCH "*) ;;
+            *) echo "::error::Sidecar is built for '$archs', but ${{ matrix.rust_target }} needs $EXPECTED_ARCH. Check the runner and python_arch."
+               exit 1 ;;
+          esac
+
+      - name: Check sidecar architecture (Linux)
+        if: matrix.os_family == 'linux'
+        env:
+          EXPECTED_ARCH: ${{ matrix.sidecar_arch }}
+        run: |
+          info=$(file -b backend/dist/pedimap-backend)
+          echo "pedimap-backend: $info"
+          if ! grep -q -- "$EXPECTED_ARCH" <<<"$info"; then
+            echo "::error::Sidecar is not an $EXPECTED_ARCH binary: $info"
+            exit 1
+          fi
+
+      # `file` is not reliably on PATH on Windows runners, so read the PE
+      # header directly: the COFF Machine field follows the "PE\0\0" signature
+      # whose offset is stored at 0x3C.
+      - name: Check sidecar architecture (Windows)
+        if: matrix.os_family == 'windows'
+        shell: pwsh
+        env:
+          EXPECTED_ARCH: ${{ matrix.sidecar_arch }}
+        run: |
+          $bytes = [System.IO.File]::ReadAllBytes("backend\dist\pedimap-backend.exe")
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = '0x{0:X4}' -f [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          Write-Host "pedimap-backend.exe PE machine: $machine (expected $env:EXPECTED_ARCH)"
+          if ($machine -ne $env:EXPECTED_ARCH) {
+            Write-Host "::error::Sidecar PE machine is $machine, expected $env:EXPECTED_ARCH (x64)."
+            exit 1
+          }
+
       # ── Stage sidecar at src-tauri/binaries/ ──────────────────────────────
       # tauri.conf.json: externalBin = ["binaries/pedimap-backend"]
       # tauri-build resolves that to: src-tauri/binaries/pedimap-backend-{triple}
       - name: Stage sidecar binary (Unix)
-        if: matrix.platform != 'windows-latest'
+        if: matrix.os_family != 'windows'
         run: |
           mkdir -p src-tauri/binaries
           cp backend/dist/pedimap-backend \
@@ -137,7 +321,7 @@ jobs:
           chmod +x "src-tauri/binaries/pedimap-backend-${{ matrix.rust_target }}"
 
       - name: Stage sidecar binary (Windows)
-        if: matrix.platform == 'windows-latest'
+        if: matrix.os_family == 'windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path src-tauri\binaries | Out-Null
@@ -146,7 +330,7 @@ jobs:
 
       # ── macOS certificate import (only when secret is present) ────────────
       - name: Import macOS certificate
-        if: matrix.platform == 'macos-latest' && env.HAS_APPLE_CERT == 'true'
+        if: matrix.os_family == 'macos' && env.HAS_APPLE_CERT == 'true'
         env:
           APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -156,11 +340,12 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/certificate.p12
-          security import /tmp/certificate.p12 \
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" \
             -k "$KEYCHAIN_PATH" \
             -P "$APPLE_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/certificate.p12"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
       # ── Prepare build config ──────────────────────────────────────────────
@@ -172,7 +357,7 @@ jobs:
         id: build-config
         shell: bash
         run: |
-          if [ "${{ matrix.platform }}" = "macos-latest" ] && \
+          if [ "${{ matrix.os_family }}" = "macos" ] && \
              [ "${{ env.HAS_APPLE_CERT }}" != "true" ]; then
             echo 'tauri_config={"build":{"beforeBuildCommand":""},"bundle":{"macOS":{"signingIdentity":null}}}' \
               >> "$GITHUB_OUTPUT"
@@ -181,38 +366,123 @@ jobs:
               >> "$GITHUB_OUTPUT"
           fi
 
-      # ── Tauri build ───────────────────────────────────────────────────────
+      # The Rust cache can restore target/, including installers from an
+      # earlier version. Start from an empty bundle folder so only this
+      # build's files can be uploaded.
+      - name: Remove stale bundles
+        shell: bash
+        run: rm -rf "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
+
+      # ── Tauri build (build-only) ──────────────────────────────────────────
+      # No tagName / releaseId: tauri-action builds and signs but uploads
+      # nothing. The publish job creates the release.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN:               ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY:     ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE:                  ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD:         ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY:             ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID:                           ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD:                     ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID:                      ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY:          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Pedimap 2 ${{ github.ref_name }}'
-          releaseBody: |
-            ## What's new
-            See [CHANGELOG.md](https://github.com/Fresnedo-Lab/pedimap2/blob/main/CHANGELOG.md)
-            for the full change history.
-
-            ### Platform installers
-            | Platform | Files |
-            |----------|-------|
-            | Windows | `.msi` (WiX) · `.exe` (NSIS) |
-            | macOS (Apple Silicon) | `.dmg` (aarch64) |
-            | macOS (Intel) | `.dmg` (x86_64) |
-            | Linux | `.AppImage` · `.deb` |
-
-            > **macOS note:** If the build is unsigned, right-click the app → Open
-            > on first launch to bypass Gatekeeper.
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: false
           args: --target ${{ matrix.rust_target }} --config '${{ steps.build-config.outputs.tauri_config }}'
+
+      # One artifact per target, named after the Rust triple. The artifact name
+      # is the first column of the rename table in scripts/release-assets.sh.
+      # The raw bundler names are kept; renaming happens once, in publish.
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.rust_target }}
+          path: |
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.exe
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.app.tar.gz
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.deb
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.rpm
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.sig
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── 3. User manual ───────────────────────────────────────────────────────────
+  # Builds the PDF as the "pedimap2-manual" artifact; publish attaches it.
+  manual:
+    name: User manual
+    needs: verify-version
+    uses: ./.github/workflows/docs.yml
+
+  # ── 4. Rename, checksum, publish ─────────────────────────────────────────────
+  publish:
+    name: Publish draft release
+    needs: [verify-version, build, manual]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.verify-version.outputs.version }}
+      DRY_RUN: ${{ needs.verify-version.outputs.dry_run }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Each artifact lands in its own folder: incoming/bundle-<triple>/…
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: incoming
+
+      - name: Show downloaded files
+        run: find incoming -type f | sort
+
+      # All naming rules live in the table at the top of the script.
+      - name: Rename files, write latest.json and SHA256SUMS.txt
+        run: scripts/release-assets.sh "$VERSION" incoming release release-notes.md
+
+      - name: Summarize
+        run: |
+          {
+            echo "## Pedimap 2 v$VERSION ($([ "$DRY_RUN" = true ] && echo 'dry run' || echo 'draft release'))"
+            echo '```'
+            (cd release && ls -l)
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Dry run: hand back the would-be release, publish nothing ──────────
+      - name: Upload release preview
+        if: needs.verify-version.outputs.dry_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-preview-v${{ needs.verify-version.outputs.version }}
+          path: |
+            release/
+            release-notes.md
+          if-no-files-found: error
+          retention-days: 14
+
+      # ── Real run ──────────────────────────────────────────────────────────
+      # Never append: tauri-action used to add files to whatever release
+      # matched the tag, which is how one release ended up with installers
+      # from two versions. gh also finds drafts by tag.
+      - name: Refuse to reuse an existing release
+        if: needs.verify-version.outputs.dry_run != 'true'
+        run: |
+          if count=$(gh release view "v$VERSION" --json assets --jq '.assets | length' 2>/dev/null); then
+            echo "::error::A release for v$VERSION already exists (draft or published) with $count file(s). This workflow never adds files to an existing release. Delete it first with: gh release delete v$VERSION --yes   (this keeps the git tag), then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Create draft release
+        if: needs.verify-version.outputs.dry_run != 'true'
+        run: |
+          gh release create "v$VERSION" release/* \
+            --draft \
+            --verify-tag \
+            --title "Pedimap 2 v$VERSION" \
+            --notes-file release-notes.md
+          echo "Draft created: https://github.com/$GH_REPO/releases (review it, then click Publish)" >> "$GITHUB_STEP_SUMMARY"

@@ -16,22 +16,41 @@ while remaining compatible with existing Pedimap data files.
 
 ## 📥 Installation
 
-Download the installer for your platform from the
-[**Releases page**](https://github.com/Fresnedo-Lab/pedimap2/releases).
+Download Pedimap 2 from the
+[**latest release**](https://github.com/Fresnedo-Lab/pedimap2/releases/latest).
 No Python, Node, or Rust installation is needed — everything is bundled.
 
-| Platform | File |
-|----------|------|
-| Windows 10/11 (64-bit) | `Pedimap2_*_x64-setup.exe` or `Pedimap2_*_x64_en-US.msi` |
-| macOS Apple Silicon | `Pedimap2_*_aarch64.dmg` |
-| macOS Intel | `Pedimap2_*_x64.dmg` |
-| Linux x86_64 | `pedimap2_*_amd64.AppImage` or `pedimap2_*_amd64.deb` |
+### Which file do I need?
+
+Download **one** file for your computer (`X.Y.Z` is the version number):
+
+| Your computer | Download |
+|---|---|
+| **Windows 10 or 11** (recommended for most users) | `Pedimap2-X.Y.Z-Windows-Installer.exe` |
+| Windows, installed for you by an IT department | `Pedimap2-X.Y.Z-Windows.msi` |
+| **Mac with Apple Silicon** (M1, M2, M3, M4 or later) | `Pedimap2-X.Y.Z-macOS-AppleSilicon.dmg` |
+| **Mac with an Intel processor** | `Pedimap2-X.Y.Z-macOS-Intel.dmg` |
+| **Linux** (any distribution) | `Pedimap2-X.Y.Z-Linux-x86_64.AppImage` |
+| Linux: Debian or Ubuntu package | `Pedimap2-X.Y.Z-Linux-x86_64.deb` |
+| Linux: Fedora, RHEL or openSUSE package | `Pedimap2-X.Y.Z-Linux-x86_64.rpm` |
+| User manual (PDF, all platforms) | `Pedimap2-X.Y.Z-User-Manual.pdf` |
+
+The release page has the same table with direct download links.
+
+**Apple Silicon or Intel?** Click the Apple logo in the top-left corner of the
+screen and choose **About This Mac**. If you see **Chip** (for example
+"Apple M2"), use the Apple Silicon file; if you see **Processor** with "Intel"
+in it, use the Intel file.
+
+**macOS:** if macOS says Pedimap 2 cannot be opened or verified, right-click
+the app in Applications → **Open** on first launch. On macOS 15 (Sequoia) and
+later, use **System Settings → Privacy & Security → Open Anyway** instead.
 
 **Linux:** mark the AppImage executable before first run —
-`chmod +x pedimap2_*.AppImage`
+`chmod +x Pedimap2-*-Linux-x86_64.AppImage`
 
-**macOS:** if you see a Gatekeeper warning on an unsigned build, right-click
-the app → Open on first launch.
+**Files you can ignore:** `-update.app.tar.gz`, `.sig`, and `latest.json` are
+used only by automatic updates. `SHA256SUMS.txt` lets you verify downloads.
 
 ### Try it immediately
 
@@ -58,6 +77,7 @@ and precalculated IBD probabilities.
 | JSON export / import round-trip | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
+| Update notifications with one-click install (from 2.1.1) | ✅ |
 
 ### Parsed but not yet visualized
 
@@ -170,15 +190,16 @@ npm run app:build
 
 ### Release
 
-Push a version tag; GitHub Actions builds all four targets and opens a draft
-release.
+Releases are built by `.github/workflows/release.yml` and always start as a
+draft. Run it as a dry run first, then push a version tag. The full checklist
+is in [CONTRIBUTING.md](CONTRIBUTING.md#releasing-a-new-version).
 
 ```bash
-# Bump the version in all four files first:
+# Bump the version in all four files first, and add a CHANGELOG.md section:
 #   package.json · frontend/package.json
 #   src-tauri/Cargo.toml · src-tauri/tauri.conf.json
 git tag -a v2.1.1 -m "Pedimap 2.1.1"
-git push origin main --tags
+git push origin v2.1.1
 ```
 
 ---
@@ -215,7 +236,8 @@ users never install Python.
 | [`docs/`](docs/) | User manual source |
 | [`docs/reference/dat-format.md`](docs/reference/dat-format.md) | `.dat` / `.pmp` format specification |
 | [`docs/reference/ui-model.md`](docs/reference/ui-model.md) | Interaction model derived from Pedimap 1.x |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development workflow and branching |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development workflow, branching, and releases |
 
 ---
 
@@ -245,7 +267,7 @@ users never install Python.
 - [x] Legacy `.dat` parser with full format coverage
 - [x] Bundled demo dataset
 - [x] macOS signing and notarization in CI
-- [x] Automatic update delivery (Tauri updater)
+- [x] In-app update check and install (ⓘ About → Check for updates; from 2.1.1 on)
 
 ---
 

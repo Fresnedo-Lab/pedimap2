@@ -5,7 +5,7 @@
 // Responsibilities:
 //   1. Spawn the Python FastAPI backend as a sidecar on startup
 //   2. Expose Tauri commands for native OS operations
-//   3. Kill the sidecar cleanly when the main window is closed
+//   3. Stop the sidecar cleanly when the app exits, and around update installs
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -73,6 +73,24 @@ fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Stop the sidecar before an update is installed. On Windows the installer
+/// must overwrite pedimap-backend.exe, which is locked while it runs; on
+/// macOS/Linux the relaunched app must not find the old backend still
+/// holding port 8765. Async so the wait in stop_child runs off the main thread.
+#[tauri::command]
+async fn stop_backend(app: AppHandle) {
+    kill_backend(&app);
+}
+
+/// Restart the sidecar if installing an update failed after stop_backend.
+#[tauri::command]
+async fn start_backend(app: AppHandle) {
+    let running = app.state::<BackendProcess>().0.lock().unwrap().is_some();
+    if !running {
+        spawn_backend(&app);
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Sidecar helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,9 +115,43 @@ fn kill_backend(app: &AppHandle) {
     // `state` ends before `state` itself is released.
     let child = state.0.lock().unwrap().take();
     if let Some(child) = child {
-        let _ = child.kill();
+        stop_child(child);
         eprintln!("[pedimap] Python backend stopped.");
     }
+}
+
+/// The sidecar is a PyInstaller onefile binary: a bootloader process that
+/// runs the Python server as its child. SIGKILL on the bootloader orphans
+/// that child, which keeps serving port 8765 after the app has quit. SIGTERM
+/// is forwarded to the child and both exit; SIGKILL is only the fallback.
+#[cfg(unix)]
+fn stop_child(child: CommandChild) {
+    use std::time::{Duration, Instant};
+
+    let pid = child.pid() as libc::pid_t;
+    // SAFETY: plain kill(2) on a pid we spawned and still own.
+    unsafe { libc::kill(pid, libc::SIGTERM) };
+
+    // The bootloader exits only after its child has, so once its pid is gone
+    // (reaped by the shell plugin's wait thread) port 8765 is free.
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < deadline {
+        // SAFETY: signal 0 only checks that the process exists.
+        if unsafe { libc::kill(pid, 0) } != 0 {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    eprintln!("[pedimap] Backend ignored SIGTERM; killing it.");
+    let _ = child.kill();
+}
+
+/// Windows has no SIGTERM; terminate the bootloader. Whether its Python child
+/// always exits with it has not been verified on Windows yet (see
+/// CONTRIBUTING.md release checks: no pedimap-backend.exe left after quitting).
+#[cfg(not(unix))]
+fn stop_child(child: CommandChild) {
+    let _ = child.kill();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +164,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(BackendProcess(Mutex::new(None)))
         .setup(|app| {
             spawn_backend(&app.handle());
@@ -124,19 +177,21 @@ fn main() {
             read_file,
             write_file,
             app_version,
+            stop_backend,
+            start_backend,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let RunEvent::WindowEvent {
+        .run(|app_handle, event| match event {
+            RunEvent::WindowEvent {
                 label,
                 event: WindowEvent::CloseRequested { .. },
                 ..
-            } = event
-            {
-                if label == "main" {
-                    kill_backend(app_handle);
-                }
-            }
+            } if label == "main" => kill_backend(app_handle),
+            // Quitting from the macOS app menu (Cmd+Q) or AppHandle::exit
+            // skips CloseRequested; stop the sidecar here too. A no-op if it
+            // was already stopped.
+            RunEvent::Exit => kill_backend(app_handle),
+            _ => {}
         });
 }
