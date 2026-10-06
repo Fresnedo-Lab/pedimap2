@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for every binary the bundler signs (bundle.macOS.entitlements
+  in tauri.conf.json), including the pedimap-backend sidecar.
+
+  disable-library-validation: the sidecar is a PyInstaller onefile binary.
+  At startup it unpacks Python.framework into a temporary folder and loads
+  it. That framework is not signed with our Team ID, so under the hardened
+  runtime (required for notarization) macOS refuses to load it: "mapping
+  process and mapped file (non-platform) have different Team IDs". The
+  backend then exits before opening port 8765, which is why the signed 2.1.0
+  and 2.1.1 Mac builds showed "Cannot reach the Pedimap backend service".
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>
