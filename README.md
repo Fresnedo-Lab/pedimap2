@@ -77,7 +77,7 @@ and precalculated IBD probabilities.
 | JSON export / import round-trip | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
-| Update notifications with one-click install (from 2.1.1) | ✅ |
+| Update notifications with one-click install (from 2.1.2) | ✅ |
 
 ### Parsed but not yet visualized
 
@@ -198,8 +198,8 @@ is in [CONTRIBUTING.md](CONTRIBUTING.md#releasing-a-new-version).
 # Bump the version in all four files first, and add a CHANGELOG.md section:
 #   package.json · frontend/package.json
 #   src-tauri/Cargo.toml · src-tauri/tauri.conf.json
-git tag -a v2.1.1 -m "Pedimap 2.1.1"
-git push origin v2.1.1
+git tag -a v2.1.2 -m "Pedimap 2 2.1.2"
+git push origin v2.1.2
 ```
 
 ---
@@ -267,7 +267,7 @@ users never install Python.
 - [x] Legacy `.dat` parser with full format coverage
 - [x] Bundled demo dataset
 - [x] macOS signing and notarization in CI
-- [x] In-app update check and install (ⓘ About → Check for updates; from 2.1.1 on)
+- [x] In-app update check and install (ⓘ About → Check for updates; from 2.1.2 on)
 
 ---
 
