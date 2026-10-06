@@ -359,17 +359,53 @@ def export_json():
     return JSONResponse(_engine.to_dict())
 
 
-@app.get("/api/export/dat")
-def export_dat():
+class DatExportRequest(BaseModel):
+    """Body for POST /api/export/dat. Without ``ids`` the whole population is
+    exported. The selection fields only label the file's header comment."""
+    ids:          Optional[List[str]] = None
+    focal_id:     Optional[str] = None
+    ancestors:    bool = False
+    descendants:  bool = False
+    siblings:     bool = False
+    # False: parents outside ``ids`` are added as founder rows (no link lost).
+    # True:  they are written as UNKNOWN (strictly closed set).
+    replace_outside_parents: bool = False
+
+
+def _dat_response(ids=None, outside_parents: str = "include", notes=()) -> PlainTextResponse:
     try:
         from pmp_parser import DatExporter, DatExportError
     except ImportError:
         raise HTTPException(501, "DatExporter not available.")
     try:
-        text = DatExporter.to_dat_text(_engine)
+        text = DatExporter.to_dat_text(_engine, ids,
+                                       outside_parents=outside_parents, notes=notes)
     except DatExportError as exc:
         raise HTTPException(409, f"Cannot export as .dat: {exc}")
     return PlainTextResponse(text, media_type="text/plain")
+
+
+@app.get("/api/export/dat")
+def export_dat():
+    return _dat_response()
+
+
+@app.post("/api/export/dat")
+def export_dat_subset(req: DatExportRequest):
+    eng = get_engine()
+    if req.ids is not None:
+        unknown = sorted({i for i in req.ids if eng.get(i) is None})
+        if unknown:
+            raise HTTPException(400, f"Unknown individual(s): {', '.join(unknown)}")
+    notes = []
+    if req.focal_id:
+        notes.append(f"Focal individual: {req.focal_id}")
+    criteria = [k for k in ("ancestors", "descendants", "siblings") if getattr(req, k)]
+    if req.focal_id or criteria:
+        notes.append("Selection: " + " + ".join(["focal", *criteria]))
+    return _dat_response(req.ids,
+                         "unknown" if req.replace_outside_parents else "include",
+                         notes)
 
 
 @app.post("/api/individual")

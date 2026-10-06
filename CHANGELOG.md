@@ -15,6 +15,12 @@ release notes, so every release needs its own section here before it is tagged.
   back into view after you have panned or zoomed away.
 - In the details panel, ancestors, descendants and siblings can be expanded
   into a list of names; click a name to select that individual.
+- **⤓ Export .dat** toolbar button. It saves the whole population, or, while a
+  subpopulation is shown, just that subpopulation (suggested file name
+  `<population>_<focal>_subpop.dat`). Parents outside the subpopulation are
+  included as founder rows so no pedigree link is lost; choose **Replace
+  outside parents with unknown** for a strictly closed set. The file's header
+  notes where it came from and how it was selected.
 
 ### Changed
 - The details panel shows an individual's traits directly under its parents,

@@ -718,9 +718,21 @@ def _table(rows: List[List[str]]) -> List[str]:
     ]
 
 
+# How a subset export treats parents that are not in the subset.
+OUTSIDE_PARENTS_INCLUDE = "include"   # add them as founder rows (no link lost)
+OUTSIDE_PARENTS_UNKNOWN = "unknown"   # write them as UNKNOWN (strictly closed set)
+
+
 class DatExporter:
     @classmethod
-    def to_dat_text(cls, engine: PedigreeEngine, ids: Optional[Iterable[str]] = None) -> str:
+    def to_dat_text(
+        cls,
+        engine: PedigreeEngine,
+        ids: Optional[Iterable[str]] = None,
+        *,
+        outside_parents: str = OUTSIDE_PARENTS_INCLUDE,
+        notes: Iterable[str] = (),
+    ) -> str:
         """Write ``engine`` (or just the individuals in ``ids``) as ``.dat`` text.
 
         Header keywords use the values read from the source file; the pedigree
@@ -729,15 +741,27 @@ class DatExporter:
         marker and IBD sections are written when present. For data read from a
         .dat file, parsing the result gives the same ``to_dict()``.
 
-        When ``ids`` selects a subset, parents outside it are written as unknown.
+        When ``ids`` selects a subset, its parents that are not in the subset are
+        handled by ``outside_parents``: "include" (default) adds them as founder
+        rows — their own parents unknown, their trait/marker/IBD data kept — so
+        no pedigree link is lost; "unknown" writes them as UNKNOWN instead. The
+        header comment then records the source population and these counts.
+        ``notes`` are extra header-comment lines (e.g. the selection criteria).
+
         Raises DatExportError if the data cannot be represented in the format.
         """
-        return _DatWriter(engine, ids).write()
+        return _DatWriter(engine, ids, outside_parents, notes).write()
 
 
 class _DatWriter:
-    def __init__(self, engine: PedigreeEngine, ids: Optional[Iterable[str]]) -> None:
+    def __init__(self, engine: PedigreeEngine, ids: Optional[Iterable[str]],
+                 outside_parents: str = OUTSIDE_PARENTS_INCLUDE,
+                 notes: Iterable[str] = ()) -> None:
+        if outside_parents not in (OUTSIDE_PARENTS_INCLUDE, OUTSIDE_PARENTS_UNKNOWN):
+            raise ValueError(f"outside_parents must be 'include' or 'unknown', "
+                             f"not {outside_parents!r}")
         self.eng = engine
+        self.notes = [" ".join(str(n).split()) for n in notes]   # one line each
         meta = engine.dat_meta or {}
         self.unknown: List[str] = list(meta.get("unknown") or ["-"])
         self.missing = self.unknown[0]          # first symbol is the display form
@@ -756,12 +780,26 @@ class _DatWriter:
         source = [i for i in meta.get("source_order", []) if i in known]
         listed = set(source)
         order = source + [i for i in engine.all_ids() if i not in listed]
+
+        # Subset: individuals selected, plus (in "include" mode) their parents
+        # that fall outside the selection, written as founder rows.
+        self.subset: Optional[Dict[str, Any]] = None
+        self.as_founders: set = set()
         if ids is not None:
             wanted = set(ids)
             stray = wanted - known
             if stray:
                 raise DatExportError(f"Unknown individual(s): {', '.join(sorted(stray))}.")
-            order = [i for i in order if i in wanted]
+            outside = {
+                p for i in wanted
+                for p in (engine.get(i).female_parent, engine.get(i).male_parent)
+                if p is not None and p in known and p not in wanted
+            }
+            if outside_parents == OUTSIDE_PARENTS_INCLUDE:
+                self.as_founders = outside
+            self.subset = {"selected": len(wanted), "outside": len(outside),
+                           "mode": outside_parents}
+            order = [i for i in order if i in wanted or i in self.as_founders]
         if not order:
             raise DatExportError("There are no individuals to export.")
         self.order = order
@@ -794,6 +832,8 @@ class _DatWriter:
         return self._name(pid) if pid in self.included else self.missing
 
     def _parent_cells(self, ind: Individual) -> Tuple[str, str]:
+        if ind.id in self.as_founders:          # outside parent added to a subset
+            return self.missing, self.missing
         keyword = _KEYWORD_FOR.get(ind.cross_type)
         if keyword:
             # Single-parent descent: the parent, then the keyword. A self keeps
@@ -824,8 +864,22 @@ class _DatWriter:
         return _quote(text, f"Value of trait {trait.name!r}")
 
     # -- sections --
+    def _comments(self) -> List[str]:
+        lines = ["Exported by Pedimap 2"]
+        if self.subset is not None:
+            lines.append(f"Subpopulation of: {self.eng.population_name or '(unnamed population)'}")
+        lines += self.notes
+        if self.subset is not None:
+            s = self.subset
+            if s["mode"] == OUTSIDE_PARENTS_INCLUDE:
+                handled = f"{s['outside']} outside parent(s) added as founder rows"
+            else:
+                handled = f"{s['outside']} outside parent(s) replaced with unknown"
+            lines.append(f"Individuals: {s['selected']} selected; {handled}")
+        return [f"; {line}" for line in lines]
+
     def write(self) -> str:
-        lines = ["; Exported by Pedimap 2", ""]
+        lines = self._comments() + [""]
         lines += self._header()
         lines += ["", "PEDIGREE"] + self._pedigree()
         lines += self._linkage_groups()

@@ -146,18 +146,78 @@ def test_marker_and_ibd_sections_written():
     assert _parse(exported).marker_codes["Elstar"]["SSR1"] == ["2", "2"]
 
 
-# ── Subsets and other sources ─────────────────────────────────────────────────
+# ── Subsets ───────────────────────────────────────────────────────────────────
 
-def test_subset_writes_outside_parents_as_unknown():
-    original = _parse(_read("Example.dat"))
-    exported = DatExporter.to_dat_text(original, ids=["Elstar", "Elise", "81015-045"])
-    sub = _parse(exported)
+def _check_subset_export(source, ids, text, mode="include"):
+    """Invariants for any subset export; returns the re-parsed engine."""
+    ids = set(ids)
+    sub = _parse(text)                                     # 1. it re-parses
+    outside = {p for i in ids
+               for p in (source.get(i).female_parent, source.get(i).male_parent)
+               if p is not None and p not in ids}
+    assert set(sub.all_ids()) == (ids | outside if mode == "include" else ids)
+    for iid in sub.all_ids():
+        ind = sub.get(iid)
+        for parent in (ind.female_parent, ind.male_parent):  # 2. in file or unknown
+            assert parent is None or parent in sub.all_ids(), (iid, parent)
+        assert ind.traits == source.get(iid).traits, iid    # 3. traits unchanged
+    for iid in outside & set(sub.all_ids()):                # added as founders
+        assert (sub.get(iid).female_parent, sub.get(iid).male_parent) == (None, None)
+    return sub
 
-    assert sorted(sub.all_ids()) == ["81015-045", "Elise", "Elstar"]
+
+def test_subset_adds_outside_parents_as_founder_rows():
+    source = _parse(_read("apple_public.dat"))
+    text = DatExporter.to_dat_text(source, ids=["Gala"])
+    sub = _check_subset_export(source, ["Gala"], text)
+
+    # Kidd's-Orange-Red is a cross in the source; here it becomes a founder row
+    # that keeps its own trait values, so Gala's parentage is not lost.
+    assert (sub.get("Gala").female_parent, sub.get("Gala").male_parent) == (
+        "Kidd's-Orange-Red", "Golden-Delicious")
+    assert sub.get("Golden-Delicious").traits["S1_S2"] == "S2S3"
+    assert "; Subpopulation of: Apple-Public" in text
+    assert "; Individuals: 1 selected; 2 outside parent(s) added as founder rows" in text
+
+
+def test_subset_can_replace_outside_parents_with_unknown():
+    source = _parse(_read("Example.dat"))
+    ids = ["Elstar", "Elise", "81015-045"]
+    text = DatExporter.to_dat_text(source, ids=ids, outside_parents="unknown")
+    sub = _check_subset_export(source, ids, text, mode="unknown")
+
     assert sub.get("Elstar").female_parent is None          # GoldenD not exported
     assert (sub.get("81015-045").female_parent, sub.get("81015-045").male_parent) == (
         "Elstar", "Elise")
-    assert set(sub.ibd["A"]["0"]) == {"Elstar", "Elise", "81015-045"}
+    assert set(sub.ibd["A"]["0"]) == set(ids)
+    assert "; Individuals: 3 selected; 4 outside parent(s) replaced with unknown" in text
+
+
+def test_subset_marker_and_ibd_rows_follow_the_ids():
+    source = _parse(_read("Example.dat"))
+    ids = ["Elstar", "Elise", "81015-045"]
+    sub = _check_subset_export(source, ids, DatExporter.to_dat_text(source, ids=ids))
+    # Selected individuals plus the 4 outside parents added as founders.
+    expected = set(ids) | {"GoldenD", "IngridM", "Septer", "Cox"}
+    for lg in sub.ibd:
+        for pos in sub.ibd[lg]:
+            assert set(sub.ibd[lg][pos]) == expected
+            for iid in expected:
+                assert sub.ibd[lg][pos][iid] == source.ibd[lg][pos][iid]
+    assert {i for i in expected if sub.get(i).markers} == expected
+    assert all(sub.get(i).markers == source.get(i).markers for i in expected)
+
+
+@pytest.mark.parametrize("relation", ["ancestors", "descendants"])
+@needs_transapple
+def test_private_fixture_every_subpopulation_exports_cleanly(relation):
+    # For every individual in the file, export focal + its ancestors or
+    # descendants, as the subpopulation view does, and check the invariants.
+    # Everything is derived at run time from the private file.
+    source = _parse(_read(TRANSAPPLE))
+    for focal in source.all_ids():
+        ids = {focal, *getattr(source, relation)(focal)}
+        _check_subset_export(source, ids, DatExporter.to_dat_text(source, ids=ids))
 
 
 def test_unknown_ids_are_rejected():
