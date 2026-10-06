@@ -1,6 +1,6 @@
 {
   "name": "pedimap2",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "private": true,
   "description": "Pedimap 2 — multiplatform desktop app for pedigree visualization in plant breeding",
   "scripts": {
