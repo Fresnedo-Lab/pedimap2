@@ -59,16 +59,31 @@ pedimap2-manual                    pedimap2-manual.pdf       User-Manual.pdf
 '
 
 # ── Updater table (latest.json) ──────────────────────────────────────────────
-# One row per platform key the Tauri updater looks up. The signature is read
-# from the raw .sig file; the download URL points at the PUBLISHED name above.
-# Windows and Linux .sig files are only embedded here, not uploaded.
+# One row per platform key. The signature is read from the raw .sig file; the
+# download URL points at the PUBLISHED name above. Windows and Linux .sig
+# files are only embedded here, not uploaded.
 #
-# platform        artifact                           signature glob                download (published)
+# tauri-plugin-updater (2.10) looks up "{os}-{arch}-{installer}" first and
+# falls back to "{os}-{arch}". The installer-specific keys make an MSI install
+# update from the MSI and a .deb/.rpm install from its own package; without
+# them those installs would be handed the NSIS installer or the AppImage
+# (which fails with "invalid updater format" for .deb/.rpm).
+#
+# need: "required" fails the release if the .sig is missing; "optional" only
+# warns and leaves the key out. The bundler is only documented to sign the
+# AppImage on Linux, so .deb/.rpm signatures may not exist.
+#
+# platform                artifact                          signature glob              download (published)   need
 UPDATER='
-darwin-aarch64    bundle-aarch64-apple-darwin        *.app.tar.gz.sig              macOS-AppleSilicon-update.app.tar.gz
-darwin-x86_64     bundle-x86_64-apple-darwin         *.app.tar.gz.sig              macOS-Intel-update.app.tar.gz
-windows-x86_64    bundle-x86_64-pc-windows-msvc      *_{V}_x64-setup.exe.sig       Windows-Installer.exe
-linux-x86_64      bundle-x86_64-unknown-linux-gnu    *_{V}_amd64.AppImage.sig      Linux-x86_64.AppImage
+darwin-aarch64            bundle-aarch64-apple-darwin       *.app.tar.gz.sig            macOS-AppleSilicon-update.app.tar.gz  required
+darwin-x86_64             bundle-x86_64-apple-darwin        *.app.tar.gz.sig            macOS-Intel-update.app.tar.gz         required
+windows-x86_64            bundle-x86_64-pc-windows-msvc     *_{V}_x64-setup.exe.sig     Windows-Installer.exe                 required
+windows-x86_64-nsis       bundle-x86_64-pc-windows-msvc     *_{V}_x64-setup.exe.sig     Windows-Installer.exe                 required
+windows-x86_64-msi        bundle-x86_64-pc-windows-msvc     *_{V}_x64_en-US.msi.sig     Windows.msi                           required
+linux-x86_64              bundle-x86_64-unknown-linux-gnu   *_{V}_amd64.AppImage.sig    Linux-x86_64.AppImage                 required
+linux-x86_64-appimage     bundle-x86_64-unknown-linux-gnu   *_{V}_amd64.AppImage.sig    Linux-x86_64.AppImage                 required
+linux-x86_64-deb          bundle-x86_64-unknown-linux-gnu   *_{V}_amd64.deb.sig         Linux-x86_64.deb                      optional
+linux-x86_64-rpm          bundle-x86_64-unknown-linux-gnu   *-{V}-1.x86_64.rpm.sig      Linux-x86_64.rpm                      optional
 '
 
 # Files without the version in their name, by design.
@@ -87,6 +102,9 @@ error() {
   # ::error:: makes the message show up in the GitHub Actions run summary.
   if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::error::$*" >&2; else echo "ERROR: $*" >&2; fi
   errors=$((errors + 1))
+}
+warn() {
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::warning::$*" >&2; else echo "WARNING: $*" >&2; fi
 }
 bail_if_errors() {
   if [ "$errors" -gt 0 ]; then
@@ -156,10 +174,15 @@ manifest=$(jq -n \
   --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {}}')
 
-while read -r platform artifact glob published; do
+while read -r platform artifact glob published need; do
   [ -n "$platform" ] || continue
   download="Pedimap2-$VERSION-$published"
   [ -f "$OUTPUT/$download" ] || error "latest.json: $platform points at $download, which is not in the release"
+  if [ "$need" = optional ] && [ -d "$INPUT/$artifact" ] &&
+     [ -z "$(find "$INPUT/$artifact" -type f -name "${glob//\{V\}/$VERSION}")" ]; then
+    warn "latest.json: no signature for optional key $platform (${glob//\{V\}/$VERSION}); leaving it out"
+    continue
+  fi
   if sig=$(find_one "$artifact" "$glob"); then
     if [ ! -s "$sig" ]; then
       error "latest.json: signature file for $platform is empty: $sig"

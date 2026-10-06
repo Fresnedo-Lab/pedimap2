@@ -43,7 +43,9 @@ bundle-x86_64-apple-darwin/macos/Pedimap 2.app.tar.gz.sig
 bundle-x86_64-unknown-linux-gnu/appimage/Pedimap 2_${v}_amd64.AppImage
 bundle-x86_64-unknown-linux-gnu/appimage/Pedimap 2_${v}_amd64.AppImage.sig
 bundle-x86_64-unknown-linux-gnu/deb/Pedimap 2_${v}_amd64.deb
+bundle-x86_64-unknown-linux-gnu/deb/Pedimap 2_${v}_amd64.deb.sig
 bundle-x86_64-unknown-linux-gnu/rpm/Pedimap 2-${v}-1.x86_64.rpm
+bundle-x86_64-unknown-linux-gnu/rpm/Pedimap 2-${v}-1.x86_64.rpm.sig
 pedimap2-manual/pedimap2-manual.pdf
 "
   while IFS= read -r f; do
@@ -115,8 +117,8 @@ json="$out/latest.json"
 check "latest.json version is $VERSION" [ "$(jq -r .version "$json")" = "$VERSION" ]
 check "latest.json pub_date is RFC 3339" \
   bash -c "jq -r .pub_date '$json' | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\$'"
-check "latest.json has exactly the 4 platform keys" \
-  [ "$(jq -r '.platforms | keys | join(",")' "$json")" = "darwin-aarch64,darwin-x86_64,linux-x86_64,windows-x86_64" ]
+check "latest.json has exactly the 9 platform keys" \
+  [ "$(jq -r '.platforms | keys | join(",")' "$json")" = "darwin-aarch64,darwin-x86_64,linux-x86_64,linux-x86_64-appimage,linux-x86_64-deb,linux-x86_64-rpm,windows-x86_64,windows-x86_64-msi,windows-x86_64-nsis" ]
 while read -r platform file sigsrc; do
   check "$platform url → $file" \
     [ "$(jq -r --arg p "$platform" '.platforms[$p].url' "$json")" = "$base/$file" ]
@@ -127,7 +129,12 @@ done <<EOF
 darwin-aarch64 Pedimap2-$VERSION-macOS-AppleSilicon-update.app.tar.gz bundle-aarch64-apple-darwin/macos/Pedimap 2.app.tar.gz.sig
 darwin-x86_64 Pedimap2-$VERSION-macOS-Intel-update.app.tar.gz bundle-x86_64-apple-darwin/macos/Pedimap 2.app.tar.gz.sig
 windows-x86_64 Pedimap2-$VERSION-Windows-Installer.exe bundle-x86_64-pc-windows-msvc/nsis/Pedimap 2_${VERSION}_x64-setup.exe.sig
+windows-x86_64-nsis Pedimap2-$VERSION-Windows-Installer.exe bundle-x86_64-pc-windows-msvc/nsis/Pedimap 2_${VERSION}_x64-setup.exe.sig
+windows-x86_64-msi Pedimap2-$VERSION-Windows.msi bundle-x86_64-pc-windows-msvc/msi/Pedimap 2_${VERSION}_x64_en-US.msi.sig
 linux-x86_64 Pedimap2-$VERSION-Linux-x86_64.AppImage bundle-x86_64-unknown-linux-gnu/appimage/Pedimap 2_${VERSION}_amd64.AppImage.sig
+linux-x86_64-appimage Pedimap2-$VERSION-Linux-x86_64.AppImage bundle-x86_64-unknown-linux-gnu/appimage/Pedimap 2_${VERSION}_amd64.AppImage.sig
+linux-x86_64-deb Pedimap2-$VERSION-Linux-x86_64.deb bundle-x86_64-unknown-linux-gnu/deb/Pedimap 2_${VERSION}_amd64.deb.sig
+linux-x86_64-rpm Pedimap2-$VERSION-Linux-x86_64.rpm bundle-x86_64-unknown-linux-gnu/rpm/Pedimap 2-${VERSION}-1.x86_64.rpm.sig
 EOF
 
 # Release notes: placeholders filled, links point at real files, changelog pulled in.
@@ -140,7 +147,17 @@ for f in $links; do
   check "notes link target is published: $f" [ -f "$out/$f" ]
 done
 
-# ── 2. Failure cases: each must exit non-zero and say why ────────────────────
+# ── 2. Optional .deb/.rpm signatures absent: release still succeeds ───────────
+echo "Without .deb/.rpm signatures (optional updater keys)"
+in="$WORK/nodebsig/in"; make_bundles "$in" "$VERSION"
+rm "$in/bundle-x86_64-unknown-linux-gnu/deb/"*.sig "$in/bundle-x86_64-unknown-linux-gnu/rpm/"*.sig
+run_case nodebsig "$VERSION" "$in"
+check "exits 0" [ "$status" -eq 0 ]
+check "warns about the missing optional keys" contains "$log" "no signature for optional key linux-x86_64-deb"
+check "latest.json leaves out linux-x86_64-deb and -rpm" \
+  [ "$(jq -r '.platforms | keys | join(",")' "$out/latest.json")" = "darwin-aarch64,darwin-x86_64,linux-x86_64,linux-x86_64-appimage,windows-x86_64,windows-x86_64-msi,windows-x86_64-nsis" ]
+
+# ── 3. Failure cases: each must exit non-zero and say why ────────────────────
 expect_failure() {  # NAME VERSION INPUT MESSAGE
   run_case "$1" "$2" "$3"
   check "$1: exits non-zero" [ "$status" -ne 0 ]
@@ -167,6 +184,10 @@ expect_failure duplicate-match "$VERSION" "$in" "found 2"
 in="$WORK/nosig/in"; make_bundles "$in" "$VERSION"
 rm "$in/bundle-x86_64-pc-windows-msvc/nsis/"*.sig
 expect_failure missing-signature "$VERSION" "$in" "*_${VERSION}_x64-setup.exe.sig"
+
+in="$WORK/nomsisig/in"; make_bundles "$in" "$VERSION"
+rm "$in/bundle-x86_64-pc-windows-msvc/msi/"*.sig
+expect_failure missing-msi-signature "$VERSION" "$in" "*_${VERSION}_x64_en-US.msi.sig"
 
 in="$WORK/nochangelog/in"; make_bundles "$in" 9.9.9
 expect_failure no-changelog-section 9.9.9 "$in" "no '## [9.9.9]' section"
