@@ -77,6 +77,7 @@ and precalculated IBD probabilities.
 | JSON export / import round-trip | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
+| Update notifications with one-click install (from 2.1.1) | ✅ |
 
 ### Parsed but not yet visualized
 
@@ -266,7 +267,7 @@ users never install Python.
 - [x] Legacy `.dat` parser with full format coverage
 - [x] Bundled demo dataset
 - [x] macOS signing and notarization in CI
-- [x] Automatic update delivery (Tauri updater)
+- [x] In-app update check and install (ⓘ About → Check for updates; from 2.1.1 on)
 
 ---
 

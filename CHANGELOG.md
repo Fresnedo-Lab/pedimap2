@@ -10,14 +10,24 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+### Fixed
+- **Intel Macs:** version 2.1.0 could not start on Intel Macs. This release
+  fixes it; please install it manually.
+- Quitting Pedimap 2 now also stops its background service, which previously
+  kept running on macOS and Linux.
+
+### Added
+- Pedimap 2 can now tell you when a new version is available and install it.
+  You can also check at any time from **ⓘ About → Check for updates**.
+
 ### Changed
-- Release downloads now have descriptive names such as
+- Release downloads now have clear names such as
   `Pedimap2-2.1.1-macOS-AppleSilicon.dmg`, and every release page starts with
   a "Which file do I need?" table.
-- The macOS Intel installer is built on a native Intel machine, so its bundled
-  backend runs on Intel Macs.
-- Releases include `SHA256SUMS.txt` for verifying downloads, plus the files
-  needed for automatic updates (`latest.json`, `-update.app.tar.gz`, `.sig`).
+- Each release contains files for one version only, plus `SHA256SUMS.txt`
+  checksums for verifying downloads.
+- The macOS Intel installer is built on a native Intel machine, and each Mac
+  installer is checked to contain only code for its kind of Mac.
 
 ## [2.1.0] — 2026-08-05
 
