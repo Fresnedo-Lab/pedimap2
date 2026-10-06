@@ -52,6 +52,19 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
 ## Known issues
 - Tauri 1.x had a Linux webkit2gtk ABI mismatch — Tauri 2 resolves this
 - secrets context not available in step-level if: — use job-level env: blocks
+- Signed macOS builds need src-tauri/Entitlements.plist
+  (com.apple.security.cs.disable-library-validation, wired in via
+  bundle.macOS.entitlements). Without it the hardened runtime refuses to load
+  the Python.framework the PyInstaller onefile sidecar unpacks ("different
+  Team IDs"), the backend exits at startup, and the app shows "Cannot reach
+  the Pedimap backend service". Unsigned dev builds never show this — only
+  running the signed binary does (release.yml smoke test,
+  scripts/verify-macos-dmg.sh --run).
+- Set GitHub secrets from files, never by pasting: e.g.
+  gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/pedimap2.key
+  Copying `cat` output from zsh picked up its trailing "%" end-of-line mark;
+  the key then failed to decode ("Invalid symbol 37") on the first build that
+  signed updater artifacts.
 - CSP lives ONLY in src-tauri/tauri.conf.json (app.security.csp). Never add
   a <meta http-equiv="Content-Security-Policy"> tag to frontend/index.html:
   in dev the Vite-served page has no CSP header, so a meta tag becomes the
