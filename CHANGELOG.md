@@ -8,7 +8,7 @@ The release workflow copies the section whose heading matches the release
 version (for example `## [2.1.2]`) into the "What's new" part of the GitHub
 release notes, so every release needs its own section here before it is tagged.
 
-## [Unreleased]
+## [2.1.2] — 2026-10-06
 
 _2.1.1 was built but never released (macOS backend failed to start)._
 
@@ -76,6 +76,7 @@ _2.1.1 was built but never released (macOS backend failed to start)._
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.0...v2.1.2
 [2.1.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/Fresnedo-Lab/pedimap2/releases/tag/v2.0.0
