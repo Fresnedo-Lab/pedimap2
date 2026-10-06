@@ -75,6 +75,7 @@ a = Analysis(
             'anyio._backends._asyncio',
             'h11',
             'pmp_parser',
+            'text_decoding',
             'pydantic',
             'pydantic.deprecated.class_validators',
             'email.mime.text',

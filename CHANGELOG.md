@@ -27,6 +27,11 @@ release notes, so every release needs its own section here before it is tagged.
   above the relatives.
 
 ### Fixed
+- Older Pedimap files with accented names (such as "Élise") now open correctly.
+  Files saved by Pedimap 1.x on Windows often use the older Windows-1252 text
+  encoding; Pedimap 2 now recognizes it, keeps every name intact so parent
+  links still match, and shows a short notice when it was used. Exported
+  files are always saved as UTF-8.
 - Switching between top-to-bottom and left-to-right now re-centers the
   pedigree in the window instead of leaving it partly off screen.
 - `.dat` export (`/api/export/dat`) works; it always failed before. The file

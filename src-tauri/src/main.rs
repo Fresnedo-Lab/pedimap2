@@ -30,16 +30,19 @@ fn get_backend_url() -> String {
     "http://127.0.0.1:8765".to_string()
 }
 
-/// Open a native file-picker. Returns the selected path or "".
+/// Open a native file-picker that allows several files, so a .dat can be
+/// selected together with its .pmp. Returns the selected paths (empty if the
+/// user cancelled).
 #[tauri::command]
-async fn open_file_dialog(app: AppHandle) -> Result<String, String> {
-    let path = app
+async fn open_file_dialog(app: AppHandle) -> Result<Vec<String>, String> {
+    let paths = app
         .dialog()
         .file()
-        .add_filter("Pedigree files", &["json", "dat", "pmp"])
-        .add_filter("All files", &["*"])
-        .blocking_pick_file();
-    Ok(path.map(|p| p.to_string()).unwrap_or_default())
+        .add_filter("Pedigree files (.dat, .pmp, .json)", &["dat", "pmp", "json"])
+        .blocking_pick_files();
+    Ok(paths
+        .map(|ps| ps.into_iter().map(|p| p.to_string()).collect())
+        .unwrap_or_default())
 }
 
 /// Open a native save dialog suggesting `default_name` (default
@@ -58,10 +61,48 @@ async fn save_file_dialog(app: AppHandle, default_name: Option<String>) -> Resul
     Ok(path.map(|p| p.to_string()).unwrap_or_default())
 }
 
-/// Read a UTF-8 file from disk and return its contents.
+/// A decoded text file and the encoding that was used ("utf-8" or
+/// "windows-1252"), so the UI can say when a legacy file was converted.
+#[derive(serde::Serialize)]
+struct TextFile {
+    text: String,
+    encoding: &'static str,
+}
+
+/// Windows-1252 differs from Latin-1 only in 0x80-0x9F. The five bytes it
+/// leaves undefined keep their own code point, so every byte is preserved.
+const WINDOWS_1252_80_9F: [char; 32] = [
+    '\u{20AC}', '\u{0081}', '\u{201A}', '\u{0192}', '\u{201E}', '\u{2026}', '\u{2020}', '\u{2021}',
+    '\u{02C6}', '\u{2030}', '\u{0160}', '\u{2039}', '\u{0152}', '\u{008D}', '\u{017D}', '\u{008F}',
+    '\u{0090}', '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}', '\u{2022}', '\u{2013}', '\u{2014}',
+    '\u{02DC}', '\u{2122}', '\u{0161}', '\u{203A}', '\u{0153}', '\u{009D}', '\u{017E}', '\u{0178}',
+];
+
+/// Strip a UTF-8 BOM, try strict UTF-8, otherwise decode as Windows-1252 —
+/// legacy Pedimap 1.x files come from Windows. Same rules as the backend's
+/// text_decoding.py; keep them in step.
+fn decode_text(bytes: &[u8]) -> TextFile {
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    match std::str::from_utf8(bytes) {
+        Ok(text) => TextFile { text: text.to_owned(), encoding: "utf-8" },
+        Err(_) => TextFile {
+            text: bytes
+                .iter()
+                .map(|&b| match b {
+                    0x80..=0x9F => WINDOWS_1252_80_9F[(b - 0x80) as usize],
+                    _ => b as char, // ASCII and 0xA0-0xFF match Latin-1
+                })
+                .collect(),
+            encoding: "windows-1252",
+        },
+    }
+}
+
+/// Read a text file from disk (see decode_text for the encoding rules).
 #[tauri::command]
-fn read_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+fn read_file(path: String) -> Result<TextFile, String> {
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(decode_text(&bytes))
 }
 
 /// Write UTF-8 content to a file on disk.
@@ -197,4 +238,43 @@ fn main() {
             RunEvent::Exit => kill_backend(app_handle),
             _ => {}
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decode_text, read_file};
+
+    fn read_bytes(name: &str, bytes: &[u8]) -> super::TextFile {
+        let path = std::env::temp_dir().join(name);
+        std::fs::write(&path, bytes).unwrap();
+        let file = read_file(path.to_string_lossy().into_owned()).unwrap();
+        let _ = std::fs::remove_file(&path);
+        file
+    }
+
+    #[test]
+    fn read_file_decodes_windows_1252_instead_of_failing() {
+        // "Élise" (0xC9) and an en dash (0x96), as a Windows program saves them.
+        let file = read_bytes("pedimap2-read-file-1252.dat", b"NAME \xC9lise sweet\x96tart\n");
+        assert_eq!(file.encoding, "windows-1252");
+        assert_eq!(file.text, "NAME \u{C9}lise sweet\u{2013}tart\n");
+        assert!(!file.text.contains('\u{FFFD}'));
+    }
+
+    #[test]
+    fn read_file_uses_utf8_and_strips_a_bom() {
+        let file = read_bytes("pedimap2-read-file-utf8.dat", "\u{FEFF}NAME Élise\n".as_bytes());
+        assert_eq!(file.encoding, "utf-8");
+        assert_eq!(file.text, "NAME Élise\n");
+    }
+
+    #[test]
+    fn every_windows_1252_byte_maps_to_a_character() {
+        let all: Vec<u8> = (0x80..=0xFF).collect();
+        let file = decode_text(&all);
+        assert_eq!(file.encoding, "windows-1252");
+        assert_eq!(file.text.chars().count(), all.len());
+        assert!(!file.text.contains('\u{FFFD}'));
+        assert_eq!(file.text.chars().next(), Some('\u{20AC}')); // 0x80 is the euro sign
+    }
 }
