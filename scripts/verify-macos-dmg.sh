@@ -6,23 +6,32 @@
 # pedimap-backend: the app opened, but its backend could never start on an
 # Intel Mac. Nothing in the build failed, so check the finished DMG.
 #
-# Usage: scripts/verify-macos-dmg.sh <dmg-path> <x86_64|arm64>
-#   e.g. scripts/verify-macos-dmg.sh Pedimap2-2.1.1-macOS-Intel.dmg x86_64
-#        scripts/verify-macos-dmg.sh Pedimap2-2.1.1-macOS-AppleSilicon.dmg arm64
+# Usage: scripts/verify-macos-dmg.sh [--run] <dmg-path> <x86_64|arm64>
+#   e.g. scripts/verify-macos-dmg.sh --run Pedimap2-2.1.2-macOS-Intel.dmg x86_64
+#        scripts/verify-macos-dmg.sh --run Pedimap2-2.1.2-macOS-AppleSilicon.dmg arm64
+#
+#   --run  also start the signed pedimap-backend from the DMG (via
+#          scripts/smoke-test-backend.sh) and require /api/health to answer
+#          with the app's version. x86_64 runs under Rosetta on Apple Silicon;
+#          arm64 cannot run on an Intel Mac. The 2.1.0/2.1.1 Mac builds had
+#          the right architectures but a backend that could not start, which
+#          only --run catches.
 #
 # Mounts the DMG read-only without opening a Finder window, inspects every
 # Mach-O file in *.app/Contents/MacOS/, prints one PASS/FAIL line per binary,
 # and always detaches. A universal binary passes if it contains the expected
 # architecture, since it runs there. Exit status: 0 all pass, 1 any fail,
-# 2 usage or mount error. macOS only (hdiutil, lipo).
+# 2 usage or mount error. macOS only (hdiutil, lipo, PlistBuddy).
 
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <dmg-path> <x86_64|arm64>" >&2
+  echo "usage: $0 [--run] <dmg-path> <x86_64|arm64>" >&2
   exit 2
 }
 
+run=false
+if [ "${1:-}" = "--run" ]; then run=true; shift; fi
 [ $# -eq 2 ] || usage
 dmg=$1 expected=$2
 case "$expected" in x86_64|arm64) ;; *) usage ;; esac
@@ -85,3 +94,23 @@ if [ ${#failed[@]} -gt 0 ]; then
   exit 1
 fi
 echo "OK: all $checked binaries are built for $expected."
+
+if $run; then
+  app=${apps[0]}
+  version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")
+  smoke_arch=""
+  if [ "$expected" != "$(uname -m)" ]; then
+    if [ "$expected" = x86_64 ]; then
+      smoke_arch=x86_64   # Rosetta
+    else
+      echo "error: cannot run arm64 code on this $(uname -m) Mac; omit --run" >&2
+      exit 2
+    fi
+  fi
+  echo
+  if ! SMOKE_ARCH=$smoke_arch "$(dirname "$0")/smoke-test-backend.sh" \
+       "$app/Contents/MacOS/pedimap-backend" "$version"; then
+    echo "FAIL: the backend in this DMG does not start. Do not publish it." >&2
+    exit 1
+  fi
+fi
