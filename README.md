@@ -77,7 +77,7 @@ and precalculated IBD probabilities.
 | Details panel — parents, traits, expandable lists of relatives | ✅ |
 | Fit to window — toolbar button or **F** | ✅ |
 | JSON export / import round-trip | ✅ |
-| Legacy `.dat` export — reads back unchanged (API route) | ✅ |
+| Legacy `.dat` export — whole population or displayed subpopulation; reads back unchanged | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
 | Update notifications with one-click install (from 2.1.2) | ✅ |
@@ -130,8 +130,17 @@ full specification.
 | `.json` | `/api/export/json` | All Pedimap 2 data, including IBD probabilities and marker color codes |
 | `.dat` | `/api/export/dat` | Header keywords as read, the pedigree with every trait column, `*SELF` / `*DH` / `*MUT` / `*VP` for single-parent descent, markers and IBD. A `.dat` file read in and exported again parses to the same data. |
 
-`.pmp` files are not written. Export is available through these routes only;
-there is no toolbar button for it yet.
+In the app, **⤓ Export .dat** saves the whole population, or — while a
+subpopulation is displayed — **Export subpopulation (.dat)** saves just that
+subpopulation (default name `<population>_<focal>_subpop.dat`). Parents of
+the subpopulation that fall outside it are added as founder rows so no
+pedigree link is lost; tick **Replace outside parents with unknown** for a
+strictly closed set. The file's header comment records the source
+population, focal individual, selection and how outside parents were handled.
+
+Via the API, `POST /api/export/dat` takes `{"ids": [...]}` (plus optional
+`focal_id`, `ancestors`, `descendants`, `siblings` for the header comment and
+`replace_outside_parents`). `.pmp` files are not written.
 
 ---
 
@@ -182,7 +191,7 @@ The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
 ### Test
 
 ```bash
-cd backend && python -m pytest tests/ -v      # 50 tests
+cd backend && python -m pytest tests/ -v      # 61 tests
 cd frontend && npm run typecheck && npm run build
 cd src-tauri && cargo check
 ```

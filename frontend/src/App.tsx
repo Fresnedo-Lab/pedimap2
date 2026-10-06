@@ -20,11 +20,12 @@
 //         Wrapped in arrow functions: onClick={() => loadGraph()}  etc.
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri as inTauriApp } from "@tauri-apps/api/core";
 import {
   useApi, useFetch, useBackendHealth,
   type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
+  type DatExportRequest, type SubpopSelection,
 } from "./hooks/useApi";
 import PedigreeCanvas, {
   type Orientation, type PedigreeCanvasHandle,
@@ -38,6 +39,32 @@ import { useUpdater } from "./hooks/useUpdater";
 
 function isTauri() {
   return typeof (window as any).__TAURI__ !== "undefined";
+}
+
+// Keep exported file names portable: letters, digits, dot, dash, underscore.
+function safeFileName(name: string): string {
+  return name.replace(/[^\w.-]+/g, "_");
+}
+
+// Save text through the native save dialog in the desktop app, or as a browser
+// download elsewhere. Uses Tauri 2's own detection: window.__TAURI__ (checked
+// by isTauri() above) only exists when withGlobalTauri is enabled, which it
+// is not, and a browser-style download does not save files in the webview.
+// Returns false if the user cancelled the dialog.
+async function saveTextFile(defaultName: string, text: string): Promise<boolean> {
+  if (inTauriApp()) {
+    const path = await invoke<string>("save_file_dialog", { defaultName });
+    if (!path) return false;
+    await invoke("write_file", { path, content: text });
+    return true;
+  }
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = defaultName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }
 
 // ── Per-view settings ─────────────────────────────────────────────────────────
@@ -192,6 +219,8 @@ export default function App() {
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
   const [activeTrait, setActiveTrait] = useState<string>("");
+  // The selection behind the displayed subpopulation; null for the whole population.
+  const [subpop,      setSubpop]      = useState<SubpopSelection | null>(null);
 
   // ── Per-view settings (orientation is the only wired field today) ─────────
   const [viewSettings, setViewSettings] =
@@ -245,6 +274,7 @@ export default function App() {
         api.getColorMap(trait ?? activeTrait),
       ]);
       setGraphData(g);
+      setSubpop(null);                 // the full graph is displayed again
       setColorMap(cm);
       setLoadError(null);
     } catch (e) {
@@ -341,10 +371,12 @@ export default function App() {
   const handleSubpop = useCallback(async () => {
     if (!selectedId) return;
     try {
-      const g = await api.buildSubpop({
+      const selection: SubpopSelection = {
         focal_id: selectedId, ancestors: true, descendants: true, siblings: false,
-      });
+      };
+      const g = await api.buildSubpop(selection);
       setGraphData(g);
+      setSubpop(selection);
       const cm = await api.getColorMap(activeTrait);
       setColorMap(cm);
       setLoadError(null);
@@ -352,6 +384,28 @@ export default function App() {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
   }, [api, selectedId, activeTrait]);
+
+  // ── .dat export: the displayed subpopulation, or the whole population ────
+  const [exportPanelOpen, setExportPanelOpen] = useState(false);
+  const [replaceOutside,  setReplaceOutside]  = useState(false);
+  useEffect(() => { setExportPanelOpen(false); }, [subpop]);
+
+  const exportDat = useCallback(async () => {
+    setExportPanelOpen(false);
+    try {
+      const req: DatExportRequest = subpop && graphData
+        ? { ...subpop, ids: graphData.nodes.map(n => n.id),
+            replace_outside_parents: replaceOutside }
+        : {};
+      const text = await api.exportDat(req);
+      const population = pedigree?.population || "pedigree";
+      const name = subpop ? `${population}_${subpop.focal_id}_subpop.dat` : `${population}.dat`;
+      await saveTextFile(safeFileName(name), text);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [api, subpop, graphData, replaceOutside, pedigree]);
 
   const handleLoadExample = useCallback(async () => {
     try {
@@ -418,6 +472,52 @@ export default function App() {
           style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
           📄 Load Example Data
         </button>
+
+        {/* Export: whole population, or (with options) the displayed subpopulation */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => (subpop ? setExportPanelOpen(o => !o) : void exportDat())}
+            aria-expanded={subpop ? exportPanelOpen : undefined}
+            title={subpop ? "Export the displayed subpopulation as .dat"
+                          : "Export the whole population as .dat"}
+            style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
+            ⤓ {subpop ? "Export subpopulation (.dat)" : "Export .dat"}
+          </button>
+          {subpop && exportPanelOpen && (
+            <div role="dialog" aria-label="Export subpopulation"
+              style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
+                width: 290, padding: 12, background: "#161b27",
+                border: "1px solid #2e3a52", borderRadius: 8,
+                boxShadow: "0 8px 32px rgba(0,0,0,.5)", userSelect: "text" }}>
+              <div style={{ fontSize: 12, color: "#e8ecf4", marginBottom: 10 }}>
+                {graphData?.nodes.length ?? 0} individuals around {subpop.focal_id}
+              </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start",
+                fontSize: 12, color: "#e8ecf4", cursor: "pointer" }}>
+                <input type="checkbox" checked={replaceOutside}
+                  onChange={e => setReplaceOutside(e.target.checked)}
+                  style={{ width: "auto", padding: 0, marginTop: 2 }} />
+                Replace outside parents with unknown
+              </label>
+              <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.45,
+                margin: "4px 0 12px 21px" }}>
+                {replaceOutside
+                  ? "Only the displayed individuals are written; links to parents outside them are dropped."
+                  : "Parents outside the subpopulation are added as founder rows, so no pedigree link is lost."}
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button onClick={() => setExportPanelOpen(false)}
+                  style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
+                  Cancel
+                </button>
+                <button onClick={() => void exportDat()}
+                  style={{ background: "#1d3a6e", color: "#4f9cf9", padding: "5px 12px" }}>
+                  Save…
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Orientation toggle (per view) */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
