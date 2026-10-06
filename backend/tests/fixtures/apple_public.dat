@@ -1,0 +1,39 @@
+; Public apple cultivars - test fixture for the Pedimap 2 .dat parser/exporter.
+; Built only from public information: cultivar names, commonly published
+; parentage, and published S-allele genotypes. "-" marks a genotype not given
+; here.
+; Seed/pollen parent order follows common records and is not verified for
+; every cross. BATCH values are arbitrary test labels.
+;
+; Fuji-self-01 is a SYNTHETIC record, not a real seedling. It exercises a
+; selfing written as the same parent twice and an S-allele incompatibility
+; (S24 is not an allele of Fuji, S1S9), hence S_QC = 2.
+;
+; S_QC: 0 = untestable (a parent or offspring genotype is missing)
+;       1 = consistent with the parents   2 = incompatible with the parents
+; Not a reference dataset.
+
+POPULATION = Apple-Public
+UNKNOWN    = -
+NULLHOMOZ  = $
+NALLELES   = 0
+PLOIDY     = 2
+
+PEDIGREE
+NAME                 FEMALE               MALE              S_1  S_2  S1_S2   BATCH  S_QC
+Golden-Delicious     -                    -                 S2   S3   S2S3    B1     0
+Red-Delicious        -                    -                 S9   S28  S9S28   B1     0
+Cox's-Orange-Pippin  -                    -                 S5   S9   S5S9    B1     0
+Jonathan             -                    -                 S7   S9   S7S9    B1     0
+McIntosh             -                    -                 S10  S25  S10S25  B2     0
+Fuji                 -                    -                 S1   S9   S1S9    B2     0
+Wagener              -                    -                 -    -    -       B2     0
+Rome-Beauty          -                    -                 -    -    -       B2     0
+Ingrid-Marie         -                    -                 -    -    -       B1     0
+Gala                 Kidd's-Orange-Red    Golden-Delicious  S2   S5   S2S5    B1+B2  0
+Kidd's-Orange-Red    Cox's-Orange-Pippin  Red-Delicious     -    -    -       B1     0
+Idared               Jonathan             Wagener           S3   S7   S3S7    B1     0
+Melrose              Jonathan             Red-Delicious     -    -    -       B2     0
+Monroe               Jonathan             Rome-Beauty       -    -    -       B2     0
+Elstar               Golden-Delicious     Ingrid-Marie      S3   S5   S3S5    B1     0
+Fuji-self-01         Fuji                 Fuji              S1   S24  S1S24   B2     2

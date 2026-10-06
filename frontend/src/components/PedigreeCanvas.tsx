@@ -3,11 +3,18 @@
 // Interactive pedigree DAG powered by vis-network.
 // Handles node colouring, selection, hover tooltips and layout.
 
-import { useEffect, useRef, useCallback } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import { Network, DataSet } from "vis-network/standalone";
 import type { GraphData, GraphNode, GraphEdge } from "../hooks/useApi";
 
 export type Orientation = "UD" | "LR";
+
+// Imperative handle for the toolbar's "Fit to window" button / F shortcut.
+export interface PedigreeCanvasHandle {
+  fit: () => void;
+}
+
+const FIT_ANIMATION = { duration: 400, easingFunction: "easeInOutQuad" as const };
 
 interface Props {
   graph:       GraphData;
@@ -84,11 +91,25 @@ const SHAPE: Record<string, string> = {
   unknown:          "ellipse",
 };
 
-export default function PedigreeCanvas({ graph, colorMap, selected, onSelect, orientation }: Props) {
+const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function PedigreeCanvas(
+  { graph, colorMap, selected, onSelect, orientation }, ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef   = useRef<Network | null>(null);
   const nodesDS      = useRef(new DataSet<any>());
   const edgesDS      = useRef(new DataSet<any>());
+
+  useImperativeHandle(ref, () => ({
+    fit: () => networkRef.current?.fit({ animation: FIT_ANIMATION }),
+  }), []);
+
+  // Select `selected` in the network, or clear the selection if it is not
+  // part of the drawn graph (e.g. a relative outside the current subpopulation,
+  // which vis-network would otherwise reject with "node not found").
+  const applySelection = useCallback((net: Network) => {
+    if (selected && nodesDS.current.get(selected)) net.selectNodes([selected]);
+    else net.unselectAll();
+  }, [selected]);
 
   // ── Build vis DataSets from graph ──────────────────────────────────────────
   const buildDatasets = useCallback(() => {
@@ -170,6 +191,11 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect, or
     );
     networkRef.current = network;
 
+    // Frame the whole pedigree once it has been drawn at its real size. The
+    // network is recreated for every new graph, so this also re-frames after
+    // each dataset load, subpopulation and "Show All".
+    network.once("afterDrawing", () => network.fit());
+
     network.on("selectNode", (params) => {
       if (params.nodes.length > 0) onSelect(params.nodes[0] as string);
     });
@@ -193,13 +219,14 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect, or
       borderWidth: n.id === selected ? 3 : 1,
     }));
     nodesDS.current.update(updates);
-    if (selected) networkRef.current.selectNodes([selected]);
-  }, [colorMap, selected, graph.nodes]);
+    applySelection(networkRef.current);
+  }, [colorMap, selected, graph.nodes, applySelection]);
 
   // ── Orientation changes: apply in place, preserving selection ─────────────
-  // setOptions + stabilize re-lays out the existing network rather than
-  // destroying/recreating it, so the current selection and node identities
-  // survive the flip (a recreate would reset both).
+  // setOptions re-lays out the existing network (synchronously) rather than
+  // destroying/recreating it, so the selection and node identities survive the
+  // flip. Physics is disabled, so stabilize() would do nothing and the viewport
+  // would keep its old pan/zoom over a rotated layout — fit() re-frames it.
   const appliedOrientation = useRef(orientation);
   useEffect(() => {
     const net = networkRef.current;
@@ -207,9 +234,9 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect, or
     if (appliedOrientation.current === orientation) return; // no-op on mount
     appliedOrientation.current = orientation;
     net.setOptions({ layout: { hierarchical: hierarchicalFor(orientation) } });
-    net.stabilize();
-    if (selected) net.selectNodes([selected]);
-  }, [orientation, selected]);
+    net.fit({ animation: FIT_ANIMATION });
+    applySelection(net);
+  }, [orientation, applySelection]);
 
   return (
     <div
@@ -217,4 +244,6 @@ export default function PedigreeCanvas({ graph, colorMap, selected, onSelect, or
       style={{ width: "100%", height: "100%", background: "#0f1117" }}
     />
   );
-}
+});
+
+export default PedigreeCanvas;

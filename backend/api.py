@@ -134,6 +134,11 @@ def list_individuals():
     ]
 
 
+def _relatives(eng: PedigreeEngine, ids) -> List[Dict[str, str]]:
+    """Relatives as {id, name} in pedigree order (parents before children)."""
+    return [{"id": i, "name": eng.get(i).name} for i in eng.in_order(ids)]
+
+
 @app.get("/api/individual/{ind_id}")
 def get_individual(ind_id: str):
     eng = get_engine()
@@ -151,9 +156,9 @@ def get_individual(ind_id: str):
         "traits":        ind.traits,
         "markers":       ind.markers,
         "notes":         ind.notes,
-        "ancestors":     len(eng.ancestors(ind_id)),
-        "descendants":   len(eng.descendants(ind_id)),
-        "siblings":      len(eng.siblings(ind_id)),
+        "ancestors":     _relatives(eng, eng.ancestors(ind_id)),
+        "descendants":   _relatives(eng, eng.descendants(ind_id)),
+        "siblings":      _relatives(eng, eng.siblings(ind_id)),
     }
 
 
@@ -357,11 +362,14 @@ def export_json():
 @app.get("/api/export/dat")
 def export_dat():
     try:
-        from pmp_parser import DatExporter
-        return PlainTextResponse(DatExporter.to_dat_text(_engine),
-                                 media_type="text/plain")
+        from pmp_parser import DatExporter, DatExportError
     except ImportError:
         raise HTTPException(501, "DatExporter not available.")
+    try:
+        text = DatExporter.to_dat_text(_engine)
+    except DatExportError as exc:
+        raise HTTPException(409, f"Cannot export as .dat: {exc}")
+    return PlainTextResponse(text, media_type="text/plain")
 
 
 @app.post("/api/individual")

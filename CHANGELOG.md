@@ -8,6 +8,27 @@ The release workflow copies the section whose heading matches the release
 version (for example `## [2.1.2]`) into the "What's new" part of the GitHub
 release notes, so every release needs its own section here before it is tagged.
 
+## [Unreleased]
+
+### Added
+- **Fit to window** toolbar button (shortcut: **F**) brings the whole pedigree
+  back into view after you have panned or zoomed away.
+- In the details panel, ancestors, descendants and siblings can be expanded
+  into a list of names; click a name to select that individual.
+
+### Changed
+- The details panel shows an individual's traits directly under its parents,
+  above the relatives.
+
+### Fixed
+- Switching between top-to-bottom and left-to-right now re-centers the
+  pedigree in the window instead of leaving it partly off screen.
+- `.dat` export (`/api/export/dat`) works; it always failed before. The file
+  keeps the header settings, every trait column, `*SELF` / `*DH` / `*MUT` /
+  `*VP` descent, markers and IBD data, and reads back into Pedimap 2 unchanged.
+- Marker color codes in `.dat` files are now kept instead of being dropped on
+  load, so they also survive JSON export and import.
+
 ## [2.1.2] — 2026-10-06
 
 _2.1.1 was built but never released (macOS backend failed to start)._

@@ -1,8 +1,10 @@
 // components/IndividualPanel.tsx
 // ================================
 // Side panel that shows full detail for a selected individual.
+// Order: parentage, traits (what users look up most), relatives, markers, notes.
 
-import type { IndividualDetail, TraitMeta, MarkerMeta } from "../hooks/useApi";
+import { useState } from "react";
+import type { IndividualDetail, RelativeRef, TraitMeta, MarkerMeta } from "../hooks/useApi";
 
 interface Props {
   individual:  IndividualDetail;
@@ -36,6 +38,52 @@ function TraitBar({ value, meta }: { value: number | string; meta?: TraitMeta })
       <span style={{ fontSize: 11, color: "#a0aec0", minWidth: 28, textAlign: "right" }}>
         {value}
       </span>
+    </div>
+  );
+}
+
+// A relative count ("231 descendants") that expands into a list of links,
+// one per line. Collapsed by default so long lists never push other sections
+// out of view; the expanded list scrolls on its own.
+function RelativeList({ singular, plural, people, onSelectId }: {
+  singular:   string;
+  plural:     string;
+  people:     RelativeRef[];
+  onSelectId: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const label = `${people.length} ${people.length === 1 ? singular : plural}`;
+
+  if (people.length === 0) {
+    return (
+      <div style={{ padding: "3px 0 3px 16px", borderBottom: "1px solid #1e2535",
+        color: "#4b5563", fontSize: 12 }}>
+        {label}
+      </div>
+    );
+  }
+  return (
+    <div style={{ borderBottom: "1px solid #1e2535" }}>
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open}
+        style={{ display: "flex", alignItems: "center", gap: 6, width: "100%",
+          background: "none", padding: "3px 0", color: "#e8ecf4", fontSize: 12,
+          textAlign: "left", borderRadius: 0 }}>
+        <span style={{ color: "#64748b", width: 10 }}>{open ? "▾" : "▸"}</span>
+        {label}
+      </button>
+      {open && (
+        <div style={{ maxHeight: 220, overflowY: "auto", padding: "0 0 6px 16px" }}>
+          {people.map(p => (
+            <button key={p.id} onClick={() => onSelectId(p.id)}
+              title={p.name !== p.id ? p.id : undefined}
+              style={{ display: "block", background: "none", padding: "1px 0",
+                color: "#4f9cf9", fontSize: 12, textDecoration: "underline",
+                textAlign: "left" }}>
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -98,11 +146,8 @@ export default function IndividualPanel({ individual: ind, traits, markers, onSe
         </div>
         {row("Mother (♀)", parentLink(ind.female_parent, "female"))}
         {row("Father (♂)", parentLink(ind.male_parent, "male"))}
-        {row("Ancestors",  ind.ancestors)}
-        {row("Descendants", ind.descendants)}
-        {row("Siblings",   ind.siblings)}
 
-        {/* Traits */}
+        {/* Traits — directly under the parents, above anything that can grow */}
         {Object.keys(ind.traits).length > 0 && (
           <>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#10b981",
@@ -118,6 +163,19 @@ export default function IndividualPanel({ individual: ind, traits, markers, onSe
             ))}
           </>
         )}
+
+        {/* Relatives — counts that expand into clickable lists */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#4f9cf9",
+          textTransform: "uppercase", letterSpacing: 1,
+          marginTop: 14, marginBottom: 6 }}>
+          Relatives
+        </div>
+        <RelativeList singular="ancestor"   plural="ancestors"
+          people={ind.ancestors}   onSelectId={onSelectId} />
+        <RelativeList singular="descendant" plural="descendants"
+          people={ind.descendants} onSelectId={onSelectId} />
+        <RelativeList singular="sibling"    plural="siblings"
+          people={ind.siblings}    onSelectId={onSelectId} />
 
         {/* Markers */}
         {Object.keys(ind.markers).length > 0 && (

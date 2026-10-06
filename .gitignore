@@ -44,6 +44,11 @@ Thumbs.db
 .tauri/
 ~/.tauri/
 
+# ── Private test data ────────────────────────────────────────────────────────
+# Unpublished breeding data: kept locally for extra parser tests (they skip
+# when the file is absent) and never committed to this public repo.
+backend/tests/fixtures/TransApple_Consolidated.dat
+
 # ── CI artefacts ─────────────────────────────────────────────────────────────
 *.AppImage
 *.deb
