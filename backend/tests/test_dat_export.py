@@ -146,6 +146,57 @@ def test_marker_and_ibd_sections_written():
     assert _parse(exported).marker_codes["Elstar"]["SSR1"] == ["2", "2"]
 
 
+# ── Declared trait types (PEDIMAP2 TRAITTYPE comments) ────────────────────────
+
+CODES_DAT = (
+    "PEDIGREE\n"
+    "NAME  FEMALE  MALE  Code\n"
+    "A     -       -     10\n"
+    "B     -       -     20\n"
+    "C     -       -     X1\n"      # the only non-numeric value makes Code discrete
+)
+
+
+def _without_directives(text: str) -> str:
+    return "\n".join(l for l in text.splitlines() if "PEDIMAP2 TRAITTYPE" not in l)
+
+
+def test_exporter_writes_one_type_comment_per_trait():
+    exported = DatExporter.to_dat_text(_parse(_read("Example.dat")))
+    directives = [l for l in exported.splitlines() if l.startswith("; PEDIMAP2 TRAITTYPE")]
+    assert directives == ["; PEDIMAP2 TRAITTYPE Color discrete",
+                          "; PEDIMAP2 TRAITTYPE Length continuous"]
+
+
+def test_subset_keeps_a_discrete_trait_whose_remaining_values_are_numeric():
+    source = _parse(CODES_DAT)
+    assert source.traits[0].trait_type.value == "qualitative"
+
+    text = DatExporter.to_dat_text(source, ids=["A", "B"])     # drops "X1"
+    sub = _parse(text)
+    assert sub.traits[0].trait_type.value == "qualitative"
+    assert sub.traits[0].categories == ["10", "20"]
+    assert sub.get("A").traits == {"Code": "10"}               # not 10.0
+    # Without the comment, inference alone would have made it continuous.
+    assert _parse(_without_directives(text)).traits[0].trait_type.value == "continuous"
+
+
+def test_parser_falls_back_to_inference():
+    # Declared continuous but a value is not a number: inference decides.
+    bad = "; PEDIMAP2 TRAITTYPE Code continuous\n" + CODES_DAT
+    assert _parse(bad).traits[0].trait_type.value == "qualitative"
+    # A declaration for a trait that is not a column is ignored.
+    other = "; PEDIMAP2 TRAITTYPE Nope discrete\n" + CODES_DAT.replace("C     -       -     X1\n", "")
+    assert _parse(other).traits[0].trait_type.value == "continuous"
+
+
+def test_declared_discrete_type_overrides_inference_for_quoted_names():
+    src = ('; pedimap2 traittype "Fruit size" DISCRETE\n'
+           'PEDIGREE\nNAME FEMALE MALE "Fruit size"\nA - - 12\nB - - 15\n')
+    trait = _parse(src).traits[0]
+    assert (trait.name, trait.trait_type.value) == ("Fruit size", "qualitative")
+
+
 # ── Subsets ───────────────────────────────────────────────────────────────────
 
 def _check_subset_export(source, ids, text, mode="include"):

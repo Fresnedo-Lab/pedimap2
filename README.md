@@ -195,7 +195,7 @@ The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
 ### Test
 
 ```bash
-cd backend && python -m pytest tests/ -v      # 63 tests
+cd backend && python -m pytest tests/ -v      # 68 tests
 cd frontend && npm run typecheck && npm run build
 cd src-tauri && cargo check
 ```
