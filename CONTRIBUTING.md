@@ -81,12 +81,18 @@ pedimap2/
 │   ├── tauri.conf.json       Bundle config (MSI/DMG/AppImage)
 │   └── icons/                App icons (all sizes)
 │
-├── .github/workflows/
-│   ├── release.yml           Cross-platform release CI
-│   └── ci.yml                PR validation CI
+├── .github/
+│   ├── workflows/
+│   │   ├── release.yml       Cross-platform release (draft + dry run)
+│   │   ├── docs.yml          User manual PDF
+│   │   └── ci.yml            PR validation CI
+│   └── release-notes-template.md
 │
 ├── scripts/
-│   └── build-sidecar.sh      Build + stage the Python sidecar
+│   ├── build-sidecar.sh      Build + stage the Python sidecar
+│   ├── release-assets.sh     Release file names, latest.json, checksums
+│   └── test-release-assets.sh  Offline test for release-assets.sh
+├── CHANGELOG.md              Release history (feeds the release notes)
 ├── package.json              Root scripts (sidecar, app:dev, app:build)
 └── README.md
 ```
@@ -130,14 +136,36 @@ python -m pytest backend/tests/ -v --tb=short
 
 ## Releasing a new version
 
-1. Bump the version in all four files — they must match:
+`.github/workflows/release.yml` builds all four targets, renames the
+installers (for example `Pedimap2-2.1.1-macOS-AppleSilicon.dmg`), and creates
+a **draft** release. It never adds files to an existing release, and it stops
+if the tag and the version files disagree.
+
+1. **Bump the version** in all four files — they must match:
    `package.json`, `frontend/package.json`, `src-tauri/Cargo.toml`,
    `src-tauri/tauri.conf.json`. (The backend reads its version from the root
    `package.json`, so `/api/health` follows automatically.)
-2. Commit: `git commit -m "chore: bump version to vX.Y.Z"`
-3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`
-4. The `release.yml` workflow builds installers for all platforms and creates
-   a GitHub Release draft automatically.
+2. **Update `CHANGELOG.md`**: rename `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD`
+   (or add that section) and update the link references at the bottom. The
+   release notes' "What's new" is copied from this section; the workflow
+   fails if it is missing.
+3. Commit (`git commit -m "chore: bump version to vX.Y.Z"`) and merge to `main`.
+4. **Dry run.** In GitHub, open **Actions → Release → Run workflow**, pick
+   `main`, and leave **dry_run** checked. When it finishes, download the
+   `release-preview-vX.Y.Z` artifact and check the file names,
+   `release-notes.md`, and `latest.json`. Nothing is published.
+5. **Tag and push:** `git tag -a vX.Y.Z -m "Pedimap 2 X.Y.Z" && git push origin vX.Y.Z`
+6. When the run finishes, open the **draft** on the Releases page, review it,
+   and click **Publish release**. Publishing also makes it the update that
+   installed copies of Pedimap 2 are offered.
+
+**If a release for the tag already exists**, the workflow stops instead of
+adding to it. Delete the release (`gh release delete vX.Y.Z --yes`, which
+keeps the tag), then re-run the workflow from the Actions tab.
+
+**Changing file names** means editing the rename table at the top of
+`scripts/release-assets.sh`, the links in `.github/release-notes-template.md`,
+and the table in `README.md`. Then run `scripts/test-release-assets.sh`.
 
 ---
 
