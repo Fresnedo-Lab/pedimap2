@@ -59,7 +59,7 @@ describe("drawing limit", () => {
     const list = screen.getByRole("list", { name: "Individuals" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(1001);
     expect((screen.getByText(/Export image/) as HTMLButtonElement).disabled).toBe(true);
-  });
+  }, 30_000);   // rendering 1,001 list items can exceed the 5 s default on CI runners
 
   it("draws a pedigree at the limit", async () => {
     serve(pedigreeOf(1000));
