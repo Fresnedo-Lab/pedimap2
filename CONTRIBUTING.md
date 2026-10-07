@@ -12,9 +12,18 @@ maintained by [Fresnedo-Lab](https://github.com/Fresnedo-Lab).
 | Tool       | Version   | Install |
 |------------|-----------|---------|
 | Python     | 3.12      | [python.org](https://www.python.org) |
-| Node.js    | 22        | [nodejs.org](https://nodejs.org) |
+| Node.js    | 22.12+    | [nodejs.org](https://nodejs.org) |
 | Rust       | stable    | `curl https://sh.rustup.rs -sSf \| sh` |
 | Tauri CLI  | ^2        | `cargo install tauri-cli --version "^2" --locked` |
+
+**Node.js versions, from the packages' declared `engines`:**
+- **Building** the frontend needs Node.js 22.12 or newer (Vite 8 and Rolldown
+  declare `^20.19.0 || >=22.12.0`).
+- **Running the tests** needs Node.js 22.13 or newer. jsdom declares
+  `^20.19.0 || ^22.13.0 || >=24.0.0` and Vitest 5 declares
+  `^22.12.0 || ^24.0.0 || >=26.0.0`. Together that means 22.13 or newer in
+  the 22 line, 24, or 26 and later. **Node 23 and 25 are not supported by the
+  test runner.**
 
 ### 1 — Clone the repository
 

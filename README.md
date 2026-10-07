@@ -180,7 +180,7 @@ accented and non-Latin names print correctly.
 | Tool | Version | Notes |
 |------|---------|-------|
 | Python | 3.12 | Must match CI; 3.9 will not work |
-| Node.js | 22 | |
+| Node.js | 22.12 or newer | |
 | Rust | stable | |
 | Tauri CLI | ^2 | `cargo install tauri-cli --version "^2" --locked` |
 
