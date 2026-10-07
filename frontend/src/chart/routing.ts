@@ -30,6 +30,36 @@ export interface RoutedLink {
   pieces: Piece[];
   /** Arrowhead polygon at the end (styles with arrows, links into individuals). */
   arrow:  Point[] | null;
+  /** Could not be routed through the gaps between rows and was drawn straight,
+   *  so it may cross boxes. Always reported (routingProblems), never silent. */
+  straight: boolean;
+}
+
+/** Links that could not be drawn as routed: shown as a warning on the chart
+ *  and in the export dialog. */
+export interface RoutingProblems {
+  straight: number;   // drawn as straight lines that may cross boxes
+  missing:  number;   // not drawn at all (a node has no position)
+}
+
+export function routingProblems(model: ChartModel, routes: RoutedLink[]): RoutingProblems {
+  return {
+    straight: routes.filter(r => r.straight).length,
+    missing:  model.links.length - routes.length,
+  };
+}
+
+/** The warning for routing problems, or null when every link is routed. */
+export function routingWarning(p: RoutingProblems): string | null {
+  const parts: string[] = [];
+  const links = (n: number) => `${n.toLocaleString("en-US")} link${n === 1 ? "" : "s"}`;
+  if (p.straight) {
+    parts.push(`${links(p.straight)} could not be routed clear of other individuals and ` +
+               `${p.straight === 1 ? "is" : "are"} drawn as straight lines, which may cross ` +
+               "individuals they do not connect.");
+  }
+  if (p.missing) parts.push(`${links(p.missing)} could not be drawn.`);
+  return parts.length ? parts.join(" ") : null;
 }
 
 export interface RouteOptions {
@@ -105,6 +135,7 @@ export function routeLinks(
     const start = exit(path[0]);
     const pieces: Piece[] = [];
     let at = start;
+    let straight = false;
     const lineTo = (to: Point) => {
       if (Math.abs(to.x - at.x) > 1e-6 || Math.abs(to.y - at.y) > 1e-6) pieces.push({ kind: "L", to });
       at = to;
@@ -121,9 +152,11 @@ export function routeLinks(
       lineTo(pt(cFrom, Math.max(along(at), bandFrom.hi)));
       const target = last ? entry(to) : positions[to];
       if (bandTo.lo <= along(at)) {
-        // Bands overlap (cannot happen with the layout's spacing, and dragging
-        // keeps nodes in their rows): no empty space, so go straight there.
+        // Bands overlap (not expected with the layout's spacing, and dragging
+        // keeps nodes in their rows): no empty space to route through, so go
+        // straight there, and flag it so the chart and export say so.
         lineTo(target);
+        straight = true;
         continue;
       }
       // Across the empty space between the bands to the next lane.
@@ -140,7 +173,7 @@ export function routeLinks(
     }
 
     const toIndividual = !isPoint(link.to);
-    routes.push({ link, role: link.role, start, pieces,
+    routes.push({ link, role: link.role, start, pieces, straight,
                   arrow: opts.arrows && toIndividual ? arrowAt(at, ud) : null });
   }
   return routes;

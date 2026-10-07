@@ -218,7 +218,8 @@ The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
 
 ```bash
 cd backend && python -m pytest tests/ -v      # 79 tests
-cd frontend && npm run typecheck && npm test && npm run build   # 38 tests
+cd frontend && npm run typecheck && npm test && npm run build   # 43 tests
+cd frontend && npx playwright install webkit && npm run test:e2e  # WebKit, after the build
 cd src-tauri && cargo test                    # 6 tests
 ```
 

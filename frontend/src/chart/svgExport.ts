@@ -10,7 +10,7 @@
 
 import type { GraphNode, TraitMeta } from "../hooks/useApi";
 import { linkColor, type ChartModel } from "./model";
-import { chartBoxes, routeLinks, svgPathData, type Box, type Point } from "./routing";
+import { chartBoxes, routeLinks, routingProblems, svgPathData, type Box, type Point } from "./routing";
 import {
   CHART_FONT, SYMBOL_RADIUS, THEMES, labelInside,
   type DisplayStyle, type NodeShape, type StyleTheme,
@@ -112,17 +112,32 @@ function crossSvg(p: Point, size: number, ink: string): string {
     `<line x1="${fmt(p.x - h)}" y1="${fmt(p.y + h)}" x2="${fmt(p.x + h)}" y2="${fmt(p.y - h)}"/></g>`;
 }
 
-export function buildSvg(input: SvgExportInput): SvgExport {
-  const { model, positions, colorMap, orientation, crossSymbolSize, legend } = input;
+/**
+ * The individuals' boxes and the link routes an export draws: the canvas's
+ * own boxes and routes, or, without a canvas, boxes estimated from labels.
+ */
+export function exportRouting(input: Pick<SvgExportInput,
+  "model" | "positions" | "boxes" | "style" | "orientation" | "crossSymbolSize">) {
+  const { model, positions, orientation, crossSymbolSize } = input;
   const theme = THEMES[input.style];
-  const shapeOf = new Map(model.individuals.map(n => [n.id, theme.shape(n.cross_type)]));
-
-  // ── Geometry ──────────────────────────────────────────────────────────────
   const boxes: Record<string, Box> = {};
   for (const n of model.individuals) {
     const p = positions[n.id];
     if (p) boxes[n.id] = input.boxes?.[n.id] ?? estimateBox(n, p, theme);
   }
+  const routes = routeLinks(model, positions, boxes, {
+    orientation, curved: theme.curvedLinks, arrows: theme.arrows, crossSymbolSize,
+  });
+  return { boxes, routes, problems: routingProblems(model, routes) };
+}
+
+export function buildSvg(input: SvgExportInput): SvgExport {
+  const { model, positions, colorMap, crossSymbolSize, legend } = input;
+  const theme = THEMES[input.style];
+  const shapeOf = new Map(model.individuals.map(n => [n.id, theme.shape(n.cross_type)]));
+
+  // ── Geometry ──────────────────────────────────────────────────────────────
+  const { boxes, routes } = exportRouting(input);
   const all = [...chartBoxes(model, positions, boxes, crossSymbolSize).values()];
   const minX = Math.min(...all.map(b => b.left)), maxX = Math.max(...all.map(b => b.right));
   const minY = Math.min(...all.map(b => b.top)),  maxY = Math.max(...all.map(b => b.bottom));
@@ -144,9 +159,6 @@ export function buildSvg(input: SvgExportInput): SvgExport {
   const height = MARGIN * 2 + Math.max(chartH, legendSvg?.height ?? 0);
 
   // ── Links: the canvas's routes, in chart coordinates ──────────────────────
-  const routes = routeLinks(model, positions, boxes, {
-    orientation, curved: theme.curvedLinks, arrows: theme.arrows, crossSymbolSize,
-  });
   const links = routes.map(r => {
     const color = linkColor(r.role, theme.ink);
     const arrow = r.arrow

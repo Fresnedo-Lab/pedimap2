@@ -7,7 +7,8 @@
 // out of the startup bundle) and the chart font, so Save is quick.
 
 import { useEffect, useState } from "react";
-import { buildSvg, type ExportBackground, type SvgExportInput } from "../chart/svgExport";
+import { buildSvg, exportRouting, type ExportBackground, type SvgExportInput } from "../chart/svgExport";
+import { routingWarning } from "../chart/routing";
 import {
   loadChartFont, loadPdfLibraries, svgToPdf, svgToPng, PNG_SCALE,
   type ImageFormat, type PdfPage,
@@ -47,6 +48,17 @@ export default function ExportImageDialog({ buildInput, baseName, scope, onClose
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Links the export could not route (the same routes as on screen).
+  const [routingAlert] = useState<string | null>(() => {
+    const input = buildInput();
+    if (!input) return null;
+    try {
+      return routingWarning(exportRouting(input).problems);
+    } catch {
+      return routingWarning({ straight: 0, missing: input.model.links.length });
+    }
+  });
 
   useEffect(() => {
     let live = true;
@@ -146,6 +158,12 @@ export default function ExportImageDialog({ buildInput, baseName, scope, onClose
           </label>
         )}
 
+        {routingAlert && (
+          <div role="alert" style={{ background: "#3b2a12", color: "#fcd34d", padding: 8,
+            borderRadius: 6, marginBottom: 12, lineHeight: 1.45 }}>
+            ⚠️ {routingAlert} The exported image will show them the same way.
+          </div>
+        )}
         {notice && (
           <div role="status" style={{ background: "#16263f", color: "#a8c7f5", padding: 8,
             borderRadius: 6, marginBottom: 12, lineHeight: 1.45 }}>

@@ -34,6 +34,8 @@ Prod:  cd backend && pyinstaller pedimap_backend.spec --distpath dist --noconfir
 ## Test commands
 Backend:  cd backend && python -m pytest tests/ -v
 Frontend: cd frontend && npm run typecheck && npm test && npm run build
+WebKit:   cd frontend && npm run test:e2e   (after the build; starts the backend on
+          8765, so quit the desktop app first or set E2E_BACKEND_PORT)
 Rust:     cd src-tauri && cargo test
 
 ## Tauri 2.x migration checklist
@@ -94,6 +96,9 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   NOTICE_LAYOUT_NODES it paints a "Laying out…" notice first. Both are in
   PedigreeCanvas.tsx; recheck them with synthetic pedigrees
   (src/test/syntheticPedigree.ts) if the layout changes.
+- Test a macOS build only after checking which branch it was built from:
+  the app embeds frontend/dist as built at that moment. A build made right
+  after switching branches tests that branch, not the open PR.
 - To run frontend tests on the private TransApple file, generate its graph
   (gitignored) with `cd backend && python -m tests.test_frontend_fixture`.
 - frontend/src/test/fixtures/apple_public.json is generated from the backend.

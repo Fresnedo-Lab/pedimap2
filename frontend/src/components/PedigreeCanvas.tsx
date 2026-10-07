@@ -17,7 +17,7 @@ import { linkColor, linkPath, type ChartModel } from "../chart/model";
 import { CHART_FONT, THEMES, labelInside, type DisplayStyle, type StyleTheme } from "../chart/style";
 import { CLASSIC_BOX } from "../chart/svgExport";
 import {
-  constrainDrag, dragRange, drawRoutes, routeLinks,
+  constrainDrag, dragRange, drawRoutes, routeLinks, routingProblems, routingWarning,
   type Box, type DragRange, type Point, type RoutedLink,
 } from "../chart/routing";
 
@@ -211,6 +211,10 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   // Number of individuals being laid out, while a slow layout runs.
   const [layingOut, setLayingOut] = useState<number | null>(null);
 
+  // Links that could not be routed (drawn straight, or not drawn): warned
+  // about on the chart, never left to look like real parentage.
+  const [routingAlert, setRoutingAlert] = useState<string | null>(null);
+
   const geometry = useCallback((): ChartGeometry | null => {
     const net = networkRef.current;
     if (!net) return null;
@@ -237,11 +241,18 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   const reroute = useCallback(() => {
     const g = geometry();
     if (!g) return;
-    routesRef.current = routeLinks(model, g.positions, g.boxes, {
-      orientation: latest.current.orientation, curved: theme.curvedLinks,
-      arrows: theme.arrows, crossSymbolSize,
-    });
+    try {
+      routesRef.current = routeLinks(model, g.positions, g.boxes, {
+        orientation: latest.current.orientation, curved: theme.curvedLinks,
+        arrows: theme.arrows, crossSymbolSize,
+      });
+    } catch (e) {
+      console.error("Link routing failed", e);
+      routesRef.current = [];
+    }
     stale.current = false;
+    const alert = routingWarning(routingProblems(model, routesRef.current));
+    setRoutingAlert(prev => (prev === alert ? prev : alert));
   }, [geometry, model, theme, crossSymbolSize]);
 
   useImperativeHandle(ref, () => ({
@@ -472,6 +483,16 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
         data-testid="pedigree-canvas"
         style={{ width: "100%", height: "100%", background: theme.background }}
       />
+      {routingAlert && (
+        <div role="alert" style={{ position: "absolute", top: 10, left: 10, right: 10,
+          display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+          <div style={{ maxWidth: 640, padding: "8px 12px", borderRadius: 6, fontSize: 12,
+            background: "#3b2a12", color: "#fcd34d", border: "1px solid #92400e",
+            lineHeight: 1.45, boxShadow: "0 4px 16px rgba(0,0,0,.35)" }}>
+            ⚠️ {routingAlert}
+          </div>
+        </div>
+      )}
       {layingOut !== null && (
         <div style={{ position: "absolute", inset: 0, display: "flex",
           alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>

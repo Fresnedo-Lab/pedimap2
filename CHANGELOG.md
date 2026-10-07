@@ -53,6 +53,8 @@ release notes, so every release needs its own section here before it is tagged.
 - Dragging an individual moves it only along its own row (sideways in
   top-to-bottom, up and down in left-to-right), and not past its neighbors,
   so its links stay clear of other individuals.
+- If a link ever cannot be routed clear of other individuals, the chart and
+  the export dialog say so, instead of quietly drawing it as a straight line.
 - Large pedigrees are laid out faster (about a second for 1,000 individuals
   on a test computer), and a "Laying out N individuals…" notice appears while
   a large chart is being arranged, so the window never looks frozen.
