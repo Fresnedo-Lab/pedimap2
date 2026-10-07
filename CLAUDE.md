@@ -33,8 +33,8 @@ Prod:  cd backend && pyinstaller pedimap_backend.spec --distpath dist --noconfir
 
 ## Test commands
 Backend:  cd backend && python -m pytest tests/ -v
-Frontend: cd frontend && npm run typecheck && npm run build
-Rust:     cd src-tauri && cargo check
+Frontend: cd frontend && npm run typecheck && npm test && npm run build
+Rust:     cd src-tauri && cargo test
 
 ## Tauri 2.x migration checklist
 - [ ] cargo tauri migrate
@@ -80,6 +80,16 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   independently. Never copy, port, or transliterate its code into this
   MIT-licensed repo. The examples/ folder contains .dat data files usable as
   additional parser test fixtures.
+- Cross (×) nodes exist only in the frontend chart model
+  (frontend/src/chart/model.ts). Never send them to the backend or list them
+  as individuals; the backend's individual ids are the authority.
+- frontend/src/test/fixtures/apple_public.json is generated from the backend.
+  After changing apple_public.dat or the API output, regenerate it with
+  `cd backend && python -m tests.test_frontend_fixture` (a backend test fails
+  until you do).
+- The desktop write commands (write_file, write_binary_file) only accept paths
+  returned by save_file_dialog in the same session. The fs plugin has no
+  write permissions; keep it that way.
 
 ## On the horizon
 - .pmp subpopulations and views are parsed only for the population name. The

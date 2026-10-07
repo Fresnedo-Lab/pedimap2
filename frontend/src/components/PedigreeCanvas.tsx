@@ -1,40 +1,59 @@
 // components/PedigreeCanvas.tsx
 // ================================
-// Interactive pedigree DAG powered by vis-network.
-// Handles node colouring, selection, hover tooltips and layout.
+// Interactive pedigree chart powered by vis-network. Draws the chart model
+// (chart/model.ts) in a display style (chart/style.ts): individuals, the
+// optional × cross nodes, and role-colored links. Handles selection, hover
+// tooltips and layout, and hands the drawn geometry to the image export.
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import { Network, DataSet } from "vis-network/standalone";
-import type { GraphData, GraphNode, GraphEdge } from "../hooks/useApi";
+import type { GraphNode } from "../hooks/useApi";
+import { linkColor, type ChartLink, type ChartModel, type LinkRole } from "../chart/model";
+import { CHART_FONT, THEMES, labelInside, type DisplayStyle, type StyleTheme } from "../chart/style";
+import { CLASSIC_BOX, type Box, type Point } from "../chart/svgExport";
 
 export type Orientation = "UD" | "LR";
 
-// Imperative handle for the toolbar's "Fit to window" button / F shortcut.
+/** Node positions and drawn rectangles, for exporting what is on screen. */
+export interface ChartGeometry {
+  positions: Record<string, Point>;
+  boxes:     Record<string, Box>;
+}
+
+// Imperative handle for the toolbar's "Fit to window" button / F shortcut and
+// for the image export.
 export interface PedigreeCanvasHandle {
   fit: () => void;
+  geometry: () => ChartGeometry | null;
 }
 
 const FIT_ANIMATION = { duration: 400, easingFunction: "easeInOutQuad" as const };
 
 interface Props {
-  graph:       GraphData;
-  colorMap:    Record<string, string>;
-  selected:    string | null;
-  onSelect:    (id: string) => void;
-  orientation: Orientation;   // "UD" = top-to-bottom, "LR" = left-to-right
+  model:           ChartModel;
+  colorMap:        Record<string, string>;
+  selected:        string | null;
+  onSelect:        (id: string) => void;
+  orientation:     Orientation;   // "UD" = top-to-bottom, "LR" = left-to-right
+  style:           DisplayStyle;
+  crossSymbolSize: number;
 }
 
-// Hierarchical-layout config for an orientation. LR stacks same-rank nodes
-// vertically, so long horizontal labels (e.g. "Cox's Orange Pippin") wrap and
-// grow the node box — give LR more nodeSpacing/levelSeparation to avoid overlap.
-function hierarchicalFor(orientation: Orientation) {
+// Hierarchical-layout config. Individuals sit on even levels (2 × generation)
+// and cross nodes on the odd level between, so each generation spans two
+// levels and the separation is half the generation spacing.
+//
+// Labels are not wrapped (so the export matches the screen), so the spacing
+// along the name grows with the longest name: between siblings in UD, and
+// between generations in LR, where same-rank nodes stack vertically.
+function hierarchicalFor(orientation: Orientation, longestLabel: number) {
   const lr = orientation === "LR";
   return {
     enabled:              true,
     direction:            orientation,
     sortMethod:           "directed",
-    levelSeparation:      lr ? 220 : 140,
-    nodeSpacing:          lr ? 180 : 100,
+    levelSeparation:      lr ? Math.max(110, (longestLabel + 60) / 2) : 70,
+    nodeSpacing:          lr ? 60 : Math.max(100, longestLabel + 40),
     treeSpacing:          160,
     blockShifting:        true,
     edgeMinimization:     true,
@@ -42,9 +61,22 @@ function hierarchicalFor(orientation: Orientation) {
   };
 }
 
+function smoothFor(theme: StyleTheme, orientation: Orientation) {
+  return theme.curvedLinks
+    ? { enabled: true, type: "cubicBezier", forceDirection: orientation === "UD" ? "vertical" : "horizontal", roundness: 0.4 }
+    : { enabled: false };
+}
+
 // Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
 // currently plumbed to the frontend, so we use its default ("-") here.
 const UNKNOWN_PARENT = "-";
+
+const LINK_TITLE: Record<LinkRole, string> = {
+  female:      "Female parent",
+  male:        "Male parent",
+  uniparental: "Single parent (selfing, doubled haploid, mutant or clone)",
+  offspring:   "Offspring",
+};
 
 // Build a node hover tooltip as a real DOM element.
 //
@@ -80,28 +112,70 @@ function buildTooltip(ind: GraphNode): HTMLElement {
   return el;
 }
 
-// Cross-type → node shape mapping
-const SHAPE: Record<string, string> = {
-  cross:            "ellipse",
-  self:             "diamond",
-  dh:               "star",
-  clone:            "square",
-  backcross:        "triangle",
-  open_pollinated:  "hexagon",
-  unknown:          "ellipse",
-};
+// Rough label width, only used to size the LR level spacing.
+const estimateLabel = (label: string, theme: StyleTheme) => [...label].length * theme.fontSize * 0.62;
+
+// The × of a cross node, drawn on the canvas like the export draws it.
+function crossRenderer(size: number, ink: string) {
+  return ({ ctx, x, y }: { ctx: CanvasRenderingContext2D; x: number; y: number }) => ({
+    drawNode() {
+      const h = size / 2;
+      ctx.save();
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - h, y - h); ctx.lineTo(x + h, y + h);
+      ctx.moveTo(x - h, y + h); ctx.lineTo(x + h, y - h);
+      ctx.stroke();
+      ctx.restore();
+    },
+    nodeDimensions: { width: size, height: size },
+  });
+}
+
+function individualColors(
+  n: GraphNode, theme: StyleTheme, colorMap: Record<string, string>, selected: string | null,
+) {
+  const fill = colorMap[n.id] ?? theme.defaultFill;
+  const isSelected = n.id === selected;
+  return {
+    color: {
+      background: fill,
+      border:     isSelected ? theme.selected : theme.border,
+      highlight:  { background: fill, border: theme.selected },
+      hover:      { background: fill, border: theme.selected },
+    },
+    borderWidth: isSelected ? 3 : 1,
+  };
+}
 
 const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function PedigreeCanvas(
-  { graph, colorMap, selected, onSelect, orientation }, ref,
+  { model, colorMap, selected, onSelect, orientation, style, crossSymbolSize }, ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef   = useRef<Network | null>(null);
   const nodesDS      = useRef(new DataSet<any>());
   const edgesDS      = useRef(new DataSet<any>());
+  const theme        = THEMES[style];
+
+  // Latest props, read when the network is created after the chart font loads.
+  const latest = useRef({ colorMap, selected, orientation, onSelect });
+  latest.current = { colorMap, selected, orientation, onSelect };
 
   useImperativeHandle(ref, () => ({
     fit: () => networkRef.current?.fit({ animation: FIT_ANIMATION }),
-  }), []);
+    geometry: () => {
+      const net = networkRef.current;
+      if (!net) return null;
+      const positions = net.getPositions() as Record<string, Point>;
+      const boxes: Record<string, Box> = {};
+      for (const n of model.individuals) {
+        if (positions[n.id]) boxes[n.id] = net.getBoundingBox(n.id);
+      }
+      return { positions, boxes };
+    },
+  }), [model]);
 
   // Select `selected` in the network, or clear the selection if it is not
   // part of the drawn graph (e.g. a relative outside the current subpopulation,
@@ -111,116 +185,127 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     else net.unselectAll();
   }, [selected]);
 
-  // ── Build vis DataSets from graph ──────────────────────────────────────────
-  const buildDatasets = useCallback(() => {
-    const nodes = graph.nodes.map((n: GraphNode) => ({
-      id:    n.id,
-      label: n.label,
-      // Drive the hierarchical layout from the backend's generation field so
-      // all founders share the top row, rather than letting vis-network infer
-      // levels from edge topology (which scattered founders across rows).
-      level: n.generation,
-      x:     n.x,
-      y:     n.y,
-      color: {
-        background: colorMap[n.id] ?? "#252e42",
-        border:     n.id === selected ? "#ffffff" : "#4f9cf9",
-        highlight:  { background: colorMap[n.id] ?? "#252e42", border: "#ffffff" },
-        hover:      { background: colorMap[n.id] ?? "#252e42", border: "#f59e0b" },
-      },
-      borderWidth:          n.id === selected ? 3 : 1,
-      shape:                SHAPE[n.cross_type] ?? "ellipse",
-      font:                 { color: "#e8ecf4", size: 11, face: "Inter, sans-serif" },
-      title:                buildTooltip(n),
-      shadow:               { enabled: true, color: "rgba(0,0,0,.4)", size: 8, x: 2, y: 2 },
-    }));
-
-    const edges = graph.edges.map((e: GraphEdge) => ({
-      from:   e.from,
-      to:     e.to,
-      arrows: { to: { enabled: true, scaleFactor: 0.6 } },
-      color:  {
-        color:     e.role === "female" ? "#4f9cf9" : "#10b981",
-        highlight: "#ffffff",
-        hover:     "#f59e0b",
-        opacity:   0.75,
-      },
-      width:  e.role === "female" ? 1.5 : 1.5,
-      dashes: e.role === "male",
-      smooth: { type: "cubicBezier", forceDirection: "vertical", roundness: 0.4 },
-      title:  e.role === "female" ? "Mother" : "Father",
-    }));
-
-    nodesDS.current.clear();
-    edgesDS.current.clear();
-    nodesDS.current.add(nodes);
-    edgesDS.current.add(edges);
-  }, [graph, colorMap, selected]);
-
-  // ── Initialise network on first render ────────────────────────────────────
+  // ── Build the network for the chart model and style ───────────────────────
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+    let network: Network | null = null;
+    let cancelled = false;
 
-    buildDatasets();
+    const create = () => {
+      if (cancelled) return;
+      const { colorMap, selected, orientation } = latest.current;
+      const classic = style === "classic";
 
-    const options = {
-      nodes: { size: 18, widthConstraint: { minimum: 80, maximum: 160 } },
-      edges: { selectionWidth: 2 },
-      layout: {
-        improvedLayout: false,
-        // Uses the current orientation; on a graph reload this effect re-runs
-        // with the latest orientation, so the choice survives dataset changes.
-        hierarchical: hierarchicalFor(orientation),
-      },
-      physics: { enabled: false },
-      interaction: {
-        hover:            true,
-        tooltipDelay:     200,
-        navigationButtons: false,
-        keyboard:          true,
-        zoomView:          true,
-        dragView:          true,
-      },
-      configure: { enabled: false },
+      const individuals = model.individuals.map(n => {
+        const shape = theme.shape(n.cross_type);
+        return {
+          id:    n.id,
+          label: n.label,
+          level: model.levels.get(n.id),
+          shape,
+          ...individualColors(n, theme, colorMap, selected),
+          font:  { color: theme.text, size: theme.fontSize, face: theme.fontFace },
+          ...(labelInside(shape)
+            ? { widthConstraint: { minimum: CLASSIC_BOX.minWidth } } : { size: 18 }),
+          ...(classic && {
+            // Classic Pedimap: the name on the top line of the rectangle.
+            heightConstraint: { minimum: CLASSIC_BOX.minHeight, valign: "top" },
+            margin:           CLASSIC_BOX.padding,
+            shapeProperties:  { borderRadius: 0 },
+          }),
+          shadow: classic ? false : { enabled: true, color: "rgba(0,0,0,.4)", size: 8, x: 2, y: 2 },
+          title:  buildTooltip(n),
+        };
+      });
+      const crosses = model.crosses.map(c => ({
+        id:          c.id,
+        level:       c.level,
+        shape:       "custom",
+        ctxRenderer: crossRenderer(crossSymbolSize, theme.ink),
+        size:        crossSymbolSize / 2,
+        chosen:      false,
+      }));
+      const edges = model.links.map((l: ChartLink, i) => {
+        const color = linkColor(l.role, theme.ink);
+        return {
+          id:     i,
+          from:   l.from,
+          to:     l.to,
+          arrows: { to: { enabled: theme.arrows && !model.crossIds.has(l.to), scaleFactor: 0.6 } },
+          color:  { color, highlight: color, hover: color, opacity: 1 },
+          width:  1.5,
+          title:  LINK_TITLE[l.role],
+        };
+      });
+
+      nodesDS.current.clear();
+      edgesDS.current.clear();
+      nodesDS.current.add([...individuals, ...crosses]);
+      edgesDS.current.add(edges);
+
+      const longest = Math.max(0, ...model.individuals.map(n => estimateLabel(n.label, theme)));
+      network = new Network(container, { nodes: nodesDS.current, edges: edgesDS.current }, {
+        edges: { selectionWidth: 1, smooth: smoothFor(theme, orientation) as any },
+        layout: {
+          improvedLayout: false,
+          // Uses the current orientation; when the model or style changes this
+          // effect re-runs with the latest orientation, so the choice survives.
+          hierarchical: hierarchicalFor(orientation, longest),
+        },
+        physics: { enabled: false },
+        interaction: {
+          hover:             true,
+          tooltipDelay:      200,
+          navigationButtons: false,
+          keyboard:          true,
+          zoomView:          true,
+          dragView:          true,
+        },
+        configure: { enabled: false },
+      });
+      networkRef.current = network;
+      appliedOrientation.current = orientation;
+
+      // Frame the whole pedigree once it has been drawn at its real size. The
+      // network is recreated for every new graph, so this also re-frames after
+      // each dataset load, subpopulation and "Show All".
+      network.once("afterDrawing", () => network?.fit());
+
+      network.on("selectNode", (params) => {
+        // Cross nodes are drawing aids, not individuals: never select one.
+        const id = (params.nodes as string[]).find(n => !model.crossIds.has(n));
+        if (id) latest.current.onSelect(id);
+        else if (network) {
+          const current = latest.current.selected;
+          if (current && nodesDS.current.get(current)) network.selectNodes([current]);
+          else network.unselectAll();
+        }
+      });
+      network.on("deselectNode", () => {/* keep panel open */});
     };
 
-    const network = new Network(
-      containerRef.current,
-      { nodes: nodesDS.current, edges: edgesDS.current },
-      options,
-    );
-    networkRef.current = network;
+    // Measure labels with the chart font, not a fallback: wait until it loads.
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    if (fonts?.load) fonts.load(`${theme.fontSize}px "${CHART_FONT}"`).then(create, create);
+    else create();
 
-    // Frame the whole pedigree once it has been drawn at its real size. The
-    // network is recreated for every new graph, so this also re-frames after
-    // each dataset load, subpopulation and "Show All".
-    network.once("afterDrawing", () => network.fit());
-
-    network.on("selectNode", (params) => {
-      if (params.nodes.length > 0) onSelect(params.nodes[0] as string);
-    });
-    network.on("deselectNode", () => {/* keep panel open */});
-
-    return () => { network.destroy(); networkRef.current = null; };
+    return () => {
+      cancelled = true;
+      network?.destroy();
+      if (networkRef.current === network) networkRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph]);
+  }, [model, style, crossSymbolSize]);
 
   // ── Update colours / selection without re-creating the network ────────────
   useEffect(() => {
     if (!networkRef.current) return;
-    const updates = graph.nodes.map((n: GraphNode) => ({
-      id:    n.id,
-      color: {
-        background: colorMap[n.id] ?? "#252e42",
-        border:     n.id === selected ? "#ffffff" : "#4f9cf9",
-        highlight:  { background: colorMap[n.id] ?? "#252e42", border: "#ffffff" },
-        hover:      { background: colorMap[n.id] ?? "#252e42", border: "#f59e0b" },
-      },
-      borderWidth: n.id === selected ? 3 : 1,
-    }));
-    nodesDS.current.update(updates);
+    nodesDS.current.update(model.individuals.map(n => ({
+      id: n.id, ...individualColors(n, theme, colorMap, selected),
+    })));
     applySelection(networkRef.current);
-  }, [colorMap, selected, graph.nodes, applySelection]);
+  }, [colorMap, selected, model, theme, applySelection]);
 
   // ── Orientation changes: apply in place, preserving selection ─────────────
   // setOptions re-lays out the existing network (synchronously) rather than
@@ -233,15 +318,20 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     if (!net) return;
     if (appliedOrientation.current === orientation) return; // no-op on mount
     appliedOrientation.current = orientation;
-    net.setOptions({ layout: { hierarchical: hierarchicalFor(orientation) } });
+    const longest = Math.max(0, ...model.individuals.map(n => estimateLabel(n.label, theme)));
+    net.setOptions({
+      layout: { hierarchical: hierarchicalFor(orientation, longest) },
+      edges:  { smooth: smoothFor(theme, orientation) as any },
+    });
     net.fit({ animation: FIT_ANIMATION });
     applySelection(net);
-  }, [orientation, applySelection]);
+  }, [orientation, applySelection, model, theme]);
 
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "100%", background: "#0f1117" }}
+      data-testid="pedigree-canvas"
+      style={{ width: "100%", height: "100%", background: theme.background }}
     />
   );
 });

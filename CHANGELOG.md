@@ -24,9 +24,34 @@ release notes, so every release needs its own section here before it is tagged.
   type, so a discrete trait stays discrete even if the values left in the
   subpopulation all happen to be numbers.
 
+- **Classic Pedimap** display style, next to the current **Modern** one: each
+  individual is a rectangle with its name on top, pale yellow unless a trait
+  colors it, on a white page.
+- Parent links are colored by role in both styles: female parent red, male
+  parent blue, and purple for single-parent descent (selfing, doubled
+  haploid, mutant, clone).
+- **Cross symbols:** the parents of a cross meet at a small × with one link on
+  to each child, so full sibs share one ×. Selfings and other single-parent
+  descent keep a single purple link. They are shown by default in Classic
+  Pedimap style and hidden in Modern; switch them on or off for each style,
+  or change their size, under ⚙.
+- **🖼 Export image…** saves the displayed chart (whole population or
+  subpopulation, all of it whatever the zoom) as PNG, SVG or PDF, in the
+  current style and with a legend for the trait being colored by. SVG and PDF
+  are vector files with names kept as text; PDF pages can fit the chart or be
+  US Letter / A4 landscape; PNG is 2× resolution, reduced (with a notice) when
+  the chart is too large for that. Names are set in the bundled Noto Sans
+  font, so accented and non-Latin names come out right.
+- Low, high and missing colors of a continuous trait can be changed next to
+  **Colour by**; the chart and the export legend use them.
+- Populations of more than 1,000 individuals are listed instead of drawn, with
+  a prompt to build a subpopulation; the limit can be changed under ⚙.
+
 ### Changed
 - The details panel shows an individual's traits directly under its parents,
   above the relatives.
+- The desktop app now writes exported files only to a location chosen in its
+  save dialog during the same session.
 
 ### Fixed
 - Older Pedimap files with accented names (such as "Élise") now open correctly.

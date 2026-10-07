@@ -6,6 +6,7 @@ Listens on 127.0.0.1:8765.
 """
 import json
 import os
+import re
 import sys
 import tempfile
 from typing import Any, Dict, List, Optional
@@ -195,11 +196,26 @@ def get_graph():
     return {"nodes": nodes, "edges": edges}
 
 
+_HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _hex_or_none(name: str, value: Optional[str]) -> Optional[str]:
+    if value is not None and not _HEX_COLOR.match(value):
+        raise HTTPException(status_code=400, detail=f"{name} must be a #RRGGBB color")
+    return value
+
+
 @app.get("/api/color/{trait_name}")
-def color_by_trait(trait_name: str):
+def color_by_trait(trait_name: str, low: Optional[str] = None,
+                   high: Optional[str] = None, missing: Optional[str] = None):
+    """Fill color per individual. `low`/`high` override a continuous trait's
+    gradient and `missing` the no-value color, each as #RRGGBB."""
+    low = _hex_or_none("low", low)
+    high = _hex_or_none("high", high)
+    missing = _hex_or_none("missing", missing)
     eng = get_engine()
     return {
-        ind_id: eng.trait_color(ind_id, trait_name)
+        ind_id: eng.trait_color(ind_id, trait_name, low=low, high=high, missing=missing)
         for ind_id in eng.all_ids()
     }
 
@@ -216,7 +232,7 @@ def build_subpop(req: SubpopRequest):
         ids |= set(eng.siblings(req.focal_id))
     pos = eng.layout()
     nodes, edges = [], []
-    for ind_id in ids:
+    for ind_id in eng.in_order(ids):
         ind = eng.get(ind_id)
         p   = pos.get(ind_id, {"x": 0, "y": 0})
         nodes.append({

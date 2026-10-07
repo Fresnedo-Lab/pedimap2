@@ -8,6 +8,10 @@
 ; Fuji-self-01 is a SYNTHETIC record, not a real seedling. It exercises a
 ; selfing written as the same parent twice and an S-allele incompatibility
 ; (S24 is not an allele of Fuji, S1S9), hence S_QC = 2.
+; Gala-self-01 is also SYNTHETIC: a selfing of a cultivar that is itself a
+; cross, so one subpopulation has female, male and selfing links.
+; Šampion is written with its Czech spelling to exercise a name outside
+; Latin-1 (Š is U+0160).
 ;
 ; S_QC: 0 = untestable (a parent or offspring genotype is missing)
 ;       1 = consistent with the parents   2 = incompatible with the parents
@@ -37,3 +41,5 @@ Melrose              Jonathan             Red-Delicious     -    -    -       B2
 Monroe               Jonathan             Rome-Beauty       -    -    -       B2     0
 Elstar               Golden-Delicious     Ingrid-Marie      S3   S5   S3S5    B1     0
 Fuji-self-01         Fuji                 Fuji              S1   S24  S1S24   B2     2
+Šampion              Golden-Delicious     Cox's-Orange-Pippin  -   -    -       B2     0
+Gala-self-01         Gala                 Gala              -    -    -       B2     0

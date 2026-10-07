@@ -19,7 +19,7 @@
 //         whose optional-string / void signatures don't match MouseEventHandler.
 //         Wrapped in arrow functions: onClick={() => loadGraph()}  etc.
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 // isTauri() is Tauri 2's own check (globalThis.isTauri). The older
 // window.__TAURI__ global only exists with withGlobalTauri enabled, which it
 // is not, so checking it made every desktop-only branch here dead code.
@@ -35,6 +35,13 @@ import PedigreeCanvas, {
   type Orientation, type PedigreeCanvasHandle,
 } from "./components/PedigreeCanvas";
 import IndividualPanel from "./components/IndividualPanel";
+import ExportImageDialog from "./components/ExportImageDialog";
+import SettingsMenu from "./components/SettingsMenu";
+import LargePedigreeNotice from "./components/LargePedigreeNotice";
+import { buildChartModel } from "./chart/model";
+import type { DisplayStyle } from "./chart/style";
+import { buildLegend, traitColorsFor, type TraitColors } from "./chart/svgExport";
+import { saveTextFile } from "./lib/saveFile";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
 import { useUpdater } from "./hooks/useUpdater";
@@ -46,33 +53,18 @@ function safeFileName(name: string): string {
   return name.replace(/[^\w.-]+/g, "_");
 }
 
-// Save text through the native save dialog in the desktop app (a browser-style
-// download does not save files from the webview), or as a browser download
-// elsewhere. Returns false if the user cancelled the dialog.
-async function saveTextFile(defaultName: string, text: string): Promise<boolean> {
-  if (isTauri()) {
-    const path = await invoke<string>("save_file_dialog", { defaultName });
-    if (!path) return false;
-    await invoke("write_file", { path, content: text });
-    return true;
-  }
-  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = defaultName;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return true;
-}
-
 // ── Per-view settings ─────────────────────────────────────────────────────────
 // Pedimap 1.x stores display options per view. This mirrors that surface so
-// later options are field additions rather than a refactor. Only `orientation`
-// is wired up today; the rest carry sensible defaults and are not yet read.
+// later options are field additions rather than a refactor. Wired up today:
+// orientation, style, showCrossSymbols, crossSymbolSize and traitColors; the
+// rest carry sensible defaults and are not yet read.
 export interface ViewSettings {
   orientation:      Orientation;                        // 'UD' | 'LR'
-  showCrossSymbols: boolean;
-  crossSymbolSize:  number;
+  style:            DisplayStyle;                       // 'modern' | 'classic'
+  // Per display style, so each keeps its own choice: × cross symbols are part
+  // of the Classic Pedimap look (on by default) and optional in Modern (off).
+  showCrossSymbols: Record<DisplayStyle, boolean>;
+  crossSymbolSize:  number;                             // px, width of the ×
   generationSpacing: number;
   sibSpacing:       number;
   fillColorMode:    "fixed" | "trait";
@@ -80,6 +72,9 @@ export interface ViewSettings {
   cellContents:     "name" | "name+markers" | "name+ibd";
   ibdLinkageGroup:  string | null;
   selectedMarkers:  string[];
+  // Per continuous trait: user-chosen low/high/missing colors (else the
+  // trait's own). Used for the chart and the export legend alike.
+  traitColors:      Record<string, Partial<TraitColors>>;
 }
 
 // One view exists today. When the tabbed View system lands, settings become a
@@ -90,8 +85,9 @@ const DEFAULT_VIEW_ID = "view-1";
 function defaultViewSettings(): ViewSettings {
   return {
     orientation:       "UD",
-    showCrossSymbols:  true,
-    crossSymbolSize:   40,
+    style:             "modern",
+    showCrossSymbols:  { modern: false, classic: true },
+    crossSymbolSize:   12,
     generationSpacing: 140,
     sibSpacing:        100,
     fillColorMode:     "fixed",
@@ -99,16 +95,30 @@ function defaultViewSettings(): ViewSettings {
     cellContents:      "name",
     ibdLinkageGroup:   null,
     selectedMarkers:   [],
+    traitColors:       {},
   };
 }
 
+// Fill in fields added since the settings were stored. Settings saved before
+// `style` existed carry an unused placeholder crossSymbolSize (40), so they
+// get the current default instead.
+function withDefaults(stored: Partial<ViewSettings>): ViewSettings {
+  const merged = { ...defaultViewSettings(), ...stored };
+  if (stored.style === undefined) merged.crossSymbolSize = defaultViewSettings().crossSymbolSize;
+  // Before per-style values it was a single (unused) boolean.
+  if (typeof stored.showCrossSymbols !== "object" || stored.showCrossSymbols === null) {
+    merged.showCrossSymbols = defaultViewSettings().showCrossSymbols;
+  }
+  return merged;
+}
 function loadViewSettings(): Record<string, ViewSettings> {
   try {
     const raw = localStorage.getItem("pedimap.viewSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
-        return parsed as Record<string, ViewSettings>;
+        return Object.fromEntries(Object.entries(parsed as Record<string, Partial<ViewSettings>>)
+          .map(([id, v]) => [id, withDefaults(v)]));
       }
     }
     // Migrate the earlier orientation-only key so current users keep their choice.
@@ -118,6 +128,23 @@ function loadViewSettings(): Record<string, ViewSettings> {
     }
   } catch { /* ignore malformed storage */ }
   return { [DEFAULT_VIEW_ID]: defaultViewSettings() };
+}
+
+// ── App-wide settings ─────────────────────────────────────────────────────────
+
+// Above this many individuals the chart is not drawn (vis-network becomes
+// unusably slow); the individuals are listed instead. Changeable in ⚙.
+export const DEFAULT_DRAWING_LIMIT = 1000;
+
+interface AppSettings { drawingLimit: number }
+
+function loadAppSettings(): AppSettings {
+  try {
+    const stored = JSON.parse(localStorage.getItem("pedimap.settings") ?? "{}");
+    const limit = Number(stored?.drawingLimit);
+    if (Number.isInteger(limit) && limit >= 1) return { drawingLimit: limit };
+  } catch { /* ignore malformed storage */ }
+  return { drawingLimit: DEFAULT_DRAWING_LIMIT };
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -234,15 +261,24 @@ export default function App() {
   }, [viewSettings]);
 
   const activeViewId = DEFAULT_VIEW_ID;  // becomes stateful with View tabs
-  const orientation =
-    (viewSettings[activeViewId] ?? defaultViewSettings()).orientation;
+  const view = viewSettings[activeViewId] ?? defaultViewSettings();
+  const { orientation, style: displayStyle, crossSymbolSize } = view;
+  const showCrossSymbols = view.showCrossSymbols[displayStyle];
 
-  const changeOrientation = useCallback((o: Orientation) => {
+  const updateView = useCallback((change: Partial<ViewSettings>) => {
     setViewSettings(prev => ({
       ...prev,
-      [activeViewId]: { ...(prev[activeViewId] ?? defaultViewSettings()), orientation: o },
+      [activeViewId]: { ...(prev[activeViewId] ?? defaultViewSettings()), ...change },
     }));
   }, [activeViewId]);
+
+  const changeOrientation = useCallback((o: Orientation) => updateView({ orientation: o }), [updateView]);
+
+  const [appSettings, setAppSettings] = useState<AppSettings>(loadAppSettings);
+  useEffect(() => {
+    try { localStorage.setItem("pedimap.settings", JSON.stringify(appSettings)); } catch { /* ignore */ }
+  }, [appSettings]);
+  const drawingLimit = appSettings.drawingLimit;
 
   // ── Fit to window (toolbar button + F shortcut) ───────────────────────────
   const canvasRef = useRef<PedigreeCanvasHandle>(null);
@@ -262,6 +298,11 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [fitToWindow]);
 
+  // The user's colors for a trait (continuous traits only), as sent to /api/color.
+  const traitColorsRef = useRef(view.traitColors);
+  traitColorsRef.current = view.traitColors;
+  const colorOverrides = useCallback((trait: string) => traitColorsRef.current[trait] ?? {}, []);
+
   // Fetch graph + colours whenever pedigree changes
   const [graphLoading, setGraphLoading] = useState(true);
   const loadGraph = useCallback(async (trait?: string) => {
@@ -269,7 +310,7 @@ export default function App() {
     try {
       const [g, cm] = await Promise.all([
         api.getGraph(),
-        api.getColorMap(trait ?? activeTrait),
+        api.getColorMap(trait ?? activeTrait, colorOverrides(trait ?? activeTrait)),
       ]);
       setGraphData(g);
       setSubpop(null);                 // the full graph is displayed again
@@ -282,7 +323,7 @@ export default function App() {
     } finally {
       setGraphLoading(false);
     }
-  }, [api, activeTrait]);
+  }, [api, activeTrait, colorOverrides]);
 
   // Single refresh of every dataset-scoped endpoint. Any loader that swaps the
   // active dataset MUST call this instead of refetching an ad-hoc subset, so a
@@ -319,13 +360,31 @@ export default function App() {
     setActiveTrait(name);
     try {
       // getColorMap returns the default (empty) map when name is "" — no request.
-      const cm = await api.getColorMap(name);
+      const cm = await api.getColorMap(name, colorOverrides(name));
       setColorMap(cm);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-  }, [api]);
+  }, [api, colorOverrides]);
+
+  // Continuous-trait colors: store per trait (per view) and recolor. Color
+  // pickers fire while dragging, so only the latest request's answer is kept.
+  const colorRequest = useRef(0);
+  const changeTraitColors = useCallback(async (trait: string, colors: Partial<TraitColors> | null) => {
+    const traitColors = { ...traitColorsRef.current };
+    if (colors) traitColors[trait] = { ...traitColors[trait], ...colors };
+    else delete traitColors[trait];
+    traitColorsRef.current = traitColors;
+    updateView({ traitColors });
+    const call = ++colorRequest.current;
+    try {
+      const cm = await api.getColorMap(trait, traitColors[trait] ?? {});
+      if (call === colorRequest.current) setColorMap(cm);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [api, updateView]);
 
   // ── File open ─────────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -394,13 +453,13 @@ export default function App() {
       const g = await api.buildSubpop(selection);
       setGraphData(g);
       setSubpop(selection);
-      const cm = await api.getColorMap(activeTrait);
+      const cm = await api.getColorMap(activeTrait, colorOverrides(activeTrait));
       setColorMap(cm);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-  }, [api, selectedId, activeTrait]);
+  }, [api, selectedId, activeTrait, colorOverrides]);
 
   // ── .dat export: the displayed subpopulation, or the whole population ────
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
@@ -423,6 +482,26 @@ export default function App() {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
   }, [api, subpop, graphData, replaceOutside, pedigree]);
+
+  // ── Chart model, drawing limit, image export ─────────────────────────────
+  const chartModel = useMemo(
+    () => (graphData ? buildChartModel(graphData, showCrossSymbols) : null),
+    [graphData, showCrossSymbols]);
+  const tooLargeToDraw = !!graphData && graphData.nodes.length > drawingLimit;
+
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const closeImageDialog = useCallback(() => setImageDialogOpen(false), []);
+
+  const buildImageInput = useCallback(() => {
+    const geometry = canvasRef.current?.geometry();
+    if (!chartModel || !geometry) return null;
+    const meta = pedigree?.traits.find(t => t.name === activeTrait);
+    const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
+    return {
+      model: chartModel, ...geometry, colorMap, style: displayStyle, orientation, crossSymbolSize,
+      legend: buildLegend(meta, chartModel.individuals, colorMap, colors),
+    };
+  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, displayStyle, orientation, crossSymbolSize]);
 
   const handleLoadExample = useCallback(async () => {
     try {
@@ -461,6 +540,7 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────────────────────
   const traits  = pedigree?.traits  ?? [];
   const markers = pedigree?.markers ?? [];
+  const activeTraitMeta = traits.find(t => t.name === activeTrait);
 
   return (
     <div style={{ display: "flex", flexDirection: "column",
@@ -538,6 +618,15 @@ export default function App() {
           )}
         </div>
 
+        <button onClick={() => setImageDialogOpen(true)}
+          disabled={!chartModel || tooLargeToDraw || graphLoading}
+          title={tooLargeToDraw ? "The chart is not drawn: build a subpopulation first"
+                                : "Export the displayed chart as PNG, SVG or PDF"}
+          style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px",
+            opacity: !chartModel || tooLargeToDraw ? 0.5 : 1 }}>
+          🖼 Export image…
+        </button>
+
         {/* Orientation toggle (per view) */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
           <span style={{ color: "#64748b", fontSize: 11 }}>Orientation:</span>
@@ -560,6 +649,20 @@ export default function App() {
           </div>
         </div>
 
+        {/* Display style (per view) */}
+        <div style={{ display: "flex", border: "1px solid #2e3a52", borderRadius: 6, overflow: "hidden" }}
+          role="group" aria-label="Display style">
+          {([["modern", "Modern"], ["classic", "Classic Pedimap"]] as const).map(([value, label]) => (
+            <button key={value} onClick={() => updateView({ style: value })}
+              aria-pressed={displayStyle === value}
+              style={{ background: displayStyle === value ? "#1d3a6e" : "#252e42",
+                color: displayStyle === value ? "#4f9cf9" : "#a0aec0",
+                padding: "5px 10px", borderRadius: 0, fontSize: 11 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         <button onClick={fitToWindow} title="Fit to window (F)"
           style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
           ⤢ Fit to window
@@ -577,6 +680,32 @@ export default function App() {
                 <option key={t.name} value={t.name}>{t.name}</option>
               ))}
             </select>
+            {activeTraitMeta?.type === "continuous" && (() => {
+              const colors = traitColorsFor(activeTraitMeta, view.traitColors[activeTrait]);
+              const picker = (key: keyof TraitColors, label: string) => (
+                <label key={key} title={`${label} color`}
+                  style={{ display: "flex", alignItems: "center", gap: 3, color: "#64748b", fontSize: 11 }}>
+                  {label}
+                  <input type="color" value={colors[key].toLowerCase()} aria-label={`${label} color`}
+                    onChange={e => void changeTraitColors(activeTrait, { [key]: e.target.value.toUpperCase() })}
+                    style={{ width: 22, height: 20, padding: 0, border: "none", background: "none" }} />
+                </label>
+              );
+              return (
+                <>
+                  {picker("low", "Low")}
+                  {picker("high", "High")}
+                  {picker("missing", "Missing")}
+                  {view.traitColors[activeTrait] && (
+                    <button onClick={() => void changeTraitColors(activeTrait, null)}
+                      title="Use the trait's own colors"
+                      style={{ background: "transparent", color: "#64748b", fontSize: 11, padding: "2px 4px" }}>
+                      Reset
+                    </button>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -599,6 +728,15 @@ export default function App() {
           {pedigree?.population ?? ""}
           {pedigree ? ` · ${graphData?.nodes?.length ?? 0} individuals` : ""}
         </span>
+        <SettingsMenu
+          showCrossSymbols={showCrossSymbols}
+          crossSymbolSize={crossSymbolSize}
+          drawingLimit={drawingLimit}
+          onShowCrossSymbols={show => updateView({
+            showCrossSymbols: { ...view.showCrossSymbols, [displayStyle]: show } })}
+          onCrossSymbolSize={size => updateView({ crossSymbolSize: size })}
+          onDrawingLimit={limit => setAppSettings(prev => ({ ...prev, drawingLimit: limit }))}
+        />
         <AboutMenu updater={updater} />
       </div>
 
@@ -688,16 +826,28 @@ export default function App() {
         {/* narrows graphData to `GraphData` (not null) in the else branch,     */}
         {/* satisfying PedigreeCanvas's non-nullable `graph: GraphData` prop.   */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-          {graphLoading || !graphData
+          {graphLoading || !graphData || !chartModel
             ? <Spinner />
+            : tooLargeToDraw
+            ? (
+              <LargePedigreeNotice
+                individuals={graphData.nodes}
+                limit={drawingLimit}
+                selected={selectedId}
+                onSelect={handleSelect}
+                onSubpop={() => void handleSubpop()}
+              />
+            )
             : (
               <PedigreeCanvas
                 ref={canvasRef}
-                graph={graphData}          // ← GraphData here, null excluded
+                model={chartModel}         // built from GraphData, null excluded
                 colorMap={colorMap}
                 selected={selectedId}
                 onSelect={handleSelect}
                 orientation={orientation}
+                style={displayStyle}
+                crossSymbolSize={crossSymbolSize}
               />
             )}
         </div>
@@ -716,6 +866,17 @@ export default function App() {
         </>
         )}
       </div>
+
+      {imageDialogOpen && (
+        <ExportImageDialog
+          buildInput={buildImageInput}
+          baseName={safeFileName(subpop
+            ? `${pedigree?.population || "pedigree"}_${subpop.focal_id}_subpop`
+            : pedigree?.population || "pedigree")}
+          scope={subpop ? `the subpopulation around ${subpop.focal_id}` : "the whole population"}
+          onClose={closeImageDialog}
+        />
+      )}
 
       {/* Hidden file input for browser fallback */}
       <input

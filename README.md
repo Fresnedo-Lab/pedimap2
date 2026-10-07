@@ -68,7 +68,11 @@ and precalculated IBD probabilities.
 | Interactive pedigree graph — pan, zoom, drag | ✅ |
 | Generation-aware hierarchical layout | ✅ |
 | Orientation toggle — top-to-bottom / left-to-right | ✅ |
+| Display styles — Modern, or Classic Pedimap (rectangles with the name on top, pale yellow fill) | ✅ |
+| Parent links colored by role — female red, male blue, single-parent (`*SELF`, `*DH`, `*MUT`, `*VP`) purple | ✅ |
+| Cross symbols — one × per parent pair, shared by full sibs; on in Classic, off in Modern (⚙ to change or resize) | ✅ |
 | Trait coloring — continuous gradient and qualitative palette | ✅ |
+| Editable low / high / missing colors for continuous traits | ✅ |
 | Semantic color names — a `Red` trait value renders red | ✅ |
 | Legacy `.dat` import — pedigree, traits, markers, IBD | ✅ |
 | Bundled example dataset | ✅ |
@@ -78,6 +82,8 @@ and precalculated IBD probabilities.
 | Fit to window — toolbar button or **F** | ✅ |
 | JSON export / import round-trip | ✅ |
 | Legacy `.dat` export — whole population or displayed subpopulation; reads back unchanged | ✅ |
+| Image export — PNG, SVG or PDF of the whole displayed chart, with trait legend | ✅ |
+| Drawing limit — populations above 1,000 individuals (⚙) are listed, not drawn | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
 | Update notifications with one-click install (from 2.1.2) | ✅ |
@@ -146,6 +152,19 @@ Via the API, `POST /api/export/dat` takes `{"ids": [...]}` (plus optional
 `focal_id`, `ancestors`, `descendants`, `siblings` for the header comment and
 `replace_outside_parents`). `.pmp` files are not written.
 
+**🖼 Export image…** saves the displayed chart — the whole population or the
+subpopulation, all of it regardless of pan and zoom — in the current display
+style, with a legend for the active trait:
+
+| Format | Contents |
+|--------|----------|
+| `.svg` | Vector drawing built from the chart itself (not a screenshot); names are text |
+| `.pdf` | The same drawing as a vector PDF, on a page fitted to the chart or on US Letter / A4 landscape |
+| `.png` | Bitmap at 2× resolution, reduced (with a notice) if a side would exceed 16,000 pixels |
+
+Names are set in the bundled Noto Sans font, embedded in every export, so
+accented and non-Latin names print correctly.
+
 ---
 
 ## 🛠 Development
@@ -195,9 +214,9 @@ The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
 ### Test
 
 ```bash
-cd backend && python -m pytest tests/ -v      # 68 tests
-cd frontend && npm run typecheck && npm run build
-cd src-tauri && cargo check
+cd backend && python -m pytest tests/ -v      # 79 tests
+cd frontend && npm run typecheck && npm test && npm run build   # 25 tests
+cd src-tauri && cargo test                    # 6 tests
 ```
 
 ### Build installers locally
@@ -273,8 +292,6 @@ users never install Python.
 - [ ] IBD haplotype rectangles per linkage group
 - [ ] Most-probable-allele display with probability thresholds
 - [ ] Marker score display with color codes
-- [ ] Sex-colored parent connectors (female red, male blue, uniparental purple)
-- [ ] Export to SVG / PDF
 - [ ] User manual as GitHub Wiki and PDF
 
 **Later**
@@ -287,6 +304,8 @@ users never install Python.
 - [x] Bundled demo dataset
 - [x] macOS signing and notarization in CI
 - [x] In-app update check and install (ⓘ About → Check for updates; from 2.1.2 on)
+- [x] Classic Pedimap display style, role-colored parent links, cross symbols
+- [x] Image export — PNG, SVG, PDF
 
 ---
 
@@ -312,6 +331,11 @@ Pedimap 2 is an independent reimplementation. It reads the Pedimap file
 format and reproduces the original's behavior, but shares no code with
 Pedimap 1.x, whose source is published without a license at
 [PBR/Pedimap](https://github.com/PBR/Pedimap).
+
+The bundled Noto Sans font (`frontend/src/assets/fonts/NotoSans-Regular.ttf`),
+used on screen and embedded in image exports, is © The Noto Project Authors
+and licensed under the SIL Open Font License 1.1 — see
+[`frontend/src/assets/fonts/OFL.txt`](frontend/src/assets/fonts/OFL.txt).
 
 ---
 

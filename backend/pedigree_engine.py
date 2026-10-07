@@ -306,27 +306,42 @@ class PedigreeEngine:
 
     # ── Colour helpers ────────────────────────────────────────────────────────
 
-    def trait_color(self, ind_id: str, trait_name: str) -> str:
+    def trait_color(self, ind_id: str, trait_name: str, *,
+                    low: Optional[str] = None, high: Optional[str] = None,
+                    missing: Optional[str] = None) -> str:
+        """Fill color of `ind_id` for `trait_name`.
+
+        `low`/`high` override the trait's continuous gradient end points and
+        `missing` the color of an individual with no value; each defaults to
+        the trait's own setting (or neutral gray for missing).
+        """
+        missing = missing or MISSING_COLOR
         ind = self.get(ind_id)
         if not ind:
-            return "#6B7280"
+            return missing
         val = ind.traits.get(trait_name)
         if val is None:
-            return "#6B7280"
+            return missing
         meta = next((t for t in self.traits if t.name == trait_name), None)
         if not meta:
-            return "#6B7280"
+            return missing
         if meta.trait_type == TraitType.QUALITATIVE:
-            return _discrete_color_map(meta).get(str(val), "#6B7280")
+            return _discrete_color_map(meta).get(str(val), missing)
+        low = low or meta.color_low
+        high = high or meta.color_high
         try:
             fval = float(val)
             rng = meta.max_val - meta.min_val
             if rng == 0:
-                return meta.color_low
+                return low
             t = max(0.0, min(1.0, (fval - meta.min_val) / rng))
-            return _lerp_hex(meta.color_low, meta.color_high, t)
+            return _lerp_hex(low, high, t)
         except (TypeError, ValueError):
-            return "#6B7280"
+            return missing
+
+
+# Fill of an individual with no value for the trait being colored by.
+MISSING_COLOR = "#6B7280"
 
 
 # ── Discrete-trait coloring ───────────────────────────────────────────────────
