@@ -104,8 +104,11 @@ These are core to Pedimap 1.x and are the focus of ongoing work:
 
 - View tabs — multiple customizable views per population
 - Population panel and subpopulations
-- Select Relatives — build subpopulations by pedigree relationship
-- Information panel — persistent detail view
+- Select Relatives — building subpopulations by pedigree relationship works
+  for ancestors and descendants only; line filters and generation limits are
+  still missing
+- Information panel — a persistent panel that follows the mouse (a details
+  panel already opens on click)
 - IBD haplotype rectangles and most-probable-allele display
 - `.pmp` subpopulations and saved views (currently only the population name is read)
 
@@ -288,9 +291,14 @@ users never install Python.
 **Next**
 - [ ] View tabs with per-view settings
 - [ ] Population panel and subpopulations
-- [ ] Select Relatives dialog
-- [ ] Information panel
+- [ ] Select Relatives dialog — *partial:* **🔍 Subpop** builds an individual's
+      ancestors and descendants only; no line filters (maternal / paternal)
+      or generation limits yet
+- [ ] Information panel — *partial:* a details panel opens when you click an
+      individual; no persistent panel that follows the mouse yet
 - [ ] Full `.pmp` support — subpopulations, saved views, notes
+- [ ] Smarter lane ordering — shorter detours for links that span
+      generations, and fewer places where several links cross at one point
 
 **Then**
 - [ ] IBD haplotype rectangles per linkage group
@@ -308,8 +316,14 @@ users never install Python.
 - [x] Bundled demo dataset
 - [x] macOS signing and notarization in CI
 - [x] In-app update check and install (ⓘ About → Check for updates; from 2.1.2 on)
-- [x] Classic Pedimap display style, role-colored parent links, cross symbols
-- [x] Image export — PNG, SVG, PDF
+- [x] Subpopulation `.dat` export, with parents outside it kept as founders (2.2.0)
+- [x] Classic Pedimap display style (2.2.0)
+- [x] Sex-colored parent links — female red, male blue, single-parent purple (2.2.0)
+- [x] Cross symbols — one × per parent pair, shared by full sibs (2.2.0)
+- [x] Image export — SVG, PDF and PNG (2.2.0)
+- [x] Editable low / high / missing colors for continuous traits (2.2.0)
+- [x] Drawing limit — large populations listed instead of drawn (2.2.0)
+- [x] Link routing — no link crosses an individual it does not connect (2.2.0)
 
 ---
 

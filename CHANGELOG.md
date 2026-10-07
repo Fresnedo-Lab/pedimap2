@@ -10,6 +10,36 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-10-07
+
+**Please redraw figures made with earlier versions before you use them.**
+Earlier versions could draw links through individuals they did not connect,
+so some parentages appeared wrong. Pedimap 2.2.0 routes every link clear of
+other individuals; charts and exported images made with earlier versions may
+show parentages that do not exist.
+
+### Fixed
+- Links no longer run through individuals they do not connect. Earlier
+  versions could draw a link straight through another individual, so the
+  chart suggested a parentage that does not exist (in the Example data, Cox's
+  link ran through Elstar, and Elstar's through Elise), and a link spanning
+  several generations could run along a row and hide the links beneath it.
+  Every link now gets its own lane through each generation it passes, in
+  both display styles, both orientations, and image exports. If a link ever
+  cannot be routed this way, the chart and the export dialog say so.
+- Older Pedimap files with accented names (such as "Élise") now open correctly.
+  Files saved by Pedimap 1.x on Windows often use the older Windows-1252 text
+  encoding; Pedimap 2 now recognizes it, keeps every name intact so parent
+  links still match, and shows a short notice when it was used. Exported
+  files are always saved as UTF-8.
+- Switching between top-to-bottom and left-to-right now re-centers the
+  pedigree in the window instead of leaving it partly off screen.
+- `.dat` export (`/api/export/dat`) works; it always failed before. The file
+  keeps the header settings, every trait column, `*SELF` / `*DH` / `*MUT` /
+  `*VP` descent, markers and IBD data, and reads back into Pedimap 2 unchanged.
+- Marker color codes in `.dat` files are now kept instead of being dropped on
+  load, so they also survive JSON export and import.
+
 ### Added
 - **Fit to window** toolbar button (shortcut: **F**) brings the whole pedigree
   back into view after you have panned or zoomed away.
@@ -23,7 +53,6 @@ release notes, so every release needs its own section here before it is tagged.
   notes where it came from and how it was selected, and records each trait's
   type, so a discrete trait stays discrete even if the values left in the
   subpopulation all happen to be numbers.
-
 - **Classic Pedimap** display style, next to the current **Modern** one: each
   individual is a rectangle with its name on top, pale yellow unless a trait
   colors it, on a white page.
@@ -53,38 +82,14 @@ release notes, so every release needs its own section here before it is tagged.
 - Dragging an individual moves it only along its own row (sideways in
   top-to-bottom, up and down in left-to-right), and not past its neighbors,
   so its links stay clear of other individuals.
-- If a link ever cannot be routed clear of other individuals, the chart and
-  the export dialog say so, instead of quietly drawing it as a straight line.
-- Large pedigrees are laid out faster (about a second for 1,000 individuals
-  on a test computer), and a "Laying out N individuals…" notice appears while
-  a large chart is being arranged, so the window never looks frozen.
+- A "Laying out N individuals…" notice appears while a large chart is being
+  arranged, so the window never looks frozen.
 - The toolbar wraps onto a second row when the window is too narrow, instead
   of running off the edge.
 - The details panel shows an individual's traits directly under its parents,
   above the relatives.
 - The desktop app now writes exported files only to a location chosen in its
   save dialog during the same session.
-
-### Fixed
-- Earlier versions could draw links through individuals they did not
-  connect, making some parentages appear wrong (in the Example data, Cox's
-  link ran through Elstar, and Elstar's through Elise); a link spanning
-  several generations could also run along a row and hide the links beneath
-  it. This is fixed: every link now gets its own lane through each generation
-  it passes and never crosses another individual or ×, in both styles, both
-  orientations, and image exports.
-- Older Pedimap files with accented names (such as "Élise") now open correctly.
-  Files saved by Pedimap 1.x on Windows often use the older Windows-1252 text
-  encoding; Pedimap 2 now recognizes it, keeps every name intact so parent
-  links still match, and shows a short notice when it was used. Exported
-  files are always saved as UTF-8.
-- Switching between top-to-bottom and left-to-right now re-centers the
-  pedigree in the window instead of leaving it partly off screen.
-- `.dat` export (`/api/export/dat`) works; it always failed before. The file
-  keeps the header settings, every trait column, `*SELF` / `*DH` / `*MUT` /
-  `*VP` descent, markers and IBD data, and reads back into Pedimap 2 unchanged.
-- Marker color codes in `.dat` files are now kept instead of being dropped on
-  load, so they also survive JSON export and import.
 
 ## [2.1.2] — 2026-10-06
 
