@@ -6,7 +6,25 @@ _Placeholder: Pedimap 2 supports exporting the graph image, the individual table
 
 ## Exporting the Graph as an Image
 
-_Placeholder: File → Export → PNG or SVG; describe the resolution options and transparent background toggle._
+Click **🖼 Export image…** in the toolbar. The export always contains the whole
+displayed chart (the full population, or the subpopulation you are showing),
+no matter how far you have zoomed or panned. It uses the current display
+style (Modern or Classic Pedimap) and orientation, with the same fills,
+role-colored parent links and cross symbols as on screen, plus a legend for
+the trait you are coloring by.
+
+| Format | Use it for |
+|--------|------------|
+| **PNG** | Slides and documents. Saved at 2× screen resolution. A very large chart is saved at a lower scale so neither side exceeds 16,000 pixels; the dialog tells you when this happened. |
+| **SVG** | Editing in Inkscape or Illustrator. A vector drawing in which names are text. |
+| **PDF** | Printing and publication. Vector, with names as text. Choose a page fitted to the chart, or US Letter or A4 in landscape (the chart is scaled down to fit inside the margins). |
+
+Names are set in Noto Sans, which is bundled with Pedimap 2 and embedded in
+every exported file, so accented and non-Latin names appear correctly on any
+computer.
+
+The chart cannot be exported while the population is too large to draw (see
+the drawing limit under ⚙); build a subpopulation first.
 
 ## Exporting the Individual Table as CSV
 

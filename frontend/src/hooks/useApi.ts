@@ -118,7 +118,7 @@ export interface ApiClient {
   getLayout():                             Promise<Record<string, {x:number;y:number}>>;
   listIndividuals():                       Promise<IndividualSummary[]>;
   getIndividual(id: string):               Promise<IndividualDetail>;
-  getColorMap(traitName: string):          Promise<Record<string, string>>;
+  getColorMap(traitName: string, colors?: ColorOverrides): Promise<Record<string, string>>;
   buildSubpop(params: {
     focal_id: string;
     ancestors?: boolean;
@@ -131,6 +131,10 @@ export interface ApiClient {
   exportDat(req?: DatExportRequest):       Promise<string>;
   reset():                                 Promise<void>;
 }
+
+/** Optional #RRGGBB overrides for /api/color: a continuous trait's gradient
+ *  end points and the color of individuals without a value. */
+export interface ColorOverrides { low?: string; high?: string; missing?: string }
 
 /** Text encodings the backend and the desktop shell report when reading files. */
 export const LEGACY_ENCODING = "windows-1252";
@@ -167,13 +171,15 @@ export function useApi(): ApiClient {
     getLayout:      ()   => apiFetch("/api/layout"),
     listIndividuals:()   => apiFetch("/api/individuals"),
     getIndividual:  (id) => apiFetch(`/api/individual/${encodeURIComponent(id)}`),
-    getColorMap:    (t)  => {
+    getColorMap:    (t, colors = {}) => {
       // Issue 1: a color request must never be issued without a trait name.
       // The backend route is /api/color/{trait_name}; calling it with an empty
       // trait produces /api/color/ → 404. Treat empty/null/undefined as "no
       // coloring" and return the default (empty) map without hitting the API.
       if (!t) return Promise.resolve<Record<string, string>>({});
-      return apiFetch(`/api/color/${encodeURIComponent(t)}`);
+      const query = new URLSearchParams(
+        Object.entries(colors).filter((e): e is [string, string] => !!e[1])).toString();
+      return apiFetch(`/api/color/${encodeURIComponent(t)}${query ? `?${query}` : ""}`);
     },
     buildSubpop:    (p)  => apiFetch("/api/subpop", {
       method: "POST",

@@ -58,3 +58,48 @@ def test_value_color_override_wins():
     eng = _engine_with(["Red", "Green"], value_colors={"Red": "#123456"})
     assert eng.trait_color("i0", "Color") == "#123456"
     assert eng.trait_color("i1", "Color") == "#22C55E"  # Green still semantic
+
+
+# ── Continuous-trait color overrides (low / high / missing) ──────────────────
+
+def _continuous_engine():
+    eng = PedigreeEngine()
+    eng.traits.append(TraitMeta(name="Size", trait_type=TraitType.CONTINUOUS,
+                                min_val=0.0, max_val=10.0,
+                                color_low="#000000", color_high="#FFFFFF"))
+    for iid, val in [("lo", 0.0), ("mid", 5.0), ("hi", 10.0), ("none", None)]:
+        traits = {} if val is None else {"Size": val}
+        ind = Individual(id=iid, name=iid, cross_type=CrossType.UNKNOWN, traits=traits)
+        eng._individuals[iid] = ind
+        eng.graph.add_node(iid, data=ind)
+    return eng
+
+
+def test_continuous_defaults_use_trait_gradient():
+    eng = _continuous_engine()
+    assert eng.trait_color("lo", "Size") == "#000000"
+    assert eng.trait_color("hi", "Size") == "#ffffff"
+    assert eng.trait_color("none", "Size") == "#6B7280"
+
+
+def test_continuous_overrides_replace_gradient_and_missing():
+    eng = _continuous_engine()
+    kw = dict(low="#FF0000", high="#0000FF", missing="#00FF00")
+    assert eng.trait_color("lo", "Size", **kw).lower() == "#ff0000"
+    assert eng.trait_color("hi", "Size", **kw).lower() == "#0000ff"
+    assert eng.trait_color("mid", "Size", **kw).lower() == "#7f007f"
+    assert eng.trait_color("none", "Size", **kw) == "#00FF00"
+
+
+def test_color_endpoint_accepts_and_validates_overrides(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    import api
+    monkeypatch.setattr(api, "_engine", _continuous_engine())
+    colors = api.color_by_trait("Size", low="#FF0000", high="#0000FF", missing="#00FF00")
+    assert colors["lo"].lower() == "#ff0000" and colors["none"] == "#00FF00"
+    assert api.color_by_trait("Size")["none"] == "#6B7280"
+    for bad in ({"low": "red"}, {"high": "#12345"}, {"missing": "#GGGGGG"}):
+        with pytest.raises(HTTPException) as exc:
+            api.color_by_trait("Size", **bad)
+        assert exc.value.status_code == 400

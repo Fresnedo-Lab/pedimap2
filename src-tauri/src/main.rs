@@ -9,7 +9,10 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::Mutex;
+use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, RunEvent, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::process::CommandChild;
@@ -19,6 +22,30 @@ use tauri_plugin_shell::ShellExt;
 // Shared state — holds the child process handle for the Python sidecar
 // ─────────────────────────────────────────────────────────────────────────────
 struct BackendProcess(Mutex<Option<CommandChild>>);
+
+/// Destinations the user picked in save_file_dialog during this session. The
+/// write commands refuse every other path, so the webview can only write
+/// where the user explicitly chose to save.
+#[derive(Default)]
+struct SaveGrants(Mutex<HashSet<PathBuf>>);
+
+impl SaveGrants {
+    fn grant(&self, path: &str) {
+        self.0.lock().unwrap().insert(PathBuf::from(path));
+    }
+
+    /// Write `bytes` to `path` only if the save dialog returned that path.
+    fn write(&self, path: &str, bytes: &[u8]) -> Result<(), String> {
+        let path = PathBuf::from(path);
+        if !self.0.lock().unwrap().contains(&path) {
+            return Err(format!(
+                "Refusing to write {}: it was not chosen in a save dialog",
+                path.display()
+            ));
+        }
+        std::fs::write(&path, bytes).map_err(|e| e.to_string())
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tauri commands
@@ -45,20 +72,46 @@ async fn open_file_dialog(app: AppHandle) -> Result<Vec<String>, String> {
         .unwrap_or_default())
 }
 
+/// Save-dialog filters, grouped so that an image export offers only image
+/// formats and a data export only data formats.
+const SAVE_FILTERS: [(&str, &str, u8); 5] = [
+    ("dat", "Pedimap Data", 0),
+    ("json", "Pedigree JSON", 0),
+    ("png", "PNG image", 1),
+    ("svg", "SVG image", 1),
+    ("pdf", "PDF document", 1),
+];
+
+/// Filters for a suggested file name: the one matching its extension first
+/// (so it is preselected), then the rest of its group.
+fn save_filters_for(name: &str) -> Vec<(&'static str, &'static str)> {
+    let ext = name.rsplit('.').next().unwrap_or("").to_lowercase();
+    let group = SAVE_FILTERS.iter().find(|f| f.0 == ext).map_or(0, |f| f.2);
+    let mut filters: Vec<_> = SAVE_FILTERS.iter().filter(|f| f.2 == group).collect();
+    filters.sort_by_key(|f| f.0 != ext);
+    filters.into_iter().map(|f| (f.0, f.1)).collect()
+}
+
 /// Open a native save dialog suggesting `default_name` (default
-/// "pedigree.json"); the filter matching its extension is listed first so it
-/// is the one preselected. Returns the chosen destination path or "".
+/// "pedigree.json"). Returns the chosen destination path or "", and grants
+/// that path to write_file / write_binary_file for the rest of the session.
 #[tauri::command]
-async fn save_file_dialog(app: AppHandle, default_name: Option<String>) -> Result<String, String> {
+async fn save_file_dialog(
+    app: AppHandle,
+    grants: State<'_, SaveGrants>,
+    default_name: Option<String>,
+) -> Result<String, String> {
     let name = default_name.unwrap_or_else(|| "pedigree.json".to_string());
-    let dialog = app.dialog().file();
-    let dialog = if name.to_lowercase().ends_with(".dat") {
-        dialog.add_filter("Pedimap Data", &["dat"]).add_filter("Pedigree JSON", &["json"])
-    } else {
-        dialog.add_filter("Pedigree JSON", &["json"]).add_filter("Pedimap Data", &["dat"])
+    let mut dialog = app.dialog().file();
+    for (ext, label) in save_filters_for(&name) {
+        dialog = dialog.add_filter(label, &[ext]);
+    }
+    let Some(path) = dialog.set_file_name(name).blocking_save_file() else {
+        return Ok(String::new());
     };
-    let path = dialog.set_file_name(name).blocking_save_file();
-    Ok(path.map(|p| p.to_string()).unwrap_or_default())
+    let path = path.to_string();
+    grants.grant(&path);
+    Ok(path)
 }
 
 /// A decoded text file and the encoding that was used ("utf-8" or
@@ -105,10 +158,44 @@ fn read_file(path: String) -> Result<TextFile, String> {
     Ok(decode_text(&bytes))
 }
 
-/// Write UTF-8 content to a file on disk.
+/// Write UTF-8 content to a path returned by save_file_dialog.
 #[tauri::command]
-fn write_file(path: String, content: String) -> Result<(), String> {
-    std::fs::write(&path, content).map_err(|e| e.to_string())
+fn write_file(grants: State<'_, SaveGrants>, path: String, content: String) -> Result<(), String> {
+    grants.write(&path, content.as_bytes())
+}
+
+/// Write binary content (PNG, PDF) to a path returned by save_file_dialog.
+/// The bytes are the raw request body, so they are not JSON-encoded; the path
+/// travels percent-encoded in the `x-path` header (headers must be ASCII).
+#[tauri::command]
+fn write_binary_file(grants: State<'_, SaveGrants>, request: Request<'_>) -> Result<(), String> {
+    let InvokeBody::Raw(bytes) = request.body() else {
+        return Err("write_binary_file expects raw bytes".to_string());
+    };
+    let path = request
+        .headers()
+        .get("x-path")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("write_binary_file needs an x-path header")?;
+    grants.write(&percent_decode(path)?, bytes)
+}
+
+/// Decode a JavaScript encodeURIComponent string.
+fn percent_decode(s: &str) -> Result<String, String> {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = s.get(i + 1..i + 3).ok_or("truncated percent escape")?;
+            out.push(u8::from_str_radix(hex, 16).map_err(|e| e.to_string())?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).map_err(|e| e.to_string())
 }
 
 /// Return the application version string from Cargo.toml.
@@ -210,6 +297,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(BackendProcess(Mutex::new(None)))
+        .manage(SaveGrants::default())
         .setup(|app| {
             spawn_backend(&app.handle());
             Ok(())
@@ -220,6 +308,7 @@ fn main() {
             save_file_dialog,
             read_file,
             write_file,
+            write_binary_file,
             app_version,
             stop_backend,
             start_backend,
@@ -242,7 +331,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_text, read_file};
+    use super::{decode_text, percent_decode, read_file, save_filters_for, SaveGrants};
 
     fn read_bytes(name: &str, bytes: &[u8]) -> super::TextFile {
         let path = std::env::temp_dir().join(name);
@@ -276,5 +365,41 @@ mod tests {
         assert_eq!(file.text.chars().count(), all.len());
         assert!(!file.text.contains('\u{FFFD}'));
         assert_eq!(file.text.chars().next(), Some('\u{20AC}')); // 0x80 is the euro sign
+    }
+
+    #[test]
+    fn writes_only_to_paths_granted_by_the_save_dialog() {
+        let dir = std::env::temp_dir();
+        let granted = dir.join("pedimap2-granted.png").to_string_lossy().into_owned();
+        let other = dir.join("pedimap2-not-granted.png").to_string_lossy().into_owned();
+        let _ = std::fs::remove_file(&other);
+
+        let grants = SaveGrants::default();
+        assert!(grants.write(&granted, b"x").is_err()); // nothing granted yet
+        grants.grant(&granted);
+        grants.write(&granted, b"\x89PNG").unwrap();
+        assert_eq!(std::fs::read(&granted).unwrap(), b"\x89PNG");
+        let err = grants.write(&other, b"x").unwrap_err();
+        assert!(err.contains("not chosen in a save dialog"));
+        assert!(!std::path::Path::new(&other).exists());
+        let _ = std::fs::remove_file(&granted);
+    }
+
+    #[test]
+    fn percent_decode_round_trips_encode_uri_component() {
+        // encodeURIComponent("/Users/a b/Šampion.pdf")
+        assert_eq!(
+            percent_decode("%2FUsers%2Fa%20b%2F%C5%A0ampion.pdf").unwrap(),
+            "/Users/a b/Šampion.pdf"
+        );
+        assert!(percent_decode("%2").is_err());
+    }
+
+    #[test]
+    fn save_filters_offer_the_matching_group_first() {
+        let exts = |n| save_filters_for(n).into_iter().map(|f| f.0).collect::<Vec<_>>();
+        assert_eq!(exts("tree.svg"), ["svg", "png", "pdf"]);
+        assert_eq!(exts("pop.dat"), ["dat", "json"]);
+        assert_eq!(exts("pedigree.json"), ["json", "dat"]);
     }
 }
