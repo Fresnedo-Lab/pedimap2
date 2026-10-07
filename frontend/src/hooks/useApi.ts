@@ -125,11 +125,22 @@ export interface ApiClient {
     descendants?: boolean;
     siblings?: boolean;
   }):                                      Promise<GraphData>;
-  loadFile(files: FileList | File[]):      Promise<{loaded: string; individuals: number}>;
+  loadFile(files: FileList | File[]):      Promise<LoadResult>;
   listDemo():                              Promise<{datasets: {name: string; description: string}[]}>;
-  loadDemo(name: string):                  Promise<{loaded: string; individuals: number}>;
+  loadDemo(name: string):                  Promise<LoadResult>;
   exportDat(req?: DatExportRequest):       Promise<string>;
   reset():                                 Promise<void>;
+}
+
+/** Text encodings the backend and the desktop shell report when reading files. */
+export const LEGACY_ENCODING = "windows-1252";
+
+/** Response of /api/load and /api/demo/load. */
+export interface LoadResult {
+  loaded:      string;
+  individuals: number;
+  encoding?:   string;                              // of the data file
+  files?:      { name: string; encoding: string }[];  // each file received
 }
 
 /** The selection behind a displayed subpopulation (as sent to /api/subpop). */

@@ -120,6 +120,10 @@ delimiters, case-sensitive name matching, quoted names containing spaces,
 and pedigrees listed in any order (individuals are topologically sorted so
 parents always precede their children).
 
+Files may be UTF-8 (with or without a byte-order mark) or, as Pedimap 1.x on
+Windows often wrote them, Windows-1252; the encoding is detected and the app
+notes when the Windows-1252 fallback was used. Exports are always UTF-8.
+
 See [`docs/reference/dat-format.md`](docs/reference/dat-format.md) for the
 full specification.
 
@@ -191,7 +195,7 @@ The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
 ### Test
 
 ```bash
-cd backend && python -m pytest tests/ -v      # 61 tests
+cd backend && python -m pytest tests/ -v      # 68 tests
 cd frontend && npm run typecheck && npm run build
 cd src-tauri && cargo check
 ```

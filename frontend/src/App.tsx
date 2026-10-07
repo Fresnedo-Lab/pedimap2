@@ -20,12 +20,16 @@
 //         Wrapped in arrow functions: onClick={() => loadGraph()}  etc.
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { invoke, isTauri as inTauriApp } from "@tauri-apps/api/core";
+// isTauri() is Tauri 2's own check (globalThis.isTauri). The older
+// window.__TAURI__ global only exists with withGlobalTauri enabled, which it
+// is not, so checking it made every desktop-only branch here dead code.
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import {
   useApi, useFetch, useBackendHealth,
   type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
-  type DatExportRequest, type SubpopSelection,
+  type DatExportRequest, type SubpopSelection, type LoadResult,
+  LEGACY_ENCODING,
 } from "./hooks/useApi";
 import PedigreeCanvas, {
   type Orientation, type PedigreeCanvasHandle,
@@ -37,22 +41,16 @@ import { useUpdater } from "./hooks/useUpdater";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isTauri() {
-  return typeof (window as any).__TAURI__ !== "undefined";
-}
-
 // Keep exported file names portable: letters, digits, dot, dash, underscore.
 function safeFileName(name: string): string {
   return name.replace(/[^\w.-]+/g, "_");
 }
 
-// Save text through the native save dialog in the desktop app, or as a browser
-// download elsewhere. Uses Tauri 2's own detection: window.__TAURI__ (checked
-// by isTauri() above) only exists when withGlobalTauri is enabled, which it
-// is not, and a browser-style download does not save files in the webview.
-// Returns false if the user cancelled the dialog.
+// Save text through the native save dialog in the desktop app (a browser-style
+// download does not save files from the webview), or as a browser download
+// elsewhere. Returns false if the user cancelled the dialog.
 async function saveTextFile(defaultName: string, text: string): Promise<boolean> {
-  if (inTauriApp()) {
+  if (isTauri()) {
     const path = await invoke<string>("save_file_dialog", { defaultName });
     if (!path) return false;
     await invoke("write_file", { path, content: text });
@@ -332,16 +330,35 @@ export default function App() {
   // ── File open ─────────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Notice shown when a file was read as Windows-1252 rather than UTF-8.
+  const [encodingNotice, setEncodingNotice] = useState<string | null>(null);
+
+  // `readEncodings` covers the desktop app, where the shell decodes files before
+  // upload (so the backend only ever sees UTF-8); in the browser the backend's
+  // per-file report is the only source.
+  const noteEncodings = useCallback((res: LoadResult, readEncodings: Record<string, string> = {}) => {
+    const legacy = (res.files ?? [])
+      .filter(f => f.encoding === LEGACY_ENCODING || readEncodings[f.name] === LEGACY_ENCODING)
+      .map(f => f.name);
+    setEncodingNotice(legacy.length === 0 ? null :
+      `${legacy.join(" and ")} ${legacy.length === 1 ? "uses" : "use"} an older text ` +
+      "encoding (Windows-1252). Accented names were read correctly; exports are saved as UTF-8.");
+  }, []);
+
   const handleOpenFile = useCallback(async () => {
     if (isTauri()) {
       try {
-        const path = await invoke<string>("open_file_dialog");
-        if (!path) return;
-        const content = await invoke<string>("read_file", { path });
-        const fname   = path.split(/[\\/]/).pop() ?? "file.json";
-        const blob    = new Blob([content], { type: "text/plain" });
-        const file    = new File([blob], fname);
-        await api.loadFile([file]);
+        // Several files may be picked, so a .dat can come with its .pmp.
+        const paths = await invoke<string[]>("open_file_dialog");
+        if (paths.length === 0) return;
+        const read = await Promise.all(paths.map(async path => {
+          const { text, encoding } =
+            await invoke<{ text: string; encoding: string }>("read_file", { path });
+          const name = path.split(/[\\/]/).pop() ?? "file.dat";
+          return { file: new File([text], name, { type: "text/plain" }), name, encoding };
+        }));
+        const res = await api.loadFile(read.map(r => r.file));
+        noteEncodings(res, Object.fromEntries(read.map(r => [r.name, r.encoding])));
         await reloadAllData();
         setLoadError(null);
       } catch (e) {
@@ -350,7 +367,7 @@ export default function App() {
     } else {
       fileInputRef.current?.click();
     }
-  }, [api, reloadAllData]);
+  }, [api, reloadAllData, noteEncodings]);
 
   const handleFileInputChange = useCallback(async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -358,14 +375,14 @@ export default function App() {
     const files = e.target.files;
     if (!files?.length) return;
     try {
-      await api.loadFile(files);
+      noteEncodings(await api.loadFile(files));
       await reloadAllData();
       setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
     }
     e.target.value = "";
-  }, [api, reloadAllData]);
+  }, [api, reloadAllData, noteEncodings]);
 
   // ── Subpopulation ─────────────────────────────────────────────────────────
   const handleSubpop = useCallback(async () => {
@@ -410,6 +427,7 @@ export default function App() {
   const handleLoadExample = useCallback(async () => {
     try {
       await api.loadDemo("Example");
+      setEncodingNotice(null);
       await reloadAllData();
       setSelectedId(null);
       setDetail(null);
@@ -422,6 +440,7 @@ export default function App() {
   const handleReset = useCallback(async () => {
     try {
       await api.reset();
+      setEncodingNotice(null);
       await reloadAllData();
       setSelectedId(null);
       setDetail(null);
@@ -585,6 +604,19 @@ export default function App() {
 
       {/* ── Update banner (desktop only) ─────────────────────────────────── */}
       <UpdateBanner updater={updater} />
+
+      {/* ── Legacy-encoding notice ───────────────────────────────────────── */}
+      {encodingNotice && (
+        <div role="status" style={{ background: "#16263f", color: "#a8c7f5",
+          padding: "6px 14px", fontSize: 12, borderBottom: "1px solid #24406b",
+          display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ flex: 1 }}>ℹ︎ {encodingNotice}</span>
+          <button onClick={() => setEncodingNotice(null)}
+            style={{ background: "transparent", color: "#a8c7f5", fontSize: 11 }}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* ── Error banner (Issue 3) ───────────────────────────────────────── */}
       {loadError && (

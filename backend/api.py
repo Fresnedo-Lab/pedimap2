@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from pedigree_engine import CrossType, Individual, PedigreeEngine, TraitType
 from sample_data import load_sample_data
+from text_decoding import decode_text
 
 # ── Determine if running as PyInstaller bundle ────────────────────────────────
 IS_FROZEN = getattr(sys, "frozen", False)
@@ -257,26 +258,34 @@ async def load_file(
 ):
     """
     Accept a .json, .dat, or .dat+.pmp upload and replace the engine state.
+
+    Files are decoded as UTF-8, falling back to Windows-1252 for legacy
+    Pedimap 1.x files (see text_decoding.py). The response reports the
+    encoding used: ``encoding`` for the data file and ``files`` per file.
     """
     global _engine
-    dat_text = (await dat_file.read()).decode("utf-8", errors="replace")
     fname = dat_file.filename or ""
+    dat_text, dat_encoding = decode_text(await dat_file.read())
+    files = [{"name": fname, "encoding": dat_encoding}]
 
     if fname.lower().endswith(".json"):
         data = json.loads(dat_text)
         _engine = PedigreeEngine.from_dict(data)
-        return {"loaded": "json", "individuals": _engine.count()}
+        return {"loaded": "json", "individuals": _engine.count(),
+                "encoding": dat_encoding, "files": files}
 
     # .dat / .pmp path — needs pmp_parser
     try:
         from pmp_parser import PmpParser
         if pmp_file:
-            pmp_text = (await pmp_file.read()).decode("utf-8", errors="replace")
+            pmp_text, pmp_encoding = decode_text(await pmp_file.read())
+            files.append({"name": pmp_file.filename or "", "encoding": pmp_encoding})
             result = PmpParser.from_pmp_text(pmp_text, dat_text)
         else:
             result = PmpParser.from_dat_text(dat_text)
         _engine = result.engine
-        return {"loaded": "dat", "individuals": _engine.count()}
+        return {"loaded": "dat", "individuals": _engine.count(),
+                "encoding": dat_encoding, "files": files}
     except ImportError:
         raise HTTPException(501, "pmp_parser module not available in this build.")
     except Exception as exc:
@@ -339,11 +348,15 @@ def demo_load(name: str):
     except ImportError:
         raise HTTPException(501, "pmp_parser module not available in this build.")
 
-    dat_text = open(dat_path, encoding="utf-8", errors="replace").read()
+    with open(dat_path, "rb") as fh:
+        dat_text, dat_encoding = decode_text(fh.read())
+    files = [{"name": name + ".dat", "encoding": dat_encoding}]
     pmp_path = os.path.join(_DEMO_DIR, name + ".pmp")
     try:
         if os.path.exists(pmp_path):
-            pmp_text = open(pmp_path, encoding="utf-8", errors="replace").read()
+            with open(pmp_path, "rb") as fh:
+                pmp_text, pmp_encoding = decode_text(fh.read())
+            files.append({"name": name + ".pmp", "encoding": pmp_encoding})
             result = PmpParser.from_pmp_text(pmp_text, dat_text)
         else:
             result = PmpParser.from_dat_text(dat_text)
@@ -351,7 +364,8 @@ def demo_load(name: str):
         raise HTTPException(400, f"Parse error: {exc}")
 
     _engine = result.engine
-    return {"loaded": name, "individuals": _engine.count()}
+    return {"loaded": name, "individuals": _engine.count(),
+            "encoding": dat_encoding, "files": files}
 
 
 @app.get("/api/export/json")
