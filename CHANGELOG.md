@@ -10,6 +10,18 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.2.1] — 2026-10-07
+
+Pedimap works exactly as in 2.2.0; this release updates the tools it is built
+and tested with.
+
+### Changed
+- Build toolchain updated to Vite 8 (from 5) and Vitest 5 (from 3).
+- All dependency security warnings are resolved: `npm audit` reports no
+  vulnerabilities (there were 12, all in development and build tools, none in
+  the installed app).
+- Building Pedimap 2 from source now needs Node.js 22.12 or newer.
+
 ## [2.2.0] — 2026-10-07
 
 **Please redraw figures made with earlier versions before you use them.**
