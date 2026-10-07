@@ -5,9 +5,9 @@
 // with its role. The canvas and the image export both draw from this model,
 // so what is exported is what is on screen.
 //
-// Cross nodes exist only here. They are never sent to the backend and never
-// listed as individuals (sidebar, search, Information panel, .dat export all
-// use the backend's individual ids).
+// Cross nodes and waypoints exist only here. They are never sent to the
+// backend and never listed as individuals (sidebar, search, Information panel,
+// .dat export all use the backend's individual ids).
 
 import type { GraphData, GraphNode } from "../hooks/useApi";
 
@@ -39,22 +39,46 @@ export interface ChartLink {
   from: string;
   to:   string;
   role: LinkRole;            // "offspring" is cross → child
+  /** Waypoints, one per level strictly between `from` and `to`, in order. */
+  via:  string[];
+}
+
+/**
+ * An invisible node on a level that a link passes through. Laid out like any
+ * other node, it reserves a lane for the link, so the link never has to cross
+ * an individual on that level (see chart/routing.ts).
+ */
+export interface ChartWaypoint {
+  id:    string;
+  level: number;
 }
 
 export interface ChartModel {
   individuals: GraphNode[];
   crosses:     ChartCross[];
   links:       ChartLink[];
-  /** Layout level of every chart node: 2 × generation for individuals, and one
-   *  level above the children for a cross, so it sits between the generations. */
+  /** Layout level of every chart node. With cross symbols, individuals are
+   *  on 2 × generation and a cross one level above its children (between the
+   *  generations); without, individuals are on their generation. A waypoint
+   *  is on the level it reserves a lane on. */
   levels:      Map<string, number>;
+  /** 2 with cross symbols (a level for the crosses between generations), else 1. */
+  levelsPerGeneration: 1 | 2;
   crossIds:    Set<string>;
+  waypoints:   ChartWaypoint[];
+  waypointIds: Set<string>;
 }
 
-const CROSS_PREFIX = "⁣cross:";   // invisible separator: never in a .dat name
+// Invisible separator: never in a .dat name.
+const CROSS_PREFIX    = "\u2063cross:";
+const WAYPOINT_PREFIX = "\u2063via:";
 
 export function isCrossId(id: string): boolean {
   return id.startsWith(CROSS_PREFIX);
+}
+
+export function isWaypointId(id: string): boolean {
+  return id.startsWith(WAYPOINT_PREFIX);
 }
 
 /**
@@ -63,14 +87,19 @@ export function isCrossId(id: string): boolean {
  * each parent links straight to the child. A uniparental child always gets a
  * single purple link from its parent. Links are only drawn to parents that are
  * part of the displayed graph.
+ *
+ * A link that spans more than one level gets a waypoint on every level in
+ * between, so that the layout gives it its own lane there.
  */
 export function buildChartModel(graph: GraphData, crossSymbols: boolean): ChartModel {
   const shown = new Set(graph.nodes.map(n => n.id));
+  const perGeneration = crossSymbols ? 2 : 1;
   const levels = new Map<string, number>();
-  for (const n of graph.nodes) levels.set(n.id, 2 * n.generation);
+  for (const n of graph.nodes) levels.set(n.id, perGeneration * n.generation);
 
   const links: ChartLink[] = [];
   const crosses = new Map<string, ChartCross>();
+  const link = (from: string, to: string, role: LinkRole) => links.push({ from, to, role, via: [] });
 
   for (const child of graph.nodes) {
     const female = child.female_parent || null;
@@ -78,7 +107,7 @@ export function buildChartModel(graph: GraphData, crossSymbols: boolean): ChartM
 
     if (isUniparental(child)) {
       const parent = female ?? male;
-      if (parent && shown.has(parent)) links.push({ from: parent, to: child.id, role: "uniparental" });
+      if (parent && shown.has(parent)) link(parent, child.id, "uniparental");
       continue;
     }
 
@@ -89,7 +118,7 @@ export function buildChartModel(graph: GraphData, crossSymbols: boolean): ChartM
     if (drawn.length === 0) continue;
 
     if (!crossSymbols) {
-      for (const p of drawn) links.push({ from: p.id!, to: child.id, role: p.role });
+      for (const p of drawn) link(p.id!, child.id, p.role);
       continue;
     }
 
@@ -98,21 +127,41 @@ export function buildChartModel(graph: GraphData, crossSymbols: boolean): ChartM
     if (!cross) {
       cross = { id, female, male, children: [], level: 2 * child.generation - 1 };
       crosses.set(id, cross);
-      for (const p of drawn) links.push({ from: p.id!, to: id, role: p.role });
+      for (const p of drawn) link(p.id!, id, p.role);
     }
     cross.children.push(child.id);
     cross.level = Math.min(cross.level, 2 * child.generation - 1);
-    links.push({ from: id, to: child.id, role: "offspring" });
+    link(id, child.id, "offspring");
   }
 
   for (const c of crosses.values()) levels.set(c.id, c.level);
+
+  const waypoints: ChartWaypoint[] = [];
+  for (const l of links) {
+    const from = levels.get(l.from)!, to = levels.get(l.to)!;
+    for (let level = from + 1; level < to; level++) {
+      const id = WAYPOINT_PREFIX + JSON.stringify([l.from, l.to, level]);
+      waypoints.push({ id, level });
+      levels.set(id, level);
+      l.via.push(id);
+    }
+  }
+
   return {
     individuals: graph.nodes,
     crosses:     [...crosses.values()],
     links,
     levels,
+    levelsPerGeneration: perGeneration,
     crossIds:    new Set(crosses.keys()),
+    waypoints,
+    waypointIds: new Set(waypoints.map(w => w.id)),
   };
+}
+
+/** The node ids a link runs through, from parent to child. */
+export function linkPath(l: ChartLink): string[] {
+  return [l.from, ...l.via, l.to];
 }
 
 /** Color of a link in a display style; offspring links use the style's ink. */

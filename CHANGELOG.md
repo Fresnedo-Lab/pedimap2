@@ -46,14 +46,33 @@ release notes, so every release needs its own section here before it is tagged.
   **Colour by**; the chart and the export legend use them.
 - Populations of more than 1,000 individuals are listed instead of drawn, with
   a prompt to build a subpopulation; the limit can be changed under ⚙.
+- Image export can put the chart on a white page (the default, for printed
+  figures) or keep the background as on screen.
 
 ### Changed
+- Dragging an individual moves it only along its own row (sideways in
+  top-to-bottom, up and down in left-to-right), and not past its neighbors,
+  so its links stay clear of other individuals.
+- If a link ever cannot be routed clear of other individuals, the chart and
+  the export dialog say so, instead of quietly drawing it as a straight line.
+- Large pedigrees are laid out faster (about a second for 1,000 individuals
+  on a test computer), and a "Laying out N individuals…" notice appears while
+  a large chart is being arranged, so the window never looks frozen.
+- The toolbar wraps onto a second row when the window is too narrow, instead
+  of running off the edge.
 - The details panel shows an individual's traits directly under its parents,
   above the relatives.
 - The desktop app now writes exported files only to a location chosen in its
   save dialog during the same session.
 
 ### Fixed
+- Earlier versions could draw links through individuals they did not
+  connect, making some parentages appear wrong (in the Example data, Cox's
+  link ran through Elstar, and Elstar's through Elise); a link spanning
+  several generations could also run along a row and hide the links beneath
+  it. This is fixed: every link now gets its own lane through each generation
+  it passes and never crosses another individual or ×, in both styles, both
+  orientations, and image exports.
 - Older Pedimap files with accented names (such as "Élise") now open correctly.
   Files saved by Pedimap 1.x on Windows often use the older Windows-1252 text
   encoding; Pedimap 2 now recognizes it, keeps every name intact so parent

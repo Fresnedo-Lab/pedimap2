@@ -4,16 +4,22 @@
 // model (not a screenshot), reproducing the display style: node shape and
 // fill, labels as real <text>, role-colored links, cross symbols, and the
 // legend of the active trait. PDF and PNG export both start from this SVG.
+//
+// Links are written from chart/routing.ts, the routes the canvas draws, so
+// they run exactly as on screen.
 
 import type { GraphNode, TraitMeta } from "../hooks/useApi";
-import { linkColor, type ChartLink, type ChartModel } from "./model";
+import { linkColor, type ChartModel } from "./model";
+import { chartBoxes, routeLinks, routingProblems, svgPathData, type Box, type Point } from "./routing";
 import {
   CHART_FONT, SYMBOL_RADIUS, THEMES, labelInside,
   type DisplayStyle, type NodeShape, type StyleTheme,
 } from "./style";
 
-export type Point = { x: number; y: number };
-export interface Box { left: number; right: number; top: number; bottom: number }
+export type { Box, Point };
+
+/** Page behind the chart: white (for print) or the style's own background. */
+export type ExportBackground = "white" | "screen";
 
 export interface LegendEntry { label: string; color: string }
 export type Legend =
@@ -31,6 +37,8 @@ export interface SvgExportInput {
   orientation:     "UD" | "LR";
   crossSymbolSize: number;
   legend?:         Legend | null;
+  /** Default "white". */
+  background?:     ExportBackground;
   /** Base64 TrueType data to embed with @font-face (SVG and PNG; not PDF). */
   fontBase64?:     string;
 }
@@ -70,25 +78,6 @@ function estimateBox(node: GraphNode, p: Point, theme: StyleTheme): Box {
   return { left: p.x - w / 2, right: p.x + w / 2, top: p.y - h / 2, bottom: p.y + h / 2 };
 }
 
-/** The part of a node that links attach to: its shape, without a label below. */
-function anchorBox(shape: NodeShape, p: Point, box: Box): Box {
-  if (labelInside(shape)) return box;
-  const r = SYMBOL_RADIUS;
-  return { left: p.x - r, right: p.x + r, top: p.y - r, bottom: p.y + r };
-}
-
-// Where the segment from the center of `b` toward `toward` leaves the shape.
-function clip(b: Box, shape: NodeShape, toward: Point): Point {
-  const cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
-  const hw = (b.right - b.left) / 2, hh = (b.bottom - b.top) / 2;
-  const dx = toward.x - cx, dy = toward.y - cy;
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-  const t = shape === "box" || shape === "square"
-    ? Math.min(dx ? hw / Math.abs(dx) : Infinity, dy ? hh / Math.abs(dy) : Infinity)
-    : 1 / Math.sqrt((dx / hw) ** 2 + (dy / hh) ** 2);
-  return { x: cx + dx * Math.min(t, 1), y: cy + dy * Math.min(t, 1) };
-}
-
 function shapeSvg(shape: NodeShape, p: Point, box: Box, fill: string, stroke: string): string {
   const paint = `fill="${fill}" stroke="${stroke}" stroke-width="1"`;
   const r = SYMBOL_RADIUS;
@@ -123,24 +112,33 @@ function crossSvg(p: Point, size: number, ink: string): string {
     `<line x1="${fmt(p.x - h)}" y1="${fmt(p.y + h)}" x2="${fmt(p.x + h)}" y2="${fmt(p.y - h)}"/></g>`;
 }
 
+/**
+ * The individuals' boxes and the link routes an export draws: the canvas's
+ * own boxes and routes, or, without a canvas, boxes estimated from labels.
+ */
+export function exportRouting(input: Pick<SvgExportInput,
+  "model" | "positions" | "boxes" | "style" | "orientation" | "crossSymbolSize">) {
+  const { model, positions, orientation, crossSymbolSize } = input;
+  const theme = THEMES[input.style];
+  const boxes: Record<string, Box> = {};
+  for (const n of model.individuals) {
+    const p = positions[n.id];
+    if (p) boxes[n.id] = input.boxes?.[n.id] ?? estimateBox(n, p, theme);
+  }
+  const routes = routeLinks(model, positions, boxes, {
+    orientation, curved: theme.curvedLinks, arrows: theme.arrows, crossSymbolSize,
+  });
+  return { boxes, routes, problems: routingProblems(model, routes) };
+}
+
 export function buildSvg(input: SvgExportInput): SvgExport {
-  const { model, positions, colorMap, orientation, crossSymbolSize, legend } = input;
+  const { model, positions, colorMap, crossSymbolSize, legend } = input;
   const theme = THEMES[input.style];
   const shapeOf = new Map(model.individuals.map(n => [n.id, theme.shape(n.cross_type)]));
 
   // ── Geometry ──────────────────────────────────────────────────────────────
-  const boxes = new Map<string, Box>();
-  for (const n of model.individuals) {
-    const p = positions[n.id];
-    if (p) boxes.set(n.id, input.boxes?.[n.id] ?? estimateBox(n, p, theme));
-  }
-  const crossHalf = crossSymbolSize / 2;
-  for (const c of model.crosses) {
-    const p = positions[c.id];
-    if (p) boxes.set(c.id, { left: p.x - crossHalf, right: p.x + crossHalf,
-                             top: p.y - crossHalf, bottom: p.y + crossHalf });
-  }
-  const all = [...boxes.values()];
+  const { boxes, routes } = exportRouting(input);
+  const all = [...chartBoxes(model, positions, boxes, crossSymbolSize).values()];
   const minX = Math.min(...all.map(b => b.left)), maxX = Math.max(...all.map(b => b.right));
   const minY = Math.min(...all.map(b => b.top)),  maxY = Math.max(...all.map(b => b.bottom));
   const ox = MARGIN - (all.length ? minX : 0), oy = MARGIN - (all.length ? minY : 0);
@@ -149,52 +147,26 @@ export function buildSvg(input: SvgExportInput): SvgExport {
   const at = (p: Point): Point => ({ x: p.x + ox, y: p.y + oy });
   const shift = (b: Box): Box => ({ left: b.left + ox, right: b.right + ox, top: b.top + oy, bottom: b.bottom + oy });
 
+  // On a white page, text that sits on the page rather than in a node (labels
+  // under symbols, the legend) takes the style's dark print color.
+  const paper = (input.background ?? "white") === "white";
+  const background = paper ? "#FFFFFF" : theme.background;
+  const pageText = paper ? theme.paperText : theme.text;
+
   // ── Legend ────────────────────────────────────────────────────────────────
-  const legendSvg = legend ? renderLegend(legend, theme, MARGIN + chartW + LEGEND_GAP, MARGIN) : null;
+  const legendSvg = legend ? renderLegend(legend, theme, pageText, MARGIN + chartW + LEGEND_GAP, MARGIN) : null;
   const width  = MARGIN * 2 + chartW + (legendSvg ? LEGEND_GAP + legendSvg.width : 0);
   const height = MARGIN * 2 + Math.max(chartH, legendSvg?.height ?? 0);
 
-  // ── Links ─────────────────────────────────────────────────────────────────
-  const markerId = (color: string) => `arrow-${color.slice(1)}`;
-  const markers = new Set<string>();
-  const linkSvg = (l: ChartLink): string => {
-    const a = positions[l.from], b = positions[l.to];
-    if (!a || !b) return "";
-    const color = linkColor(l.role, theme.ink);
-    const toCross = model.crossIds.has(l.to);
-    const end = (id: string, p: Point, other: Point) => {
-      if (model.crossIds.has(id)) return at(p);           // links meet at the ×
-      const shape = shapeOf.get(id)!;
-      return at(clip(anchorBox(shape, p, boxes.get(id)!), shape, other));
-    };
-    let p1: Point, p2: Point, d: string;
-    if (theme.curvedLinks) {
-      // Leave and enter along the layout direction, like vis-network's
-      // cubic Bézier links with a forced direction.
-      const side = (id: string, p: Point, out: boolean): Point => {
-        if (model.crossIds.has(id)) return at(p);
-        const box = anchorBox(shapeOf.get(id)!, p, boxes.get(id)!);
-        return at(orientation === "UD"
-          ? { x: p.x, y: out ? box.bottom : box.top }
-          : { x: out ? box.right : box.left, y: p.y });
-      };
-      p1 = side(l.from, a, true);
-      p2 = side(l.to, b, false);
-      const k = 0.5;
-      const c1 = orientation === "UD" ? { x: p1.x, y: p1.y + (p2.y - p1.y) * k } : { x: p1.x + (p2.x - p1.x) * k, y: p1.y };
-      const c2 = orientation === "UD" ? { x: p2.x, y: p2.y - (p2.y - p1.y) * k } : { x: p2.x - (p2.x - p1.x) * k, y: p2.y };
-      d = `M${fmt(p1.x)},${fmt(p1.y)} C${fmt(c1.x)},${fmt(c1.y)} ${fmt(c2.x)},${fmt(c2.y)} ${fmt(p2.x)},${fmt(p2.y)}`;
-    } else {
-      p1 = end(l.from, a, b);
-      p2 = end(l.to, b, a);
-      d = `M${fmt(p1.x)},${fmt(p1.y)} L${fmt(p2.x)},${fmt(p2.y)}`;
-    }
-    const arrow = theme.arrows && !toCross;
-    if (arrow) markers.add(color);
-    return `<path class="link link-${l.role}" d="${d}" fill="none" stroke="${color}" ` +
-      `stroke-width="1.5"${arrow ? ` marker-end="url(#${markerId(color)})"` : ""}/>`;
-  };
-  const links = model.links.map(linkSvg).join("\n");
+  // ── Links: the canvas's routes, in chart coordinates ──────────────────────
+  const links = routes.map(r => {
+    const color = linkColor(r.role, theme.ink);
+    const arrow = r.arrow
+      ? `<polygon class="arrow" points="${r.arrow.map(q => `${fmt(q.x)},${fmt(q.y)}`).join(" ")}" fill="${color}"/>`
+      : "";
+    return `<path class="link link-${r.role}" d="${svgPathData(r)}" fill="none" stroke="${color}" ` +
+      `stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>${arrow}`;
+  }).join("\n");
 
   // ── Nodes ─────────────────────────────────────────────────────────────────
   const crossesSvg = model.crosses
@@ -203,16 +175,17 @@ export function buildSvg(input: SvgExportInput): SvgExport {
 
   const nodesSvg = model.individuals.filter(n => positions[n.id]).map(n => {
     const p = at(positions[n.id]);
-    const box = shift(boxes.get(n.id)!);
+    const box = shift(boxes[n.id]);
     const shape = shapeOf.get(n.id)!;
     const fill = colorMap[n.id] ?? theme.defaultFill;
     let ty: number;
     if (shape === "box") ty = box.top + CLASSIC_BOX.padding + theme.fontSize * 0.9;  // name on top
     else if (shape === "ellipse") ty = p.y + theme.fontSize * 0.35;
     else ty = p.y + SYMBOL_RADIUS + 4 + theme.fontSize * 0.9;                        // below the symbol
+    const color = labelInside(shape) ? theme.text : pageText;
     return `<g class="node">${shapeSvg(shape, p, box, fill, theme.border)}` +
       `<text class="individual" x="${fmt(p.x)}" y="${fmt(ty)}" text-anchor="middle" ` +
-      `fill="${theme.text}">${escapeXml(n.label)}</text></g>`;
+      `fill="${color}">${escapeXml(n.label)}</text></g>`;
   }).join("\n");
 
   // ── Document ──────────────────────────────────────────────────────────────
@@ -220,19 +193,15 @@ export function buildSvg(input: SvgExportInput): SvgExport {
     ? `<style>@font-face{font-family:"${CHART_FONT}";` +
       `src:url(data:font/ttf;base64,${input.fontBase64}) format("truetype");}</style>`
     : "";
-  const markerDefs = [...markers].map(color =>
-    `<marker id="${markerId(color)}" viewBox="0 0 10 10" refX="10" refY="5" ` +
-    `markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
-    `<path d="M0,0 L10,5 L0,10 z" fill="${color}"/></marker>`).join("");
 
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(width)}" height="${fmt(height)}" ` +
       `viewBox="0 0 ${fmt(width)} ${fmt(height)}" font-family="${CHART_FONT}, sans-serif" ` +
       `font-size="${theme.fontSize}">`,
-    `<defs>${fontFace}${markerDefs}</defs>`,
-    `<rect class="background" x="0" y="0" width="${fmt(width)}" height="${fmt(height)}" fill="${theme.background}"/>`,
-    `<g class="links">${links}</g>`,
+    `<defs>${fontFace}</defs>`,
+    `<rect class="background" x="0" y="0" width="${fmt(width)}" height="${fmt(height)}" fill="${background}"/>`,
+    `<g class="links" transform="translate(${fmt(ox)},${fmt(oy)})">${links}</g>`,
     `<g class="crosses">${crossesSvg}</g>`,
     `<g class="nodes">${nodesSvg}</g>`,
     legendSvg ? legendSvg.svg : "",
@@ -243,9 +212,9 @@ export function buildSvg(input: SvgExportInput): SvgExport {
 
 // ── Legend ───────────────────────────────────────────────────────────────────
 
-function renderLegend(legend: Legend, theme: StyleTheme, x: number, y: number) {
+function renderLegend(legend: Legend, theme: StyleTheme, textColor: string, x: number, y: number) {
   const text = (cls: string, tx: number, ty: number, s: string, extra = "") =>
-    `<text class="${cls}" x="${fmt(tx)}" y="${fmt(ty)}" fill="${theme.text}"${extra}>${escapeXml(s)}</text>`;
+    `<text class="${cls}" x="${fmt(tx)}" y="${fmt(ty)}" fill="${textColor}"${extra}>${escapeXml(s)}</text>`;
   const swatch = (sx: number, sy: number, color: string) =>
     `<rect x="${fmt(sx)}" y="${fmt(sy)}" width="${SWATCH}" height="${SWATCH}" fill="${color}" stroke="${theme.border}" stroke-width="0.5"/>`;
 

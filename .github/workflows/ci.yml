@@ -1,7 +1,7 @@
 # .github/workflows/ci.yml   ← v7  (post lock-file commit)
 # ==========================
 # Continuous integration — runs on every push and pull request.
-# Validates: Python tests, frontend build, Tauri compilation.
+# Validates: Python tests, frontend build, WebKit end-to-end, Tauri compilation.
 #
 # Prerequisites for this version:
 #   • frontend/package-lock.json committed  → npm ci + cache enabled
@@ -78,7 +78,58 @@ jobs:
         run: npm run build
         working-directory: frontend
 
-  # ── 3. Tauri Rust compile check ─────────────────────────────────────────────
+  # ── 3. WebKit end-to-end: link routing in exported images ──────────────────
+  # WebKit is the engine of the macOS app's webview. Builds the frontend, runs
+  # it against the real backend, exports SVG in every display setting and
+  # checks that no link crosses an individual or × it does not connect.
+  webkit-e2e:
+    name: WebKit end-to-end (link routing)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+
+      - name: End-to-end tests (WebKit)
+        run: npm run test:e2e
+        working-directory: frontend
+        env:
+          E2E_PYTHON: python
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webkit-e2e-results
+          path: frontend/test-results/
+          retention-days: 7
+
+  # ── 4. Tauri Rust compile check ─────────────────────────────────────────────
   # Runs on macos-latest to avoid the webkit2gtk / wry 0.24.x incompatibility
   # on Ubuntu 22.04.  See Cargo.toml for the full explanation.
   # Long-term fix: migrate to Tauri 2.x (wry 0.39+, webkit2gtk 0.20+).

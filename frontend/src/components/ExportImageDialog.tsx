@@ -7,7 +7,8 @@
 // out of the startup bundle) and the chart font, so Save is quick.
 
 import { useEffect, useState } from "react";
-import { buildSvg, type SvgExportInput } from "../chart/svgExport";
+import { buildSvg, exportRouting, type ExportBackground, type SvgExportInput } from "../chart/svgExport";
+import { routingWarning } from "../chart/routing";
 import {
   loadChartFont, loadPdfLibraries, svgToPdf, svgToPng, PNG_SCALE,
   type ImageFormat, type PdfPage,
@@ -16,7 +17,7 @@ import { saveBinaryFile, saveTextFile } from "../lib/saveFile";
 
 interface Props {
   /** What to draw, from the live canvas; null if no chart is drawn. */
-  buildInput: () => Omit<SvgExportInput, "fontBase64"> | null;
+  buildInput: () => Omit<SvgExportInput, "fontBase64" | "background"> | null;
   /** File name without extension. */
   baseName:   string;
   /** e.g. "the whole population" or "the subpopulation around Gala". */
@@ -41,10 +42,23 @@ const button = { background: "#252e42", color: "#a0aec0", padding: "5px 12px" };
 export default function ExportImageDialog({ buildInput, baseName, scope, onClose }: Props) {
   const [format, setFormat] = useState<ImageFormat>("png");
   const [page,   setPage]   = useState<PdfPage>("fit");
+  // White by default: dark backgrounds are rarely wanted in printed figures.
+  const [background, setBackground] = useState<ExportBackground>("white");
   const [ready,  setReady]  = useState(false);
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Links the export could not route (the same routes as on screen).
+  const [routingAlert] = useState<string | null>(() => {
+    const input = buildInput();
+    if (!input) return null;
+    try {
+      return routingWarning(exportRouting(input).problems);
+    } catch {
+      return routingWarning({ straight: 0, missing: input.model.links.length });
+    }
+  });
 
   useEffect(() => {
     let live = true;
@@ -65,8 +79,9 @@ export default function ExportImageDialog({ buildInput, baseName, scope, onClose
     setError(null);
     setNotice(null);
     try {
-      const input = buildInput();
-      if (!input) throw new Error("There is no drawn chart to export.");
+      const drawn = buildInput();
+      if (!drawn) throw new Error("There is no drawn chart to export.");
+      const input = { ...drawn, background };
       const font = await loadChartFont();
       let saved: boolean;
       let reducedNotice: string | null = null;
@@ -122,6 +137,18 @@ export default function ExportImageDialog({ buildInput, baseName, scope, onClose
           ))}
         </fieldset>
 
+        <div role="radiogroup" aria-label="Background"
+          style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 12 }}>
+          Background:
+          {([["white", "White"], ["screen", "As on screen"]] as const).map(([value, label]) => (
+            <label key={value} style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+              <input type="radio" name="image-background" value={value} checked={background === value}
+                onChange={() => setBackground(value)} style={{ width: "auto" }} />
+              {label}
+            </label>
+          ))}
+        </div>
+
         {format === "pdf" && (
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
             Page:
@@ -131,6 +158,12 @@ export default function ExportImageDialog({ buildInput, baseName, scope, onClose
           </label>
         )}
 
+        {routingAlert && (
+          <div role="alert" style={{ background: "#3b2a12", color: "#fcd34d", padding: 8,
+            borderRadius: 6, marginBottom: 12, lineHeight: 1.45 }}>
+            ⚠️ {routingAlert} The exported image will show them the same way.
+          </div>
+        )}
         {notice && (
           <div role="status" style={{ background: "#16263f", color: "#a8c7f5", padding: 8,
             borderRadius: 6, marginBottom: 12, lineHeight: 1.45 }}>
