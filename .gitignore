@@ -57,3 +57,6 @@ backend/tests/fixtures/TransApple_Consolidated.dat
 *.exe
 *.tar.gz
 *.zip
+
+# Graph of the private TransApple file, generated locally for frontend tests
+frontend/src/test/fixtures/private/

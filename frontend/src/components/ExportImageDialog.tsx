@@ -7,7 +7,7 @@
 // out of the startup bundle) and the chart font, so Save is quick.
 
 import { useEffect, useState } from "react";
-import { buildSvg, type SvgExportInput } from "../chart/svgExport";
+import { buildSvg, type ExportBackground, type SvgExportInput } from "../chart/svgExport";
 import {
   loadChartFont, loadPdfLibraries, svgToPdf, svgToPng, PNG_SCALE,
   type ImageFormat, type PdfPage,
@@ -16,7 +16,7 @@ import { saveBinaryFile, saveTextFile } from "../lib/saveFile";
 
 interface Props {
   /** What to draw, from the live canvas; null if no chart is drawn. */
-  buildInput: () => Omit<SvgExportInput, "fontBase64"> | null;
+  buildInput: () => Omit<SvgExportInput, "fontBase64" | "background"> | null;
   /** File name without extension. */
   baseName:   string;
   /** e.g. "the whole population" or "the subpopulation around Gala". */
@@ -41,6 +41,8 @@ const button = { background: "#252e42", color: "#a0aec0", padding: "5px 12px" };
 export default function ExportImageDialog({ buildInput, baseName, scope, onClose }: Props) {
   const [format, setFormat] = useState<ImageFormat>("png");
   const [page,   setPage]   = useState<PdfPage>("fit");
+  // White by default: dark backgrounds are rarely wanted in printed figures.
+  const [background, setBackground] = useState<ExportBackground>("white");
   const [ready,  setReady]  = useState(false);
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
@@ -65,8 +67,9 @@ export default function ExportImageDialog({ buildInput, baseName, scope, onClose
     setError(null);
     setNotice(null);
     try {
-      const input = buildInput();
-      if (!input) throw new Error("There is no drawn chart to export.");
+      const drawn = buildInput();
+      if (!drawn) throw new Error("There is no drawn chart to export.");
+      const input = { ...drawn, background };
       const font = await loadChartFont();
       let saved: boolean;
       let reducedNotice: string | null = null;
@@ -121,6 +124,18 @@ export default function ExportImageDialog({ buildInput, baseName, scope, onClose
             </label>
           ))}
         </fieldset>
+
+        <div role="radiogroup" aria-label="Background"
+          style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 12 }}>
+          Background:
+          {([["white", "White"], ["screen", "As on screen"]] as const).map(([value, label]) => (
+            <label key={value} style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+              <input type="radio" name="image-background" value={value} checked={background === value}
+                onChange={() => setBackground(value)} style={{ width: "auto" }} />
+              {label}
+            </label>
+          ))}
+        </div>
 
         {format === "pdf" && (
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>

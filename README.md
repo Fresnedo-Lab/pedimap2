@@ -71,6 +71,7 @@ and precalculated IBD probabilities.
 | Display styles — Modern, or Classic Pedimap (rectangles with the name on top, pale yellow fill) | ✅ |
 | Parent links colored by role — female red, male blue, single-parent (`*SELF`, `*DH`, `*MUT`, `*VP`) purple | ✅ |
 | Cross symbols — one × per parent pair, shared by full sibs; on in Classic, off in Modern (⚙ to change or resize) | ✅ |
+| Link routing — a link never runs through an individual or × it does not connect; links spanning generations get their own lane | ✅ |
 | Trait coloring — continuous gradient and qualitative palette | ✅ |
 | Editable low / high / missing colors for continuous traits | ✅ |
 | Semantic color names — a `Red` trait value renders red | ✅ |
@@ -82,7 +83,7 @@ and precalculated IBD probabilities.
 | Fit to window — toolbar button or **F** | ✅ |
 | JSON export / import round-trip | ✅ |
 | Legacy `.dat` export — whole population or displayed subpopulation; reads back unchanged | ✅ |
-| Image export — PNG, SVG or PDF of the whole displayed chart, with trait legend | ✅ |
+| Image export — PNG, SVG or PDF of the whole displayed chart, with trait legend, on white or as on screen | ✅ |
 | Drawing limit — populations above 1,000 individuals (⚙) are listed, not drawn | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
@@ -162,6 +163,8 @@ style, with a legend for the active trait:
 | `.pdf` | The same drawing as a vector PDF, on a page fitted to the chart or on US Letter / A4 landscape |
 | `.png` | Bitmap at 2× resolution, reduced (with a notice) if a side would exceed 16,000 pixels |
 
+Links are routed exactly as on screen. The page is white by default (choose
+**As on screen** to keep the Modern style's dark background).
 Names are set in the bundled Noto Sans font, embedded in every export, so
 accented and non-Latin names print correctly.
 
@@ -215,7 +218,7 @@ The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
 
 ```bash
 cd backend && python -m pytest tests/ -v      # 79 tests
-cd frontend && npm run typecheck && npm test && npm run build   # 25 tests
+cd frontend && npm run typecheck && npm test && npm run build   # 38 tests
 cd src-tauri && cargo test                    # 6 tests
 ```
 

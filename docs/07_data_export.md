@@ -19,6 +19,10 @@ the trait you are coloring by.
 | **SVG** | Editing in Inkscape or Illustrator. A vector drawing in which names are text. |
 | **PDF** | Printing and publication. Vector, with names as text. Choose a page fitted to the chart, or US Letter or A4 in landscape (the chart is scaled down to fit inside the margins). |
 
+Under **Background**, **White** (the default) puts the chart on a white page,
+which suits printed figures; **As on screen** keeps the display style's own
+background, such as Modern's dark one. Links are routed exactly as on screen.
+
 Names are set in Noto Sans, which is bundled with Pedimap 2 and embedded in
 every exported file, so accented and non-Latin names appear correctly on any
 computer.

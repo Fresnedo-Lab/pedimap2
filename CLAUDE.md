@@ -80,9 +80,22 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   independently. Never copy, port, or transliterate its code into this
   MIT-licensed repo. The examples/ folder contains .dat data files usable as
   additional parser test fixtures.
-- Cross (×) nodes exist only in the frontend chart model
+- Cross (×) nodes and link waypoints exist only in the frontend chart model
   (frontend/src/chart/model.ts). Never send them to the backend or list them
   as individuals; the backend's individual ids are the authority.
+- Links are drawn from frontend/src/chart/routing.ts on the canvas and in
+  every export; vis-network's own edges are invisible and only steer the
+  layout. Keep both paths on routeLinks so exports match the screen, and keep
+  the invariant test (chart/linkRouting.test.tsx) passing: no link may cross
+  a box other than its own endpoints. Dragging is limited to a node's own row
+  and its neighbors (routing.ts dragRange), which that guarantee relies on.
+- vis-network lays out synchronously. Above LARGE_LAYOUT_NODES the canvas
+  skips vis's edgeMinimization pass (most of the time for big charts); above
+  NOTICE_LAYOUT_NODES it paints a "Laying out…" notice first. Both are in
+  PedigreeCanvas.tsx; recheck them with synthetic pedigrees
+  (src/test/syntheticPedigree.ts) if the layout changes.
+- To run frontend tests on the private TransApple file, generate its graph
+  (gitignored) with `cd backend && python -m tests.test_frontend_fixture`.
 - frontend/src/test/fixtures/apple_public.json is generated from the backend.
   After changing apple_public.dat or the API output, regenerate it with
   `cd backend && python -m tests.test_frontend_fixture` (a backend test fails

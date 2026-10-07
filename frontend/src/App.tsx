@@ -547,8 +547,11 @@ export default function App() {
       height: "100vh", overflow: "hidden", background: "#0f1117" }}>
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <div style={{ height: 44, display: "flex", alignItems: "center",
-        padding: "0 14px", gap: 10,
+      {/* Wraps onto more rows when the window is too narrow; controls keep
+          their labels on one line. */}
+      <div role="toolbar" aria-label="Main toolbar"
+        style={{ minHeight: 44, display: "flex", flexWrap: "wrap", alignItems: "center",
+        padding: "6px 14px", columnGap: 10, rowGap: 6, whiteSpace: "nowrap",
         background: "#161b27", borderBottom: "1px solid #2e3a52",
         flexShrink: 0, userSelect: "none" }}>
 

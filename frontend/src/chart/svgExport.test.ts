@@ -116,3 +116,37 @@ describe("PNG scale", () => {
     expect(size.width).toBeGreaterThan(MAX_PNG_DIMENSION - 2);     // uses the room it has
   });
 });
+
+describe("export background", () => {
+  const modern = (background?: "white" | "screen") =>
+    parse(exportOf(appleGala, { style: "modern", background,
+      legend: buildLegend(applePedigree.traits.find(t => t.name === "S1_S2"), appleGala.nodes, appleColorS1S2),
+      colorMap: appleColorS1S2 }).svg);
+  const labelColor = (doc: Document, name: string) =>
+    [...doc.querySelectorAll("text.individual")].find(t => t.textContent === name)!.getAttribute("fill");
+
+  it("is white by default, with page text in the print color", () => {
+    const doc = modern();
+    expect(doc.querySelector("rect.background")!.getAttribute("fill")).toBe("#FFFFFF");
+    expect(labelColor(doc, "Gala-self-01")).toBe("#1F2937");          // label under a selfing's diamond
+    expect(labelColor(doc, "Gala")).toBe("#e8ecf4");                  // inside its node: unchanged
+    expect(doc.querySelector("text.legend")!.getAttribute("fill")).toBe("#1F2937");
+  });
+
+  it("can keep the background as on screen", () => {
+    const doc = modern("screen");
+    expect(doc.querySelector("rect.background")!.getAttribute("fill")).toBe("#0f1117");
+    expect(labelColor(doc, "Gala-self-01")).toBe("#e8ecf4");
+  });
+});
+
+describe("routed links in the export", () => {
+  it("are one path per link; arrows only where a link ends at an individual", () => {
+    const model = buildChartModel(appleGala, true);
+    const doc = parse(exportOf(appleGala, { style: "modern" }).svg);
+    expect(doc.querySelectorAll("g.links path")).toHaveLength(model.links.length);
+    const intoIndividuals = model.links.filter(l => !model.crossIds.has(l.to)).length;
+    expect(doc.querySelectorAll("g.links polygon.arrow")).toHaveLength(intoIndividuals);
+    expect(parse(exportOf(appleGala).svg).querySelectorAll("polygon.arrow")).toHaveLength(0);  // Classic: none
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROLE_COLORS, buildChartModel, isCrossId, linkColor } from "./model";
+import { ROLE_COLORS, buildChartModel, isCrossId, isWaypointId, linkColor, linkPath } from "./model";
 import { appleGraph, syntheticGraph } from "../test/fixtures";
 
 describe("chart model with cross symbols", () => {
@@ -19,7 +19,7 @@ describe("chart model with cross symbols", () => {
 
   it("draws a selfing as a single purple link without a cross", () => {
     const toChild = model.links.filter(l => l.to === "Fuji-self-01");
-    expect(toChild).toEqual([{ from: "Fuji", to: "Fuji-self-01", role: "uniparental" }]);
+    expect(toChild).toMatchObject([{ from: "Fuji", to: "Fuji-self-01", role: "uniparental" }]);
     expect(ROLE_COLORS.uniparental).toBe("#800080");
     expect(model.crosses.some(c => c.children.includes("Fuji-self-01"))).toBe(false);
   });
@@ -60,7 +60,7 @@ describe("full sibs", () => {
   });
 
   it("a doubled haploid is a single purple link too", () => {
-    expect(model.links.filter(l => l.to === "D")).toEqual([{ from: "P1", to: "D", role: "uniparental" }]);
+    expect(model.links.filter(l => l.to === "D")).toMatchObject([{ from: "P1", to: "D", role: "uniparental" }]);
   });
 });
 
@@ -68,10 +68,49 @@ describe("without cross symbols", () => {
   it("links each parent straight to the child", () => {
     const model = buildChartModel(appleGraph, false);
     expect(model.crosses).toEqual([]);
-    expect(model.links.filter(l => l.to === "Idared")).toEqual([
+    expect(model.links.filter(l => l.to === "Idared")).toMatchObject([
       { from: "Jonathan", to: "Idared", role: "female" },
       { from: "Wagener",  to: "Idared", role: "male" },
     ]);
     expect(model.links.filter(l => l.to === "Fuji-self-01")).toHaveLength(1);
+  });
+});
+
+describe("waypoints", () => {
+  // P (gen 0) → A (gen 1) → B (gen 2); P is also the female parent of C
+  // (gen 3, father B), so the link P → C's cross spans four levels.
+  const graph = syntheticGraph([
+    ["P", null, null], ["Q", null, null], ["A", "P", "Q"], ["B", "A", null],
+    ["C", "P", "B"], ["S", "P", "P", "self"],
+  ]);
+
+  it("put one waypoint on every level a link passes", () => {
+    const model = buildChartModel(graph, true);
+    const toC = model.crosses.find(c => c.children.includes("C"))!;
+    const pToC = model.links.find(l => l.from === "P" && l.to === toC.id)!;
+    expect(model.levels.get("P")).toBe(0);
+    expect(toC.level).toBe(5);
+    expect(pToC.via.map(id => model.levels.get(id))).toEqual([1, 2, 3, 4]);
+    expect(linkPath(pToC)).toEqual(["P", ...pToC.via, toC.id]);
+
+    // A selfing skips the cross level; links between adjacent levels get none.
+    const self = model.links.find(l => l.to === "S")!;
+    expect(self.via.map(id => model.levels.get(id))).toEqual([1]);
+    expect(model.links.filter(l => l.to === toC.id && l.from === "B")[0].via).toEqual([]);
+    expect(model.links.filter(l => l.role === "offspring").every(l => l.via.length === 0)).toBe(true);
+  });
+
+  it("are chart aids only, never individuals", () => {
+    const model = buildChartModel(graph, false);
+    expect(model.waypoints.length).toBeGreaterThan(0);
+    expect(model.waypoints.every(w => isWaypointId(w.id) && !isCrossId(w.id))).toBe(true);
+    expect(model.individuals.map(n => n.id)).toEqual(graph.nodes.map(n => n.id));
+    expect(model.individuals.some(n => model.waypointIds.has(n.id))).toBe(false);
+    // Without crosses there is one level per generation: links to the next
+    // generation need no waypoint; P → C skips two generations, so two.
+    expect(model.levelsPerGeneration).toBe(1);
+    expect(model.links.filter(l => l.to === "A").map(l => l.via.length)).toEqual([0, 0]);
+    expect(model.links.find(l => l.from === "P" && l.to === "C")!.via.map(id => model.levels.get(id)))
+      .toEqual([1, 2]);
   });
 });

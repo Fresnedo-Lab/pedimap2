@@ -16,6 +16,8 @@ export interface StyleTheme {
   /** Border of the selected individual (on screen only). */
   selected:    string;
   text:        string;
+  /** Text on a white export page (labels under symbols, legend). */
+  paperText:   string;
   /** Color of the cross → child link and of the × itself. */
   ink:         string;
   fontFace:    string;
@@ -47,6 +49,7 @@ export const THEMES: Record<DisplayStyle, StyleTheme> = {
     border:      "#4f9cf9",
     selected:    "#ffffff",
     text:        "#e8ecf4",
+    paperText:   "#1F2937",
     ink:         "#8a94a8",
     fontFace:    `${CHART_FONT}, Inter, sans-serif`,
     fontSize:    11,
@@ -62,6 +65,7 @@ export const THEMES: Record<DisplayStyle, StyleTheme> = {
     border:      "#000000",
     selected:    "#F59E0B",
     text:        "#000000",
+    paperText:   "#000000",
     ink:         "#000000",
     fontFace:    `${CHART_FONT}, sans-serif`,
     fontSize:    12,
