@@ -10,6 +10,11 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.2.2] — 2026-10-10
+
+Pedimap 2 now starts even when another program uses its usual port, and
+explains startup problems.
+
 ### Fixed
 - The app no longer fails to start when another program uses port 8765.
   Pedimap now starts its background service on a free port, never talks to
