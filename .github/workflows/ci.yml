@@ -61,6 +61,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
+      # scripts/tag-release.sh, the only way to tag a release, against a
+      # throwaway repository (nothing is pushed anywhere real).
+      - name: Release tagging script
+        run: scripts/test-tag-release.sh
+
       - name: Install deps
         run: npm ci
         working-directory: frontend

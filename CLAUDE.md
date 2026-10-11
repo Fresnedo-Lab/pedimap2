@@ -99,6 +99,10 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   NOTICE_LAYOUT_NODES it paints a "Laying out…" notice first. Both are in
   PedigreeCanvas.tsx; recheck them with synthetic pedigrees
   (src/test/syntheticPedigree.ts) if the layout changes.
+- Release tags are created only by scripts/tag-release.sh VERSION (on main,
+  clean, in sync with origin, all four version files and a CHANGELOG section
+  at VERSION). Never `git tag` a release by hand: a hand-made v2.2.2 once
+  landed on the commit before the version bump.
 - Test a macOS build only after checking which branch it was built from:
   the app embeds frontend/dist as built at that moment. A build made right
   after switching branches tests that branch, not the open PR.

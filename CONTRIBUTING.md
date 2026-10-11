@@ -174,7 +174,19 @@ if the tag and the version files disagree.
    - `release-notes.md` reads well.
 
    Nothing is published by a dry run.
-5. **Tag and push:** `git tag -a vX.Y.Z -m "Pedimap 2 X.Y.Z" && git push origin vX.Y.Z`
+5. **Tag and push — only with `scripts/tag-release.sh`.** Never create a
+   release tag by hand. After the release PR is merged:
+   ```bash
+   git switch main && git pull
+   scripts/tag-release.sh X.Y.Z
+   ```
+   It creates and pushes the annotated tag `vX.Y.Z` (which starts the release
+   workflow) only if you are on `main`, the working tree is clean, `main` is
+   in sync with `origin/main`, all four version files say `X.Y.Z`, CHANGELOG.md
+   has a `## [X.Y.Z]` section, and the tag does not exist yet. Otherwise it
+   refuses and says why. `scripts/tag-release.sh --check X.Y.Z` runs the same
+   checks without tagging. (A tag pushed by hand onto the wrong commit is
+   caught by the workflow's version check, but only after it has started.)
 6. **Verify both Mac installers from the draft** before publishing. Download
    them from the draft release page (or `gh release download vX.Y.Z -p '*.dmg'`)
    and run:
