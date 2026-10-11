@@ -238,15 +238,15 @@ npm run app:build
 ### Release
 
 Releases are built by `.github/workflows/release.yml` and always start as a
-draft. Run it as a dry run first, then push a version tag. The full checklist
-is in [CONTRIBUTING.md](CONTRIBUTING.md#releasing-a-new-version).
+draft. Run it as a dry run first, then tag the release, only with
+`scripts/tag-release.sh`. The full checklist is in
+[CONTRIBUTING.md](CONTRIBUTING.md#releasing-a-new-version).
 
 ```bash
-# Bump the version in all four files first, and add a CHANGELOG.md section:
-#   package.json · frontend/package.json
-#   src-tauri/Cargo.toml · src-tauri/tauri.conf.json
-git tag -a v2.1.2 -m "Pedimap 2 2.1.2"
-git push origin v2.1.2
+# After the release PR (version in all four files, CHANGELOG.md section) is
+# merged; it refuses unless main is clean, in sync and at that version:
+git switch main && git pull
+scripts/tag-release.sh 2.2.3
 ```
 
 ---
