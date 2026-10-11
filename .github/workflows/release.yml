@@ -350,6 +350,17 @@ jobs:
           rm -f "$RUNNER_TEMP/certificate.p12"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
+      # Apple's original Developer ID authority expires on February 1, 2027;
+      # certificates it issued cannot sign after that. Print who issued the
+      # signing certificate and stop unless it is the current authority (G2).
+      - name: Check signing certificate authority (G2)
+        if: matrix.os_family == 'macos' && env.HAS_APPLE_CERT == 'true'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          scripts/check-developer-id-issuer.sh \
+            "$RUNNER_TEMP/signing.keychain-db" "$APPLE_SIGNING_IDENTITY"
+
       # ── Prepare build config ──────────────────────────────────────────────
       # Suppresses beforeBuildCommand (frontend already built above).
       # On unsigned macOS builds, also sets signingIdentity to null so Tauri

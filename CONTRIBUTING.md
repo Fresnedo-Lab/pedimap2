@@ -200,6 +200,22 @@ if the tag and the version files disagree.
 adding to it. Delete the release (`gh release delete vX.Y.Z --yes`, which
 keeps the tag), then re-run the workflow from the Actions tab.
 
+### Building the app locally
+
+```bash
+npm run app:build
+```
+
+This builds the sidecar and the installers for your computer under
+`src-tauri/target/release/bundle/`. It skips the in-app updater's files (the
+signed `.app.tar.gz` and its `.sig`): they need the updater's private signing
+key, which only the release workflow has. Without the skip, a local build ends
+with "A public key has been found, but no private key". The skip is the
+override in `src-tauri/tauri.local-build.conf.json`
+(`bundle.createUpdaterArtifacts: false`), passed by `app:build` with
+`--config`. Release builds in CI do not use it and still produce the updater
+files.
+
 ### Testing the in-app updater before a release
 
 Draft releases need a login to download, so test against a local server
