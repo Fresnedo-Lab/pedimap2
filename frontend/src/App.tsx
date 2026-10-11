@@ -25,8 +25,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 // is not, so checking it made every desktop-only branch here dead code.
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import {
-  useApi, useFetch, useBackendHealth,
-  type GraphData, type PedigreeData,
+  useApi, useFetch, useBackendHealth, explainBackendFailure,
+  type BackendFailure, type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
   type DatExportRequest, type SubpopSelection, type LoadResult,
   LEGACY_ENCODING,
@@ -166,10 +166,10 @@ function Spinner() {
 // The top bar / toolbar is always rendered by App, so it stays usable even
 // while this is on screen — the user is never trapped.
 function BackendGate({
-  status, lastError, onRetry,
+  status, failure, onRetry,
 }: {
   status: "starting" | "error";
-  lastError: string | null;
+  failure: BackendFailure;
   onRetry: () => void;
 }) {
   const [showDetail, setShowDetail] = useState(false);
@@ -211,7 +211,7 @@ function BackendGate({
           background: "#0b0e14", border: "1px solid #2e3a52", borderRadius: 6,
           padding: 10, color: "#94a3b8", fontSize: 11, whiteSpace: "pre-wrap",
           margin: 0 }}>
-          {lastError ?? "No error detail available."}
+          {explainBackendFailure(failure).join("\n")}
         </pre>
       )}
     </div>
@@ -224,7 +224,7 @@ export default function App() {
   const api = useApi();
 
   // ── Backend readiness gate (Issue 2) ──────────────────────────────────────
-  const { status: backendStatus, lastError: backendError, retry: retryBackend } =
+  const { status: backendStatus, failure: backendFailure, retry: retryBackend } =
     useBackendHealth();
   const ready = backendStatus === "ready";
 
@@ -782,7 +782,7 @@ export default function App() {
         {!ready ? (
           <BackendGate
             status={backendStatus === "error" ? "error" : "starting"}
-            lastError={backendError}
+            failure={backendFailure}
             onRetry={retryBackend}
           />
         ) : (

@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
+import { forgetBackendUrl } from "./useApi";
 
 export const RELEASES_URL = "https://github.com/Fresnedo-Lab/pedimap2/releases";
 export const releasePageUrl = (version: string) => `${RELEASES_URL}/tag/v${version}`;
@@ -130,9 +131,9 @@ export function useUpdater(backendReady: boolean): Updater {
 
       setState(s => ({ ...s, status: "installing" }));
       // The sidecar must be stopped before installing: Windows cannot replace
-      // a running pedimap-backend.exe, and the relaunched app must not find
-      // the old backend still holding port 8765. On Windows, install() quits
-      // the app and hands over to the installer, so nothing below runs there.
+      // a running pedimap-backend.exe, and the old backend must not keep
+      // running after the relaunch. On Windows, install() quits the app and
+      // hands over to the installer, so nothing below runs there.
       await invoke("stop_backend");
       try {
         await found.install();
@@ -140,6 +141,7 @@ export function useUpdater(backendReady: boolean): Updater {
       } catch (e) {
         await invoke("start_backend").catch(err =>
           console.error("[updater] could not restart the backend:", err));
+        forgetBackendUrl();     // it may have come back on another port
         throw e;
       }
 

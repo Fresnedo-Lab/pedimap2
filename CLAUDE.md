@@ -20,7 +20,10 @@ docs/             User manual source (Markdown)
 
 ## Key conventions
 - American English throughout
-- Backend sidecar runs on 127.0.0.1:8765
+- Backend sidecar runs on 127.0.0.1: on a free port the Rust shell picks
+  (PEDIMAP_PORT, get_backend_url) in release builds, on 8765 in development
+  and the e2e tests. /api/health carries "app": "pedimap2"; the frontend
+  accepts no other reply.
 - Sidecar binary naming: pedimap-backend-{rust-triple} in src-tauri/binaries/
 - Semver: bump package.json, Cargo.toml, and tauri.conf.json together
 - All backend routes prefixed /api/

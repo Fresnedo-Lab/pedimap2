@@ -214,8 +214,10 @@ cd frontend && npm install && cd ..
 npm run app:dev     # builds and stages the sidecar, then launches Tauri
 ```
 
-The Python backend runs as a sidecar on `127.0.0.1:8765`. The frontend polls
-`/api/health` and will not issue other requests until the backend is ready.
+The Python backend runs as a sidecar on `127.0.0.1`: on 8765 in development,
+and on a free port the app picks when installed. The frontend polls
+`/api/health`, accepts only Pedimap's own backend there, and will not issue
+other requests until it is ready.
 
 ### Test
 
@@ -261,7 +263,7 @@ git push origin v2.1.2
 │  │  React 18 + TypeScript + Vite      │  │
 │  │  vis-network pedigree canvas       │  │
 │  └────────────────┬───────────────────┘  │
-│                   │ HTTP :8765           │
+│                   │ HTTP, local port     │
 │  ┌────────────────▼───────────────────┐  │
 │  │  FastAPI sidecar (PyInstaller)     │  │
 │  │  NetworkX DAG · .dat/.pmp parser   │  │

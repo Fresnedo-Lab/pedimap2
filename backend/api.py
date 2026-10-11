@@ -2,7 +2,8 @@
 api.py  –  Pedimap 2.0  FastAPI Backend
 =========================================
 Sidecar process spawned by the Tauri shell.
-Listens on 127.0.0.1:8765.
+Listens on 127.0.0.1, on the port in PEDIMAP_PORT (the desktop app picks a
+free one), or 8765 in development.
 """
 import json
 import os
@@ -111,9 +112,15 @@ class SubpopRequest(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+# Identifies this server as Pedimap's backend: the app accepts a health reply
+# only if it carries this id, so it never talks to another program that
+# happens to listen on the port.
+APP_ID = "pedimap2"
+
+
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": app.version, "port": PORT}
+    return {"status": "ok", "app": APP_ID, "version": app.version, "port": PORT}
 
 
 @app.get("/api/pedigree")

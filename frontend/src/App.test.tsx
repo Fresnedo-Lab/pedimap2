@@ -26,7 +26,7 @@ function pedigreeOf(n: number): GraphData {
 
 function serve(graph: GraphData) {
   const routes: Record<string, unknown> = {
-    "/api/health":      { status: "ok" },
+    "/api/health":      { status: "ok", app: "pedimap2", version: "test" },
     "/api/pedigree":    { population: "Synthetic", ploidy: 2, traits: [], markers: [] },
     "/api/individuals": graph.nodes.map(n => ({ id: n.id, name: n.label, generation: n.generation, cross_type: n.cross_type })),
     "/api/graph":       graph,

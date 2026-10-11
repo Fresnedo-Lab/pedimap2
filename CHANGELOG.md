@@ -11,6 +11,13 @@ release notes, so every release needs its own section here before it is tagged.
 ## [Unreleased]
 
 ### Fixed
+- The app no longer fails to start when another program uses port 8765.
+  Pedimap now starts its background service on a free port, never talks to
+  another program by mistake, and if the service still cannot be reached,
+  **Show details** explains why in plain words: whether the service stopped
+  and how, whether its port was taken (and to quit the other program), and
+  its last messages. If the service's program is missing, it suggests
+  reinstalling Pedimap 2 from the Releases page.
 - Settings menu layout on macOS: in the ⚙ menu, the help text under
   **Drawing limit** ran past the edge of the menu, and the boxes for the cross
   symbol size and the drawing limit were not visible. The text now wraps and
