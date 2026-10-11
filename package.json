@@ -6,6 +6,6 @@
   "scripts": {
     "sidecar": "bash scripts/build-sidecar.sh",
     "app:dev": "npm run sidecar && cargo tauri dev",
-    "app:build": "npm run sidecar && cargo tauri build"
+    "app:build": "npm run sidecar && cargo tauri build --config src-tauri/tauri.local-build.conf.json"
   }
 }

@@ -139,6 +139,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The release workflow's Developer ID authority check (G2), against
+      # throwaway certificates and a temporary keychain (macOS runner).
+      - name: Developer ID issuer check
+        run: scripts/test-check-developer-id-issuer.sh
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
