@@ -27,6 +27,9 @@ set_version() {
 set_version 1.2.3
 printf '# Changelog\n\n## [Unreleased]\n\n## [1.2.3] — 2026-01-01\n\n### Fixed\n- Something.\n\n## [1.2.2] — 2025-12-01\n\n- Older.\n' > CHANGELOG.md
 git_ add -A && git_ commit -q -m "release 1.2.3" && git_ push -q origin main
+# The script's own git commands (git tag -a) need an identity; CI runners have
+# no global one, so give this repository its own.
+git config user.name "Test" && git config user.email "test@example.com"
 
 expect() {   # expect pass|fail "<message to find>" <args...>
   local want=$1 needle=$2; shift 2
@@ -86,6 +89,17 @@ git_ commit -q -am "empty 1.3.0 section" && git_ push -q origin main
 expect fail "no '## [1.3.0]' section"      1.3.0
 sed -i.tmp 's/^## \[1\.3\.0\] — 2026-02-01$/## [1.3.0] — 2026-02-01\n\n- New./' CHANGELOG.md && rm -f CHANGELOG.md.tmp
 git_ commit -q -am "notes for 1.3.0" && git_ push -q origin main
+
+# No git identity: refused before tagging. An empty HOME and no system config
+# hide any identity this machine has; the repository's own is removed for it.
+git config --unset user.name && git config --unset user.email
+if out=$(HOME="$work/nohome" GIT_CONFIG_NOSYSTEM=1 EMAIL= "$SCRIPT" 1.3.0 2>&1); then
+  echo "FAIL: tagged without a git identity" >&2; exit 1
+fi
+grep -qF "git does not know who you are" <<<"$out" || { printf 'FAIL: no identity:\n%s\n' "$out" >&2; exit 1; }
+[ -z "$(git tag -l v1.3.0)" ] || { echo "FAIL: a tag was created without an identity" >&2; exit 1; }
+printf 'ok   %-58s %s\n' "1.3.0 (no git identity)" "git does not know who you are"
+git config user.name "Test" && git config user.email "test@example.com"
 
 # Everything right: --check creates nothing, then a real tag and push
 expect pass "--check given, so no tag was created" --check 1.3.0

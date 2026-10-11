@@ -12,6 +12,7 @@
 #   - package.json, frontend/package.json, src-tauri/Cargo.toml and
 #     src-tauri/tauri.conf.json all have version VERSION;
 #   - CHANGELOG.md has a non-empty "## [VERSION]" section (the release notes);
+#   - git knows who is tagging (user.name and user.email);
 #   - the tag vVERSION does not exist yet, here or on origin.
 #
 # Usage:
@@ -90,6 +91,15 @@ notes=$(awk -v heading="## [$version]" '
   found && $0 != "---" && NF { print }' CHANGELOG.md 2>/dev/null || true)
 [ -n "$notes" ] || refuse "CHANGELOG.md has no '## [$version]' section with content (the release notes)"
 ok "CHANGELOG.md has a [$version] section"
+
+# ── Who tags ──────────────────────────────────────────────────────────────────
+# An annotated tag records its tagger. Require an identity that was set on
+# purpose: otherwise git invents one from the account and host name, or fails.
+tagger_name=${GIT_COMMITTER_NAME:-$(git config user.name || true)}
+tagger_email=${GIT_COMMITTER_EMAIL:-$(git config user.email || true)}
+[ -n "$tagger_name" ] && [ -n "$tagger_email" ] ||
+  refuse "git does not know who you are: set git config user.name and user.email"
+ok "tagger: $tagger_name <$tagger_email>"
 
 # ── Tag not taken ─────────────────────────────────────────────────────────────
 if git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null; then
