@@ -26,7 +26,7 @@ _Placeholder: performance tips for pedigrees over 5,000 individuals — enable c
 
 ## REST API Access
 
-_Placeholder: the FastAPI backend exposes all data at http://127.0.0.1:8765/api/; link to the auto-generated OpenAPI docs at /docs._
+_Placeholder: the FastAPI backend exposes all data at http://127.0.0.1:<port>/api/ (8765 in development; the installed app picks a free port); link to the auto-generated OpenAPI docs at /docs._
 
 ## Command-Line Options
 

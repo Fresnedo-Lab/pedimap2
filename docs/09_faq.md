@@ -40,4 +40,4 @@ _Placeholder: enable condensed view, hide edge labels, and consider splitting th
 
 ### Does Pedimap 2 send my data anywhere?
 
-_Placeholder: all data stays local — the Python backend runs on 127.0.0.1:8765 and no network requests are made to external servers._
+_Placeholder: all data stays local — the Python backend runs on 127.0.0.1 (this computer only) and no network requests are made to external servers._

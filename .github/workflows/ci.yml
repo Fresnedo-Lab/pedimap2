@@ -188,3 +188,9 @@ jobs:
       - name: cargo check
         run: cargo check
         working-directory: src-tauri
+
+      # Unit tests of the shell: backend port choice (with 8765 occupied),
+      # sidecar failure reporting, file decoding, save-dialog write grants.
+      - name: cargo test
+        run: cargo test
+        working-directory: src-tauri

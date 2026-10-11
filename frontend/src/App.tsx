@@ -25,8 +25,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 // is not, so checking it made every desktop-only branch here dead code.
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import {
-  useApi, useFetch, useBackendHealth,
-  type GraphData, type PedigreeData,
+  useApi, useFetch, useBackendHealth, explainBackendFailure,
+  type BackendFailure, type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
   type DatExportRequest, type SubpopSelection, type LoadResult,
   LEGACY_ENCODING,
@@ -165,12 +165,13 @@ function Spinner() {
 // Readiness gate shown in the body until the backend answers /api/health.
 // The top bar / toolbar is always rendered by App, so it stays usable even
 // while this is on screen — the user is never trapped.
-function BackendGate({
-  status, lastError, onRetry,
+export function BackendGate({
+  status, failure, onRetry, onOpenLink,
 }: {
   status: "starting" | "error";
-  lastError: string | null;
+  failure: BackendFailure;
   onRetry: () => void;
+  onOpenLink: (url: string) => void;
 }) {
   const [showDetail, setShowDetail] = useState(false);
 
@@ -211,7 +212,23 @@ function BackendGate({
           background: "#0b0e14", border: "1px solid #2e3a52", borderRadius: 6,
           padding: 10, color: "#94a3b8", fontSize: 11, whiteSpace: "pre-wrap",
           margin: 0 }}>
-          {lastError ?? "No error detail available."}
+          {explainBackendFailure(failure).map((line, i) => {
+            // Web addresses open in the system browser.
+            const url = /https:\/\/\S+/.exec(line)?.[0];
+            return (
+              <span key={i}>
+                {i > 0 && "\n"}
+                {url ? (
+                  <>
+                    {line.slice(0, line.indexOf(url))}
+                    <a href={url} onClick={e => { e.preventDefault(); onOpenLink(url); }}
+                      style={{ color: "#4f9cf9" }}>{url}</a>
+                    {line.slice(line.indexOf(url) + url.length)}
+                  </>
+                ) : line}
+              </span>
+            );
+          })}
         </pre>
       )}
     </div>
@@ -224,7 +241,7 @@ export default function App() {
   const api = useApi();
 
   // ── Backend readiness gate (Issue 2) ──────────────────────────────────────
-  const { status: backendStatus, lastError: backendError, retry: retryBackend } =
+  const { status: backendStatus, failure: backendFailure, retry: retryBackend } =
     useBackendHealth();
   const ready = backendStatus === "ready";
 
@@ -782,8 +799,9 @@ export default function App() {
         {!ready ? (
           <BackendGate
             status={backendStatus === "error" ? "error" : "starting"}
-            lastError={backendError}
+            failure={backendFailure}
             onRetry={retryBackend}
+            onOpenLink={updater.openExternal}
           />
         ) : (
         <>

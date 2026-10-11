@@ -58,8 +58,11 @@ npm run app:dev
 ```
 
 This builds and stages the Python sidecar, then launches the Tauri dev window
-with hot-reload. The backend runs as a sidecar on `127.0.0.1:8765`; the
-frontend polls `/api/health` and waits for it before issuing other requests.
+with hot-reload. In development the backend runs on `127.0.0.1:8765`; the
+installed app starts it on a free port instead, so another program on 8765
+cannot stop it. The frontend polls `/api/health`, accepts only a reply that
+identifies Pedimap's backend (`"app": "pedimap2"`), and waits for it before
+issuing other requests.
 
 ---
 

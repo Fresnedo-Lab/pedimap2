@@ -3,25 +3,116 @@
 // Pedimap 2.0 — Tauri 2 application entry point.
 //
 // Responsibilities:
-//   1. Spawn the Python FastAPI backend as a sidecar on startup
+//   1. Spawn the Python FastAPI backend as a sidecar on startup, on a free
+//      local port, and report why it failed if it does
 //   2. Expose Tauri commands for native OS operations
 //   3. Stop the sidecar cleanly when the app exits, and around update installs
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
+use std::net::TcpListener;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, RunEvent, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
-use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared state — holds the child process handle for the Python sidecar
+// Shared state — the Python sidecar's process handle, and what is known about
+// it for the "Show details" view when the frontend cannot reach it
 // ─────────────────────────────────────────────────────────────────────────────
 struct BackendProcess(Mutex<Option<CommandChild>>);
+
+/// Port of the backend in development (`cargo tauri dev`, where it is started
+/// by hand with uvicorn) and the e2e tests; also used if no free port is found.
+const DEV_PORT: u16 = 8765;
+
+/// Stderr lines kept for the "Show details" view.
+const STDERR_LINES: usize = 30;
+
+/// The sidecar as last started: its port, whether it is running, how it
+/// exited, and its last stderr lines.
+#[derive(Default, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackendReport {
+    port: u16,
+    url: String,
+    running: bool,
+    spawn_error: Option<String>,
+    exit_code: Option<i32>,
+    exit_signal: Option<i32>,
+    /// Its stderr said the port was already in use by another program.
+    port_in_use: bool,
+    stderr_tail: VecDeque<String>,
+}
+
+#[derive(Default)]
+struct BackendState(Arc<Mutex<BackendReport>>);
+
+/// The port to start the backend on. PEDIMAP_PORT wins; development builds use
+/// DEV_PORT so the developer workflow is unchanged; otherwise `previous` if it
+/// is still free (so the frontend's URL survives a restart), else any free port.
+fn choose_port(env_port: Option<&str>, dev: bool, previous: Option<u16>) -> u16 {
+    if let Some(port) = env_port.and_then(|p| p.trim().parse().ok()) {
+        return port;
+    }
+    if dev {
+        return DEV_PORT;
+    }
+    if let Some(port) = previous.filter(|&p| p != 0 && port_is_free(p)) {
+        return port;
+    }
+    free_port().unwrap_or(DEV_PORT)
+}
+
+/// A port nothing listens on: bind port 0, read the port the OS picked, release it.
+fn free_port() -> std::io::Result<u16> {
+    let listener = TcpListener::bind(("127.0.0.1", 0))?;
+    Ok(listener.local_addr()?.port())
+}
+
+fn port_is_free(port: u16) -> bool {
+    TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+/// Whether a stderr line reports that the port was taken (macOS errno 48,
+/// Linux errno 98, Windows WSAEADDRINUSE 10048).
+fn mentions_port_in_use(line: &str) -> bool {
+    let line = line.to_lowercase();
+    line.contains("address already in use")
+        || line.contains("only one usage of each socket address")
+        || line.contains("10048")
+}
+
+/// Update the report from one sidecar event.
+fn record_event(report: &mut BackendReport, event: CommandEvent) {
+    match event {
+        CommandEvent::Stderr(bytes) | CommandEvent::Stdout(bytes) => {
+            let line = String::from_utf8_lossy(&bytes).trim_end().to_string();
+            if line.is_empty() {
+                return;
+            }
+            eprintln!("[pedimap-backend] {line}");
+            report.port_in_use |= mentions_port_in_use(&line);
+            report.stderr_tail.push_back(line);
+            while report.stderr_tail.len() > STDERR_LINES {
+                report.stderr_tail.pop_front();
+            }
+        }
+        CommandEvent::Error(error) => report.stderr_tail.push_back(error),
+        CommandEvent::Terminated(payload) => {
+            report.running = false;
+            report.exit_code = payload.code;
+            report.exit_signal = payload.signal;
+            eprintln!("[pedimap] Python backend exited (code {:?}, signal {:?})",
+                      payload.code, payload.signal);
+        }
+        _ => {}
+    }
+}
 
 /// Destinations the user picked in save_file_dialog during this session. The
 /// write commands refuse every other path, so the webview can only write
@@ -53,8 +144,14 @@ impl SaveGrants {
 
 /// URL that the React frontend uses to reach the FastAPI backend.
 #[tauri::command]
-fn get_backend_url() -> String {
-    "http://127.0.0.1:8765".to_string()
+fn get_backend_url(state: State<'_, BackendState>) -> String {
+    state.0.lock().unwrap().url.clone()
+}
+
+/// What is known about the sidecar, for "Show details" when it does not answer.
+#[tauri::command]
+fn backend_report(state: State<'_, BackendState>) -> BackendReport {
+    state.0.lock().unwrap().clone()
 }
 
 /// Open a native file-picker that allows several files, so a .dat can be
@@ -206,18 +303,20 @@ fn app_version() -> String {
 
 /// Stop the sidecar before an update is installed. On Windows the installer
 /// must overwrite pedimap-backend.exe, which is locked while it runs; on
-/// macOS/Linux the relaunched app must not find the old backend still
-/// holding port 8765. Async so the wait in stop_child runs off the main thread.
+/// macOS/Linux the old backend must not keep running after the relaunch.
+/// Async so the wait in stop_child runs off the main thread.
 #[tauri::command]
 async fn stop_backend(app: AppHandle) {
     kill_backend(&app);
 }
 
-/// Restart the sidecar if installing an update failed after stop_backend.
+/// Start the sidecar again if it is not running: after stop_backend when an
+/// update failed to install, or from Retry after it exited.
 #[tauri::command]
 async fn start_backend(app: AppHandle) {
-    let running = app.state::<BackendProcess>().0.lock().unwrap().is_some();
+    let running = app.state::<BackendState>().0.lock().unwrap().running;
     if !running {
+        kill_backend(&app); // drop the handle of an exited process
         spawn_backend(&app);
     }
 }
@@ -227,16 +326,41 @@ async fn start_backend(app: AppHandle) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn spawn_backend(app: &AppHandle) {
-    match app.shell().sidecar("pedimap-backend") {
-        Err(e) => eprintln!("[pedimap] Failed to locate sidecar: {e}"),
-        Ok(cmd) => match cmd.spawn() {
-            Err(e) => eprintln!("[pedimap] Failed to spawn sidecar: {e}"),
-            Ok((_rx, child)) => {
-                let state: State<BackendProcess> = app.state();
-                *state.0.lock().unwrap() = Some(child);
-                eprintln!("[pedimap] Python backend started on port 8765");
-            }
-        },
+    let report = app.state::<BackendState>().0.clone();
+    let previous = report.lock().unwrap().port;
+    let port = choose_port(std::env::var("PEDIMAP_PORT").ok().as_deref(),
+                           cfg!(debug_assertions), Some(previous));
+    *report.lock().unwrap() = BackendReport {
+        port,
+        url: format!("http://127.0.0.1:{port}"),
+        ..Default::default()
+    };
+
+    let spawned = app
+        .shell()
+        .sidecar("pedimap-backend")
+        .map_err(|e| format!("could not find the backend program: {e}"))
+        .and_then(|cmd| {
+            cmd.env("PEDIMAP_PORT", port.to_string())
+                .spawn()
+                .map_err(|e| format!("could not start the backend program: {e}"))
+        });
+    match spawned {
+        Err(e) => {
+            eprintln!("[pedimap] {e}");
+            report.lock().unwrap().spawn_error = Some(e);
+        }
+        Ok((mut events, child)) => {
+            *app.state::<BackendProcess>().0.lock().unwrap() = Some(child);
+            report.lock().unwrap().running = true;
+            eprintln!("[pedimap] Python backend started on port {port}");
+            // Keep its output and exit status for "Show details".
+            tauri::async_runtime::spawn(async move {
+                while let Some(event) = events.recv().await {
+                    record_event(&mut report.lock().unwrap(), event);
+                }
+            });
+        }
     }
 }
 
@@ -253,7 +377,7 @@ fn kill_backend(app: &AppHandle) {
 
 /// The sidecar is a PyInstaller onefile binary: a bootloader process that
 /// runs the Python server as its child. SIGKILL on the bootloader orphans
-/// that child, which keeps serving port 8765 after the app has quit. SIGTERM
+/// that child, which keeps serving its port after the app has quit. SIGTERM
 /// is forwarded to the child and both exit; SIGKILL is only the fallback.
 #[cfg(unix)]
 fn stop_child(child: CommandChild) {
@@ -264,7 +388,7 @@ fn stop_child(child: CommandChild) {
     unsafe { libc::kill(pid, libc::SIGTERM) };
 
     // The bootloader exits only after its child has, so once its pid is gone
-    // (reaped by the shell plugin's wait thread) port 8765 is free.
+    // (reaped by the shell plugin's wait thread) its port is free.
     let deadline = Instant::now() + Duration::from_secs(3);
     while Instant::now() < deadline {
         // SAFETY: signal 0 only checks that the process exists.
@@ -297,6 +421,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(BackendProcess(Mutex::new(None)))
+        .manage(BackendState::default())
         .manage(SaveGrants::default())
         .setup(|app| {
             spawn_backend(&app.handle());
@@ -304,6 +429,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
+            backend_report,
             open_file_dialog,
             save_file_dialog,
             read_file,
@@ -331,7 +457,73 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_text, percent_decode, read_file, save_filters_for, SaveGrants};
+    use super::{
+        choose_port, decode_text, mentions_port_in_use, percent_decode, read_file, record_event,
+        save_filters_for, BackendReport, SaveGrants, DEV_PORT,
+    };
+    use std::net::TcpListener;
+    use tauri_plugin_shell::process::{CommandEvent, TerminatedPayload};
+
+    // ── Backend port ─────────────────────────────────────────────────────────
+
+    /// Hold 8765 for the test, unless something else already does.
+    fn occupy_dev_port() -> Option<TcpListener> {
+        TcpListener::bind(("127.0.0.1", DEV_PORT)).ok()
+    }
+
+    #[test]
+    fn release_builds_pick_another_port_when_8765_is_taken() {
+        let _held = occupy_dev_port();
+        assert!(TcpListener::bind(("127.0.0.1", DEV_PORT)).is_err(), "8765 must be taken");
+        let port = choose_port(None, false, None);
+        assert_ne!(port, DEV_PORT);
+        // The chosen port is really free: the backend can bind it.
+        let backend = TcpListener::bind(("127.0.0.1", port)).expect("chosen port is free");
+        drop(backend);
+    }
+
+    #[test]
+    fn a_restart_keeps_the_port_while_it_is_free() {
+        let previous = choose_port(None, false, None);
+        assert_eq!(choose_port(None, false, Some(previous)), previous);
+        let _taken = TcpListener::bind(("127.0.0.1", previous)).unwrap();
+        assert_ne!(choose_port(None, false, Some(previous)), previous);
+    }
+
+    #[test]
+    fn development_and_pedimap_port_keep_their_fixed_ports() {
+        assert_eq!(choose_port(None, true, None), DEV_PORT);
+        assert_eq!(choose_port(Some("9123"), false, None), 9123);
+        assert_eq!(choose_port(Some("9123"), true, None), 9123);
+        assert_ne!(choose_port(Some("not a port"), false, None), 0);
+    }
+
+    #[test]
+    fn port_conflicts_are_recognized_on_every_platform() {
+        assert!(mentions_port_in_use("ERROR:    [Errno 48] error while attempting to bind on \
+            address ('127.0.0.1', 8765): address already in use"));                    // macOS
+        assert!(mentions_port_in_use("[Errno 98] error while attempting to bind on address \
+            ('127.0.0.1', 8765): address already in use"));                            // Linux
+        assert!(mentions_port_in_use("[WinError 10048] only one usage of each socket address \
+            (protocol/network address/port) is normally permitted"));                  // Windows
+        assert!(!mentions_port_in_use("INFO:     Uvicorn running on http://127.0.0.1:8765"));
+    }
+
+    #[test]
+    fn the_report_keeps_the_exit_status_and_last_stderr_lines() {
+        let mut report = BackendReport { running: true, ..Default::default() };
+        for i in 0..40 {
+            record_event(&mut report, CommandEvent::Stderr(format!("line {i}\n").into_bytes()));
+        }
+        record_event(&mut report, CommandEvent::Stderr(
+            b"ERROR:    [Errno 48] error while attempting to bind on address: address already in use".to_vec()));
+        record_event(&mut report, CommandEvent::Terminated(TerminatedPayload { code: Some(1), signal: None }));
+        assert!(!report.running);
+        assert_eq!(report.exit_code, Some(1));
+        assert!(report.port_in_use);
+        assert_eq!(report.stderr_tail.len(), 30);
+        assert!(report.stderr_tail.back().unwrap().contains("address already in use"));
+    }
 
     fn read_bytes(name: &str, bytes: &[u8]) -> super::TextFile {
         let path = std::env::temp_dir().join(name);
