@@ -28,6 +28,12 @@
   font-display: block;
 }
 
+/* ── Toolbar ────────────────────────────────────────────────────────────
+   Its button labels never wrap (a narrow window wraps the toolbar into more
+   rows instead). Scoped to buttons: popovers opened from the toolbar, such
+   as ⚙ Settings, wrap their text normally. */
+[role="toolbar"] button { white-space: nowrap; }
+
 /* ── Reset ──────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; overflow: hidden; }

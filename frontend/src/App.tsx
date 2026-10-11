@@ -547,15 +547,16 @@ export default function App() {
       height: "100vh", overflow: "hidden", background: "#0f1117" }}>
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      {/* Wraps onto more rows when the window is too narrow; controls keep
-          their labels on one line. */}
+      {/* Wraps onto more rows when the window is too narrow; its buttons
+          (index.css) and its own labels keep their text on one line. Not set
+          on the toolbar itself: popovers opened from it must wrap normally. */}
       <div role="toolbar" aria-label="Main toolbar"
         style={{ minHeight: 44, display: "flex", flexWrap: "wrap", alignItems: "center",
-        padding: "6px 14px", columnGap: 10, rowGap: 6, whiteSpace: "nowrap",
+        padding: "6px 14px", columnGap: 10, rowGap: 6,
         background: "#161b27", borderBottom: "1px solid #2e3a52",
         flexShrink: 0, userSelect: "none" }}>
 
-        <span style={{ fontWeight: 800, fontSize: 15, color: "#4f9cf9",
+        <span style={{ fontWeight: 800, fontSize: 15, color: "#4f9cf9", whiteSpace: "nowrap",
           letterSpacing: -0.5, marginRight: 6 }}>
           🌿 Pedimap 2
         </span>
@@ -632,7 +633,7 @@ export default function App() {
 
         {/* Orientation toggle (per view) */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-          <span style={{ color: "#64748b", fontSize: 11 }}>Orientation:</span>
+          <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap" }}>Orientation:</span>
           <div style={{ display: "flex", border: "1px solid #2e3a52",
             borderRadius: 6, overflow: "hidden" }}>
             <button onClick={() => changeOrientation("UD")}
@@ -673,7 +674,7 @@ export default function App() {
 
         {traits.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-            <span style={{ color: "#64748b", fontSize: 11 }}>Colour by:</span>
+            <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap" }}>Colour by:</span>
             <select
               value={activeTrait}
               onChange={e => handleTraitChange(e.target.value)}
@@ -727,7 +728,7 @@ export default function App() {
         )}
 
         <div style={{ flex: 1 }} />
-        <span style={{ color: "#4b5563", fontSize: 11 }}>
+        <span style={{ color: "#4b5563", fontSize: 11, whiteSpace: "nowrap" }}>
           {pedigree?.population ?? ""}
           {pedigree ? ` · ${graphData?.nodes?.length ?? 0} individuals` : ""}
         </span>

@@ -64,7 +64,7 @@ export default function SettingsMenu(p: Props) {
                 const n = Number(e.target.value);
                 if (n >= CROSS_SYMBOL_SIZE.min && n <= CROSS_SYMBOL_SIZE.max) p.onCrossSymbolSize(n);
               }}
-              style={{ width: 64 }} />
+              style={{ width: 64, flexShrink: 0 }} />
           </label>
           <div style={{ borderTop: "1px solid #2e3a52" }} />
           <label style={row}>
@@ -73,7 +73,7 @@ export default function SettingsMenu(p: Props) {
               onChange={e => setLimitText(e.target.value)}
               onBlur={commitLimit}
               onKeyDown={e => { if (e.key === "Enter") commitLimit(); }}
-              style={{ width: 80 }} />
+              style={{ width: 80, flexShrink: 0 }} />
           </label>
           <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.45 }}>
             Larger populations are listed instead of drawn; build a subpopulation to draw part of one.
