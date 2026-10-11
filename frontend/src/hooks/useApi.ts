@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { LATEST_RELEASE_URL } from "../lib/links";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -354,6 +355,19 @@ export function useBackendHealth(): {
   return { status, failure, retry };
 }
 
+/** Last line of "Show details" when the backend program is missing. */
+export const REINSTALL_HINT = `Reinstall Pedimap 2 from the Releases page: ${LATEST_RELEASE_URL}`;
+
+/**
+ * Whether a start failure means the backend program is not there: the shell
+ * could not locate it, or the OS found no file to run (error 2: "No such file
+ * or directory" on macOS/Linux, "cannot find the file" on Windows).
+ */
+export function backendProgramMissing(spawnError: string): boolean {
+  return /could not find the backend program|os error 2\b|no such file or directory|cannot find the file/i
+    .test(spawnError);
+}
+
 /**
  * Plain-language explanation of why the backend cannot be reached, for
  * "Show details": what happened to its process, a port conflict and what to
@@ -384,6 +398,8 @@ export function explainBackendFailure(f: BackendFailure): string[] {
   if (r?.stderrTail.length) {
     lines.push("", "Last messages from the backend service:", ...r.stderrTail);
   }
+  // A missing program will not come back with Retry: say how to fix it, last.
+  if (r?.spawnError && backendProgramMissing(r.spawnError)) lines.push("", REINSTALL_HINT);
   if (!lines.length) lines.push("No error detail available.");
   return lines;
 }

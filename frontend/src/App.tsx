@@ -165,12 +165,13 @@ function Spinner() {
 // Readiness gate shown in the body until the backend answers /api/health.
 // The top bar / toolbar is always rendered by App, so it stays usable even
 // while this is on screen — the user is never trapped.
-function BackendGate({
-  status, failure, onRetry,
+export function BackendGate({
+  status, failure, onRetry, onOpenLink,
 }: {
   status: "starting" | "error";
   failure: BackendFailure;
   onRetry: () => void;
+  onOpenLink: (url: string) => void;
 }) {
   const [showDetail, setShowDetail] = useState(false);
 
@@ -211,7 +212,23 @@ function BackendGate({
           background: "#0b0e14", border: "1px solid #2e3a52", borderRadius: 6,
           padding: 10, color: "#94a3b8", fontSize: 11, whiteSpace: "pre-wrap",
           margin: 0 }}>
-          {explainBackendFailure(failure).join("\n")}
+          {explainBackendFailure(failure).map((line, i) => {
+            // Web addresses open in the system browser.
+            const url = /https:\/\/\S+/.exec(line)?.[0];
+            return (
+              <span key={i}>
+                {i > 0 && "\n"}
+                {url ? (
+                  <>
+                    {line.slice(0, line.indexOf(url))}
+                    <a href={url} onClick={e => { e.preventDefault(); onOpenLink(url); }}
+                      style={{ color: "#4f9cf9" }}>{url}</a>
+                    {line.slice(line.indexOf(url) + url.length)}
+                  </>
+                ) : line}
+              </span>
+            );
+          })}
         </pre>
       )}
     </div>
@@ -784,6 +801,7 @@ export default function App() {
             status={backendStatus === "error" ? "error" : "starting"}
             failure={backendFailure}
             onRetry={retryBackend}
+            onOpenLink={updater.openExternal}
           />
         ) : (
         <>

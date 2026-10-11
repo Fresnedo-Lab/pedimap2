@@ -19,8 +19,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 import { forgetBackendUrl } from "./useApi";
+import { RELEASES_URL } from "../lib/links";
 
-export const RELEASES_URL = "https://github.com/Fresnedo-Lab/pedimap2/releases";
+export { RELEASES_URL };
 export const releasePageUrl = (version: string) => `${RELEASES_URL}/tag/v${version}`;
 
 const CHECK_TIMEOUT_MS = 15_000;

@@ -3,7 +3,7 @@
 // identifies Pedimap's backend, and explains failures in plain words.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 
 const tauri = vi.hoisted(() => ({ desktop: true, invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({
@@ -12,7 +12,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
-  explainBackendFailure, forgetBackendUrl, isPedimapHealth, useBackendHealth,
+  REINSTALL_HINT, explainBackendFailure, forgetBackendUrl, isPedimapHealth, useBackendHealth,
   type BackendReport,
 } from "./useApi";
 
@@ -83,5 +83,52 @@ describe("Show details", () => {
     expect(explainBackendFailure(failure({ running: true }))[0])
       .toBe("The backend service is running but did not answer at http://127.0.0.1:54321.");
     expect(explainBackendFailure(failure(null, "")).join("")).toBe("No error detail available.");
+  });
+});
+
+describe("a missing backend program", () => {
+  const failure = (r: Partial<BackendReport>) =>
+    ({ url: "http://127.0.0.1:54321", lastError: "Load failed", foreign: false, report: report(r) });
+  const LINK = "https://github.com/Fresnedo-Lab/pedimap2/releases/latest";
+
+  it("ends Show details with how to reinstall Pedimap 2, with the link", () => {
+    expect(REINSTALL_HINT).toBe(`Reinstall Pedimap 2 from the Releases page: ${LINK}`);
+    for (const spawnError of [
+      "could not start the backend program: No such file or directory (os error 2)",   // macOS (seen)
+      "could not find the backend program: sidecar not found",
+      "could not start the backend program: The system cannot find the file specified. (os error 2)",  // Windows
+    ]) {
+      const lines = explainBackendFailure(failure({ running: false, spawnError }));
+      expect(lines.at(-1), spawnError).toBe(REINSTALL_HINT);
+      expect(lines[0]).toBe(`Pedimap could not start its backend service: ${spawnError}.`);
+    }
+  });
+
+  it("is not suggested for other failures", () => {
+    for (const r of [
+      { running: false, spawnError: "could not start the backend program: Permission denied (os error 13)" },
+      { running: false, exitCode: 1, portInUse: true },
+      { running: true },
+    ]) {
+      expect(explainBackendFailure(failure(r)).join("\n")).not.toContain("Reinstall");
+    }
+  });
+});
+
+describe("the Show details link", () => {
+  it("opens the Releases page in the system browser", async () => {
+    const { BackendGate } = await import("../App");
+    const opened = vi.fn();
+    render(<BackendGate status="error" onRetry={() => {}} onOpenLink={opened}
+      failure={{ url: "http://127.0.0.1:54321", lastError: "Load failed", foreign: false,
+                 report: report({ running: false,
+                   spawnError: "could not start the backend program: No such file or directory (os error 2)" }) }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+    const link = screen.getByRole("link", { name: "https://github.com/Fresnedo-Lab/pedimap2/releases/latest" });
+    expect(link.closest("pre")!.textContent!.endsWith(REINSTALL_HINT)).toBe(true);
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    link.dispatchEvent(click);
+    expect(opened).toHaveBeenCalledWith("https://github.com/Fresnedo-Lab/pedimap2/releases/latest");
+    expect(click.defaultPrevented).toBe(true);                // not opened inside the app window
   });
 });
