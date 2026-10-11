@@ -10,6 +10,12 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+### Fixed
+- Settings menu layout on macOS: in the ⚙ menu, the help text under
+  **Drawing limit** ran past the edge of the menu, and the boxes for the cross
+  symbol size and the drawing limit were not visible. The text now wraps and
+  both boxes show.
+
 ## [2.2.1] — 2026-10-07
 
 Pedimap works exactly as in 2.2.0; this release updates the tools it is built
