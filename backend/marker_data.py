@@ -185,3 +185,49 @@ def flexqtl_codes(eng: PedigreeEngine) -> bool:
 def _code_key(item: Tuple[Any, int]) -> Tuple[int, Any]:
     code = item[0]
     return (0, code) if isinstance(code, int) else (1, str(code))
+
+
+def haplotypes(eng: PedigreeEngine, group: str) -> Optional[Dict[str, Any]]:
+    """One linkage group's IBD data for the haplotype display, sparse: per
+    individual, homologue and position, the nonzero [founder allele,
+    probability] pairs (docs/design/haplotype-display.md, §1.2). None when the
+    group has no IBD positions."""
+    by_pos = eng.ibd.get(group)
+    if not by_pos:
+        return None
+    unknown = _unknown(eng)
+    positions = [{"position": pos, "cM": float(pos)} for pos in by_pos]
+    markers = []
+    founder_alleles: Dict[str, List[Optional[str]]] = {}
+    for m in eng.markers:
+        if m.linkage_group != group:
+            continue
+        at = next((p["position"] for p in positions if abs(p["cM"] - m.position_cM) <= 1e-6), None)
+        markers.append({"name": m.name, "cM": m.position_cM, "position": at})
+        if m.founder_alleles:
+            founder_alleles[m.name] = [None if a in unknown else a for a in m.founder_alleles]
+    spots = [p["cM"] for p in positions] + [m["cM"] for m in markers]
+    meta = eng.dat_meta or {}
+    rows: Dict[str, List[List[List[List[float]]]]] = {}
+    for iid in eng._individuals:
+        homologues: List[List[List[List[float]]]] = [[] for _ in range(eng.ploidy)]
+        for pos in by_pos:
+            vectors = by_pos[pos].get(iid)
+            for h in range(eng.ploidy):
+                vec = vectors[h] if vectors else []
+                homologues[h].append([[j + 1, v] for j, v in enumerate(vec) if v > 0])
+        if any(any(band for band in h) for h in homologues):
+            rows[iid] = homologues
+    first = next(iter(by_pos.values()))
+    nalleles = meta.get("nalleles") or (len(next(iter(first.values()))[0]) if first else 0)
+    return {
+        "linkage_group":   group,
+        "start_cM":        min([0.0] + spots),
+        "end_cM":          max(spots),
+        "positions":       positions,
+        "markers":         markers,
+        "nalleles":        nalleles,
+        "founders":        meta.get("founder_order") or None,
+        "founder_alleles": founder_alleles,
+        "rows":            rows,
+    }

@@ -13,6 +13,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Network, DataSet } from "vis-network/standalone";
 import { DEFAULT_PARENT_LABELS, type GraphNode, type ParentLabels } from "../hooks/useApi";
+import { timingEnd, timingStart } from "../lib/timing";
 import { linkColor, linkPath, type ChartModel } from "../chart/model";
 import {
   CHART_FONT, THEMES, labelInside, nodeLabelColor, type DisplayStyle, type NodeShape, type StyleTheme,
@@ -438,6 +439,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       edgesDS.current.add(edges);
 
       const longest = Math.max(0, ...model.individuals.map(n => estimateLabel(n.label, theme)));
+      timingStart("layout");
       network = new Network(container, { nodes: nodesDS.current, edges: edgesDS.current }, {
         edges: {
           smooth:         false,
@@ -476,6 +478,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
                         hierarchicalFor(o, longest, model.levelsPerGeneration, false).nodeSpacing);
       };
       pack();
+      timingEnd("layout");
       const emitter = (net as unknown as VisInternals).body.emitter;
       emitter.on("_dataChanged", pack);
       emitter.on("_resetHierarchicalLayout", pack);
@@ -487,10 +490,12 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       // has drawn them, so stale routes are recomputed after a frame and the
       // chart drawn again.
       network.on("beforeDrawing", (ctx: CanvasRenderingContext2D) => {
+        timingStart("draw");
         drawRoutes(ctx, routesRef.current, role => linkColor(role, theme.ink));
         if (network) drawHatching(ctx, network, model, theme, latest.current.hatched);
       });
       network.on("afterDrawing", () => {
+        timingEnd("draw");
         if (!stale.current) return;
         reroute();
         requestAnimationFrame(() => network?.redraw());
@@ -597,7 +602,9 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     const longest = Math.max(0, ...model.individuals.map(n => estimateLabel(n.label, theme)));
     const relayout = () => {
       if (networkRef.current !== net) return;
+      timingStart("layout");
       net.setOptions({ layout: { hierarchical: hierarchicalFor(orientation, longest, model.levelsPerGeneration, isLargeLayout(model)) } });
+      timingEnd("layout");
       stale.current = true;
       net.fit({ animation: FIT_ANIMATION });
       applySelection(net);

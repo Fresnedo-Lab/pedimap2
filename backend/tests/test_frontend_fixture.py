@@ -29,6 +29,14 @@ TARGETS = {
     "sim_small.json": "flexqtl_binko/flexqtl_routeB_sim_small.ped",
     # Details panel and marker coloring: API replies for chosen individuals.
     "panels.json": None,
+    # Haplotype display: /api/haplotypes per linkage group, and the
+    # individuals of a subpopulation (as the Subpop button builds it).
+    "haplotypes.json": None,
+}
+HAPLOTYPES = {
+    "flexqtl": ("flexqtl_binko/flexqtl_routeB_sim_small.ped", ["1", "2"], "G3_010"),
+    "binko_ibd": ("flexqtl_binko/binko_ibd.ped", ["1", "3"], None),
+    "example": ("Example.dat", ["A", "B", "C"], None),
 }
 PANELS = {
     "binko_legacy": ("flexqtl_binko/binko_legacy.ped", ["G1_001", "F003", "DUMMY_G1_007_F"], "M1_001"),
@@ -70,9 +78,23 @@ def _panels() -> dict:
     return out
 
 
+def _haplotypes() -> dict:
+    out = {"_comment": COMMENT}
+    for key, (source, groups, focal) in HAPLOTYPES.items():
+        _load(os.path.join(FIXTURES, source))
+        entry = {"groups": {g: api.get_haplotypes(g) for g in groups}}
+        if focal:
+            subpop = api.build_subpop(api.SubpopRequest(focal_id=focal, ancestors=True, descendants=True))
+            entry["subpop"] = {focal: [n["id"] for n in subpop["nodes"]]}
+        out[key] = entry
+    return out
+
+
 def build(target: str) -> dict:
     if target == "panels.json":
         return _panels()
+    if target == "haplotypes.json":
+        return _haplotypes()
     _load(os.path.join(FIXTURES, TARGETS[target]))
     if target == "example.json":
         return {"_comment": COMMENT, "pedigree": _pedigree(), "graph": api.get_graph()}
@@ -88,7 +110,9 @@ def build(target: str) -> dict:
     }
 
 
-def _dump(data: dict) -> str:
+def _dump(data: dict, target: str = "") -> str:
+    if target == "haplotypes.json":         # long arrays of numbers: one line
+        return json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n"
     return json.dumps(data, indent=1, ensure_ascii=False) + "\n"
 
 
@@ -96,14 +120,14 @@ def test_frontend_fixtures_are_current(monkeypatch):
     monkeypatch.setattr(api, "_engine", api._engine)     # restore after build()
     for target in TARGETS:
         with open(os.path.join(FRONTEND_FIXTURES, target), encoding="utf-8") as fh:
-            assert fh.read() == _dump(build(target)), f"{target} is out of date"
+            assert fh.read() == _dump(build(target), target), f"{target} is out of date"
 
 
 if __name__ == "__main__":
     for target in TARGETS:
         path = os.path.join(FRONTEND_FIXTURES, target)
         with open(path, "w", encoding="utf-8") as fh:
-            fh.write(_dump(build(target)))
+            fh.write(_dump(build(target), target))
         print(f"wrote {os.path.normpath(path)}")
     if os.path.exists(PRIVATE_SOURCE):
         _load(PRIVATE_SOURCE)
