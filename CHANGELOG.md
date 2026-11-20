@@ -10,6 +10,12 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-11-20
+
+Pedimap 2 now reads FlexQTL and Binko files correctly and shows their marker
+genotypes and IBD probabilities. Click an individual to see its genotypes and
+the founder alleles it most likely carries, or color the chart by a marker.
+
 ### Added
 - The details panel shows an individual's **marker data**. Under **Markers**,
   each linkage group's loci are listed with the two alleles in the file's
@@ -27,25 +33,26 @@ release notes, so every release needs its own section here before it is tagged.
   loci, linkage groups, IBD positions and the genotype codes in use.
 
 ### Fixed
+- **The IBD data of FlexQTL files with several linkage groups was mixed up in
+  earlier versions.** Pedimap filed all IBD positions of such a file under one
+  linkage group, so where two groups share a position (such as 0 cM) only the
+  last group's values were kept: a file with 42 positions kept only 21. **If you
+  opened such a file in an earlier version, open the original file again in
+  2.3.0**; `.dat` and JSON files saved from it by an earlier version carry the
+  mixed-up data.
+- FlexQTL and Binko files are read as their reader's specification describes
+  (`docs/reference/flexqtl-binko-pedimap/`), and Binko files with IBD data are
+  no longer rejected because Binko's dummy founders have no IBD rows.
 - Loading a new dataset closes the details panel and clears the selected
   individual, the **Subpop** button and the search box. Before, the panel and
   the button could still show an individual of the previous file.
 - Names inside a node are black or white, whichever stands out from its fill
   (at least WCAG AA contrast), in both display styles and in image exports.
   In the Modern style they were always white and vanished on light colors.
-- FlexQTL and Binko files are read correctly, and the IBD data of FlexQTL
-  files with several linkage groups is no longer mixed up. Pedimap filed all
-  IBD positions of such a file under one linkage group, so positions that two
-  groups share (such as 0 cM) kept only the last group's values: a file with
-  42 positions showed 21. A `.dat` export made from such a file with
-  Pedimap 2.2.2 or earlier has the same loss; export it again from the
-  original file.
-- Binko files with IBD data are no longer rejected because Binko's dummy
-  founders have no IBD rows.
 - Founders without offspring are placed in the founders' row, as far apart as
   siblings, instead of each as a separate tree beyond the pedigree. Charts
-  with many such founders are much smaller: the FlexQTL test file's 11 made
-  its left-to-right chart about 1,100 pixels taller.
+  with many such founders are much smaller: in a test file, 11 of them made
+  the left-to-right chart about 1,100 pixels taller.
 - Suggested file names for exports no longer repeat a data file's extension
   that FlexQTL and Binko put in the population name (`pm_small.png`, not
   `pm_small.dat.png`), and the save dialog offers only the format being
@@ -252,7 +259,11 @@ _2.1.1 was built but never released (macOS backend failed to start)._
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.2...HEAD
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.2...v2.3.0
+[2.2.2]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.1...v2.2.2
+[2.2.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.2...v2.2.0
 [2.1.2]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.1.0...v2.1.2
 [2.1.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/Fresnedo-Lab/pedimap2/releases/tag/v2.0.0

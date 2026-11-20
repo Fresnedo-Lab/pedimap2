@@ -76,10 +76,13 @@ and precalculated IBD probabilities.
 | Editable low / high / missing colors for continuous traits | ✅ |
 | Semantic color names — a `Red` trait value renders red | ✅ |
 | Legacy `.dat` import — pedigree, traits, markers, IBD | ✅ |
+| FlexQTL and Binko files (`pedimap.ped`) read as their reader's specification describes; errors give the line number | ✅ |
 | Bundled example dataset | ✅ |
 | Individual search and selection | ✅ |
-| Hover details — parents, generation, trait values | ✅ |
-| Details panel — parents, traits, expandable lists of relatives | ✅ |
+| Hover details — parents (labeled as the file's caption names them), generation, trait values | ✅ |
+| Details panel — parents, traits, expandable lists of relatives, marker genotypes with their codes, and the most probable founder alleles at each IBD position | ✅ |
+| Color by a marker — genotype code, or copies of an allele, with a legend | ✅ |
+| Marker data summary — loci, linkage groups, IBD positions, codes in use | ✅ |
 | Fit to window — toolbar button or **F** | ✅ |
 | JSON export / import round-trip | ✅ |
 | Legacy `.dat` export — whole population or displayed subpopulation; reads back unchanged | ✅ |
@@ -89,14 +92,15 @@ and precalculated IBD probabilities.
 | Offline-first — all computation is local | ✅ |
 | Update notifications with one-click install (from 2.1.2) | ✅ |
 
-### Parsed but not yet visualized
+### Shown in the details panel, not yet on the chart
 
-The `.dat` parser reads these completely and they survive a JSON round-trip,
-but no interface renders them yet:
+- IBD probabilities per linkage group and position: the panel shows each
+  homologue's most probable founder alleles
+- Observed marker alleles with their genotype codes
 
-- IBD probabilities per linkage group and position
-- Observed marker alleles with per-score color codes
-- Linkage group maps and founder allele definitions
+The parser also reads the linkage group maps and the founder allele
+definitions (`FOUNDERALLELES`); they survive a JSON round-trip, but no
+interface shows them yet.
 
 ### Not yet implemented
 
@@ -109,7 +113,8 @@ These are core to Pedimap 1.x and are the focus of ongoing work:
   still missing
 - Information panel — a persistent panel that follows the mouse (a details
   panel already opens on click)
-- IBD haplotype rectangles and most-probable-allele display
+- IBD haplotype rectangles and most-probable alleles on the chart (the details
+  panel already shows them)
 - `.pmp` subpopulations and saved views (currently only the population name is read)
 
 ---
@@ -121,6 +126,7 @@ These are core to Pedimap 1.x and are the focus of ongoing work:
 | Extension | Support |
 |-----------|---------|
 | `.dat` | Full — header keywords, pedigree with trait columns, uniparental descent (`*SELF`, `*DH`, `*MUT`, `*VP`), linkage groups, marker alleles, IBD probability matrices |
+| `.ped` | Full — the same format as FlexQTL and Binko write it (`pedimap.ped`), including `FACTOR0`, `CONFIRMEDNULL`, `LOCUS` indexes and founders without data |
 | `.pmp` | Partial — population name only; subpopulations and views are not yet modeled |
 | `.json` | Full — Pedimap 2 native format |
 
@@ -282,6 +288,7 @@ users never install Python.
 |----------|----------|
 | [`docs/`](docs/) | User manual source |
 | [`docs/reference/dat-format.md`](docs/reference/dat-format.md) | `.dat` / `.pmp` format specification |
+| [`docs/reference/flexqtl-binko-pedimap/`](docs/reference/flexqtl-binko-pedimap/README.md) | The file as FlexQTL and Binko write it: reader's specification, fixtures, expected content |
 | [`docs/reference/ui-model.md`](docs/reference/ui-model.md) | Interaction model derived from Pedimap 1.x |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development workflow, branching, and releases |
@@ -329,6 +336,10 @@ users never install Python.
 - [x] Editable low / high / missing colors for continuous traits (2.2.0)
 - [x] Drawing limit — large populations listed instead of drawn (2.2.0)
 - [x] Link routing — no link crosses an individual it does not connect (2.2.0)
+- [x] FlexQTL and Binko files read as their reader's specification describes (2.3.0)
+- [x] Marker genotypes and IBD founder-allele probabilities in the details panel (2.3.0)
+- [x] Color by genotype code or allele copies at a marker, with a legend (2.3.0)
+- [x] Names readable on every fill (WCAG AA contrast), on screen and in exports (2.3.0)
 
 ---
 
