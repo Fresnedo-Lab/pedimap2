@@ -93,9 +93,11 @@ class PedigreeEngine:
         # No UI consumes it yet, but it is carried through to_dict() so the data
         # survives a round-trip.
         self.ibd: Dict[str, Any] = {}
-        # Observed-allele color codes keyed individual -> marker -> [codes],
-        # parallel to Individual.markers (which holds the allele names).
-        self.marker_codes: Dict[str, Dict[str, List[str]]] = {}
+        # Genotype indicator codes keyed individual -> marker -> [codes], one per
+        # allele and parallel to Individual.markers (which holds the alleles in
+        # the file's order). Any non-negative integer; FlexQTL's meanings are in
+        # docs/reference/flexqtl-binko-pedimap (4.2).
+        self.marker_codes: Dict[str, Dict[str, List[int]]] = {}
         # Details of the source .dat file that the engine model doesn't otherwise
         # hold — header values (unknown, nullhomoz, nalleles), the parent-column
         # labels, the original row order and the IBDPOSITIONS lists — so that
@@ -261,7 +263,13 @@ class PedigreeEngine:
         eng.ploidy = data.get("ploidy", 2)
         # Round-trip IBD data (emitted by to_dict); absent for non-IBD files.
         eng.ibd = data.get("ibd", {})
-        eng.marker_codes = data.get("marker_codes", {})
+        # Genotype indicator codes are integers; JSON saved by 2.2.2 and earlier
+        # has them as the strings read from the file.
+        eng.marker_codes = {
+            iid: {mk: [int(c) if isinstance(c, str) and c.isdigit() else c for c in codes]
+                  for mk, codes in by_marker.items()}
+            for iid, by_marker in data.get("marker_codes", {}).items()
+        }
         eng.dat_meta = data.get("dat_meta", {})
         for t in data.get("traits", []):
             eng.traits.append(TraitMeta(

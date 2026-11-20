@@ -159,6 +159,7 @@ export interface LoadResult {
   individuals: number;
   encoding?:   string;                              // of the data file
   files?:      { name: string; encoding: string }[];  // each file received
+  warnings?:   string[];                            // problems that did not stop loading
 }
 
 /** The selection behind a displayed subpopulation (as sent to /api/subpop). */
@@ -203,9 +204,10 @@ export function useApi(): ApiClient {
     loadFile: async (files) => {
       const fd = new FormData();
       const arr = Array.from(files);
-      const dat = arr.find(f => f.name.endsWith(".dat") || f.name.endsWith(".json"));
-      const pmp = arr.find(f => f.name.endsWith(".pmp"));
-      if (!dat) throw new Error("Please select a .dat or .json file.");
+      // The data file: .dat, or .ped as FlexQTL and Binko name it, or .json.
+      const dat = arr.find(f => /\.(dat|ped|json)$/i.test(f.name));
+      const pmp = arr.find(f => /\.pmp$/i.test(f.name));
+      if (!dat) throw new Error("Please select a .dat, .ped or .json file.");
       fd.append("dat_file", dat, dat.name);
       if (pmp) fd.append("pmp_file", pmp, pmp.name);
       return apiFetch("/api/load", { method: "POST", body: fd });

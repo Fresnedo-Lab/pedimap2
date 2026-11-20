@@ -142,8 +142,8 @@ def test_marker_and_ibd_sections_written():
         "LINKAGEGROUP A", "LINKAGEGROUP B", "LINKAGEGROUP C"]
     assert sum(l.startswith("ALLELES ") for l in lines) == 5
     assert sum(l.startswith("IBDPOSITION ") for l in lines) == 5
-    # Color codes on observed alleles survive (Elstar SSR1 is coded 2 / 2).
-    assert _parse(exported).marker_codes["Elstar"]["SSR1"] == ["2", "2"]
+    # Indicator codes on observed alleles survive (Elstar SSR1 is coded 2 / 2).
+    assert _parse(exported).marker_codes["Elstar"]["SSR1"] == [2, 2]
 
 
 # ── Declared trait types (PEDIMAP2 TRAITTYPE comments) ────────────────────────
