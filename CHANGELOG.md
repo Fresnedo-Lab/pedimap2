@@ -20,6 +20,14 @@ release notes, so every release needs its own section here before it is tagged.
   original file.
 - Binko files with IBD data are no longer rejected because Binko's dummy
   founders have no IBD rows.
+- Founders without offspring are placed in the founders' row, as far apart as
+  siblings, instead of each as a separate tree beyond the pedigree. Charts
+  with many such founders are much smaller: the FlexQTL test file's 11 made
+  its left-to-right chart about 1,100 pixels taller.
+- Suggested file names for exports no longer repeat a data file's extension
+  that FlexQTL and Binko put in the population name (`pm_small.png`, not
+  `pm_small.dat.png`), and the save dialog offers only the format being
+  saved.
 
 ### Changed
 - Errors in a data file now give the line number, and more mistakes are caught
