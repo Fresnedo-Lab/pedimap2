@@ -301,11 +301,14 @@ users never install Python.
 - [ ] Full `.pmp` support — subpopulations, saved views, notes
 - [ ] Smarter lane ordering — shorter detours for links that span
       generations, and fewer places where several links cross at one point
+- [ ] On-screen legend for trait colorings
 
 **Then**
 - [ ] IBD haplotype rectangles per linkage group
 - [ ] Most-probable-allele display with probability thresholds
-- [ ] Marker score display with color codes
+      (details panel done; chart display pending)
+- [ ] Marker score display with color codes (details panel done; chart
+      display pending)
 - [ ] User manual as GitHub Wiki and PDF
 
 **Later**

@@ -2,7 +2,7 @@
 pedigree_engine.py  –  Pedimap 2.0
 ====================================
 Core pedigree engine built on NetworkX.
-All graph queries, trait colouring and layout logic live here.
+All graph queries, trait coloring and layout logic live here.
 """
 from __future__ import annotations
 
@@ -205,7 +205,7 @@ class PedigreeEngine:
                 }
         return positions
 
-    # ── Serialisation ─────────────────────────────────────────────────────────
+    # ── Serialization ─────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
         self.assign_generations()
@@ -312,7 +312,7 @@ class PedigreeEngine:
                 eng.graph.add_edge(ind.male_parent,   iid, role="male")
         return eng
 
-    # ── Colour helpers ────────────────────────────────────────────────────────
+    # ── Color helpers ────────────────────────────────────────────────────────
 
     def trait_color(self, ind_id: str, trait_name: str, *,
                     low: Optional[str] = None, high: Optional[str] = None,

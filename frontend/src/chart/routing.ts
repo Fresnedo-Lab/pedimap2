@@ -180,7 +180,7 @@ export function routeLinks(
 }
 
 // Arrowhead whose tip is `tip`, pointing along the layout direction (every
-// route ends travelling that way into its target).
+// route ends traveling that way into its target).
 function arrowAt(tip: Point, ud: boolean): Point[] {
   const back = (d: number, side: number) =>
     ud ? { x: tip.x + side, y: tip.y - d } : { x: tip.x - d, y: tip.y + side };

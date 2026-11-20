@@ -4,7 +4,7 @@
 // save dialog and written by the Rust shell (a browser-style download does not
 // save files from the webview), which only writes to the path the dialog
 // returned. Elsewhere they are browser downloads. Both return false if the
-// user cancelled the dialog.
+// user canceled the dialog.
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
 

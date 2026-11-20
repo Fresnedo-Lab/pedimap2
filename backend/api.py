@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
+import marker_data
 from pedigree_engine import CrossType, Individual, PedigreeEngine, TraitType
 from sample_data import load_sample_data
 from text_decoding import decode_text
@@ -125,7 +126,11 @@ def health():
 
 @app.get("/api/pedigree")
 def get_pedigree():
-    return _engine.to_dict()
+    """The engine's data, plus how to label the parents (from the file's
+    caption) and a summary of the marker data."""
+    return {**_engine.to_dict(),
+            "parent_labels":  marker_data.parent_labels(_engine),
+            "marker_summary": marker_data.marker_summary(_engine)}
 
 
 @app.get("/api/individuals")
@@ -168,7 +173,22 @@ def get_individual(ind_id: str):
         "ancestors":     _relatives(eng, eng.ancestors(ind_id)),
         "descendants":   _relatives(eng, eng.descendants(ind_id)),
         "siblings":      _relatives(eng, eng.siblings(ind_id)),
+        # Genotype rows in map order (alleles as written, None for unknown,
+        # with their indicator codes) and the likely founder alleles of each
+        # homologue at every IBD position.
+        "genotypes":     marker_data.genotypes(eng, ind_id),
+        "ibd":           marker_data.ibd_summary(eng, ind_id),
     }
+
+
+@app.get("/api/marker-values")
+def get_marker_values(marker: str):
+    """Every individual's genotype at one marker, for coloring by it."""
+    eng = get_engine()
+    if not any(m.name == marker for m in eng.markers) and not any(
+            marker in ind.markers for ind in eng._individuals.values()):
+        raise HTTPException(404, f"Marker '{marker}' not found.")
+    return marker_data.marker_values(eng, marker)
 
 
 @app.get("/api/layout")

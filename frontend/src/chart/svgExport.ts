@@ -12,7 +12,7 @@ import type { GraphNode, TraitMeta } from "../hooks/useApi";
 import { linkColor, type ChartModel } from "./model";
 import { chartBoxes, routeLinks, routingProblems, svgPathData, type Box, type Point } from "./routing";
 import {
-  CHART_FONT, SYMBOL_RADIUS, THEMES, labelInside,
+  CHART_FONT, SYMBOL_RADIUS, THEMES, labelInside, nodeLabelColor,
   type DisplayStyle, type NodeShape, type StyleTheme,
 } from "./style";
 
@@ -21,7 +21,21 @@ export type { Box, Point };
 /** Page behind the chart: white (for print) or the style's own background. */
 export type ExportBackground = "white" | "screen";
 
-export interface LegendEntry { label: string; color: string }
+/** A legend entry; `hatch` draws its swatch hatched (see HATCH). */
+export interface LegendEntry { label: string; color: string; hatch?: boolean }
+
+/** Diagonal hatching on a mid-gray: the fill of an individual whose value is
+ *  unknown where a value is expected (e.g. copies of an allele when one of its
+ *  alleles is unknown), set apart from any solid color. */
+// Light stripes on the gray, so that a label on it (black, see labelColorOn)
+// stands out from both: 8.2:1 against the gray, 17:1 against the stripes.
+export const HATCH = { fill: "#9CA3AF", ink: "#E5E7EB", spacing: 6, width: 2 };
+const HATCH_ID = "unknown-hatch";
+const hatchPattern = () =>
+  `<pattern id="${HATCH_ID}" patternUnits="userSpaceOnUse" width="${HATCH.spacing}" ` +
+  `height="${HATCH.spacing}" patternTransform="rotate(45)">` +
+  `<rect width="${HATCH.spacing}" height="${HATCH.spacing}" fill="${HATCH.fill}"/>` +
+  `<rect width="${HATCH.width}" height="${HATCH.spacing}" fill="${HATCH.ink}"/></pattern>`;
 export type Legend =
   | { trait: string; kind: "discrete"; entries: LegendEntry[] }
   | { trait: string; kind: "continuous"; min: number; max: number;
@@ -33,6 +47,8 @@ export interface SvgExportInput {
   /** Drawn node rectangles from the canvas; estimated from the label if absent. */
   boxes?:          Record<string, Box>;
   colorMap:        Record<string, string>;
+  /** Individuals drawn hatched (HATCH) instead of with their color. */
+  hatched?:        string[];
   style:           DisplayStyle;
   orientation:     "UD" | "LR";
   crossSymbolSize: number;
@@ -134,6 +150,9 @@ export function exportRouting(input: Pick<SvgExportInput,
 export function buildSvg(input: SvgExportInput): SvgExport {
   const { model, positions, colorMap, crossSymbolSize, legend } = input;
   const theme = THEMES[input.style];
+  const hatched = new Set(input.hatched ?? []);
+  const usesHatch = hatched.size > 0 ||
+    (legend?.kind === "discrete" && legend.entries.some(e => e.hatch));
   const shapeOf = new Map(model.individuals.map(n => [n.id, theme.shape(n.cross_type)]));
 
   // ── Geometry ──────────────────────────────────────────────────────────────
@@ -177,12 +196,13 @@ export function buildSvg(input: SvgExportInput): SvgExport {
     const p = at(positions[n.id]);
     const box = shift(boxes[n.id]);
     const shape = shapeOf.get(n.id)!;
-    const fill = colorMap[n.id] ?? theme.defaultFill;
+    const fill = hatched.has(n.id) ? `url(#${HATCH_ID})` : colorMap[n.id] ?? theme.defaultFill;
     let ty: number;
     if (shape === "box") ty = box.top + CLASSIC_BOX.padding + theme.fontSize * 0.9;  // name on top
     else if (shape === "ellipse") ty = p.y + theme.fontSize * 0.35;
     else ty = p.y + SYMBOL_RADIUS + 4 + theme.fontSize * 0.9;                        // below the symbol
-    const color = labelInside(shape) ? theme.text : pageText;
+    // A label inside the shape takes black or white by its fill (WCAG AA).
+    const color = nodeLabelColor(shape, hatched.has(n.id) ? HATCH.fill : fill, pageText);
     return `<g class="node">${shapeSvg(shape, p, box, fill, theme.border)}` +
       `<text class="individual" x="${fmt(p.x)}" y="${fmt(ty)}" text-anchor="middle" ` +
       `fill="${color}">${escapeXml(n.label)}</text></g>`;
@@ -199,7 +219,7 @@ export function buildSvg(input: SvgExportInput): SvgExport {
     `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(width)}" height="${fmt(height)}" ` +
       `viewBox="0 0 ${fmt(width)} ${fmt(height)}" font-family="${CHART_FONT}, sans-serif" ` +
       `font-size="${theme.fontSize}">`,
-    `<defs>${fontFace}</defs>`,
+    `<defs>${fontFace}${usesHatch ? hatchPattern() : ""}</defs>`,
     `<rect class="background" x="0" y="0" width="${fmt(width)}" height="${fmt(height)}" fill="${background}"/>`,
     `<g class="links" transform="translate(${fmt(ox)},${fmt(oy)})">${links}</g>`,
     `<g class="crosses">${crossesSvg}</g>`,
@@ -215,8 +235,9 @@ export function buildSvg(input: SvgExportInput): SvgExport {
 function renderLegend(legend: Legend, theme: StyleTheme, textColor: string, x: number, y: number) {
   const text = (cls: string, tx: number, ty: number, s: string, extra = "") =>
     `<text class="${cls}" x="${fmt(tx)}" y="${fmt(ty)}" fill="${textColor}"${extra}>${escapeXml(s)}</text>`;
-  const swatch = (sx: number, sy: number, color: string) =>
-    `<rect x="${fmt(sx)}" y="${fmt(sy)}" width="${SWATCH}" height="${SWATCH}" fill="${color}" stroke="${theme.border}" stroke-width="0.5"/>`;
+  const swatch = (sx: number, sy: number, color: string, hatch = false) =>
+    `<rect x="${fmt(sx)}" y="${fmt(sy)}" width="${SWATCH}" height="${SWATCH}" ` +
+    `fill="${hatch ? `url(#${HATCH_ID})` : color}" stroke="${theme.border}" stroke-width="0.5"/>`;
 
   // Regular weight only (see svgToPdf); the title is set apart by size.
   const parts = [text("legend-title", x, y + theme.fontSize, legend.trait, ` font-size="${theme.fontSize + 2}"`)];
@@ -225,7 +246,7 @@ function renderLegend(legend: Legend, theme: StyleTheme, textColor: string, x: n
 
   if (legend.kind === "discrete") {
     for (const e of legend.entries) {
-      parts.push(swatch(x, rowY, e.color));
+      parts.push(swatch(x, rowY, e.color, e.hatch));
       parts.push(text("legend", x + SWATCH + 6, rowY + SWATCH - 2, e.label));
       width = Math.max(width, SWATCH + 6 + textWidth(e.label, theme.fontSize));
       rowY += LEGEND_ROW;

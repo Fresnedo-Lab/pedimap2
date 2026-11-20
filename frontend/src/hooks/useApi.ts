@@ -37,6 +37,57 @@ export interface IndividualDetail {
   ancestors:     RelativeRef[];
   descendants:   RelativeRef[];
   siblings:      RelativeRef[];
+  genotypes?:    GenotypeRow[];       // in map order
+  ibd?:          IbdPosition[];       // linkage group by linkage group
+}
+
+/** One genotype row: the alleles as written (null for unknown), in the order
+ *  of the caption's parent columns, and their indicator codes. */
+export interface GenotypeRow {
+  marker:        string;
+  linkage_group: string;
+  position_cM:   number | null;
+  alleles:       (string | null)[];
+  codes:         number[];
+}
+
+/** A likely founder allele of a homologue: its number (1-based), the founder
+ *  that owns it (null when the file does not say, e.g. an exported subset),
+ *  and the probability. */
+export interface IbdAllele { allele: number; founder: string | null; probability: number }
+
+/** The likely founder alleles of each homologue at one IBD position. */
+export interface IbdPosition {
+  linkage_group: string;
+  position:      string;
+  position_cM:   number;
+  homologues:    IbdAllele[][];
+}
+
+/** Every individual's genotype at one marker. */
+export interface MarkerValues {
+  marker:       string;
+  allele_names: string[];
+  values:       Record<string, { alleles: (string | null)[]; codes: number[] }>;
+}
+
+/** Parent labels from the file's caption: `female`/`male` name the
+ *  female_parent/male_parent fields, `columns` the caption's two parent
+ *  columns in order (the order of the alleles and homologues). */
+export interface ParentLabels { female: string; male: string; columns: [string, string] }
+
+export interface MarkerSummary {
+  loci:            number;
+  linkage_groups:  { name: string; loci: number; ibd_positions: number }[];
+  ibd_positions:   number;
+  genotype_rows:   number;
+  individuals_with_genotypes: number;
+  codes:           { code: number; count: number }[];
+  nalleles:        number | null;
+  founders_named:  boolean;
+  /** The codes are FlexQTL's consistency classes (the caption has FACTOR0, as
+   *  FlexQTL and Binko write it); otherwise they are only colors. */
+  flexqtl_codes:   boolean;
 }
 
 export interface GraphNode {
@@ -74,7 +125,13 @@ export interface MarkerMeta {
 export interface PedigreeData {
   population: string; ploidy: number;
   traits: TraitMeta[]; markers: MarkerMeta[];
+  parent_labels?:  ParentLabels;
+  marker_summary?: MarkerSummary;
 }
+
+/** Labels for files without a caption (demo data, JSON). */
+export const DEFAULT_PARENT_LABELS: ParentLabels =
+  { female: "Female parent", male: "Male parent", columns: ["Female parent", "Male parent"] };
 
 // ── Backend URL resolution ────────────────────────────────────────────────────
 
@@ -132,6 +189,7 @@ export interface ApiClient {
   getLayout():                             Promise<Record<string, {x:number;y:number}>>;
   listIndividuals():                       Promise<IndividualSummary[]>;
   getIndividual(id: string):               Promise<IndividualDetail>;
+  getMarkerValues(marker: string):         Promise<MarkerValues>;
   getColorMap(traitName: string, colors?: ColorOverrides): Promise<Record<string, string>>;
   buildSubpop(params: {
     focal_id: string;
@@ -186,6 +244,8 @@ export function useApi(): ApiClient {
     getLayout:      ()   => apiFetch("/api/layout"),
     listIndividuals:()   => apiFetch("/api/individuals"),
     getIndividual:  (id) => apiFetch(`/api/individual/${encodeURIComponent(id)}`),
+    getMarkerValues: (marker) =>
+      apiFetch(`/api/marker-values?${new URLSearchParams({ marker }).toString()}`),
     getColorMap:    (t, colors = {}) => {
       // Issue 1: a color request must never be issued without a trait name.
       // The backend route is /api/color/{trait_name}; calling it with an empty
@@ -296,7 +356,7 @@ export function useBackendHealth(): {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const started = Date.now();
     let url: string | null = null;
@@ -309,20 +369,20 @@ export function useBackendHealth(): {
     const fail = async (foreign: boolean) => {
       const report = isTauri()
         ? await invoke<BackendReport>("backend_report").catch(() => null) : null;
-      if (cancelled) return;
+      if (canceled) return;
       setFailure({ url, lastError, foreign, report });
       setStatus("error");
     };
 
     const poll = async () => {
-      if (cancelled) return;
+      if (canceled) return;
       try {
         url = await resolveBackendUrl();
         const res = await fetch(`${url}/api/health`);
-        if (cancelled) return;
+        if (canceled) return;
         if (res.ok) {
           const body = await res.json().catch(() => null);
-          if (cancelled) return;
+          if (canceled) return;
           if (isPedimapHealth(body)) { setStatus("ready"); return; }
           // Another program answers on this port: never talk to it.
           lastError = `${url} answered, but it is not Pedimap's backend.`;
@@ -331,7 +391,7 @@ export function useBackendHealth(): {
         }
         lastError = `Health check returned HTTP ${res.status}`;
       } catch (e) {
-        if (cancelled) return;
+        if (canceled) return;
         lastError = e instanceof Error ? e.message : String(e);
       }
       // Still not ready: give up after the timeout, otherwise poll again.
@@ -343,7 +403,7 @@ export function useBackendHealth(): {
     };
 
     void poll();
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+    return () => { canceled = true; if (timer) clearTimeout(timer); };
   }, [attempt]);
 
   // Retry restarts the backend if it has stopped (possibly on a new port).

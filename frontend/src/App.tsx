@@ -28,7 +28,7 @@ import {
   useApi, useFetch, useBackendHealth, explainBackendFailure,
   type BackendFailure, type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
-  type DatExportRequest, type SubpopSelection, type LoadResult,
+  type DatExportRequest, type SubpopSelection, type LoadResult, type MarkerValues,
   LEGACY_ENCODING,
 } from "./hooks/useApi";
 import PedigreeCanvas, {
@@ -42,6 +42,9 @@ import { buildChartModel } from "./chart/model";
 import type { DisplayStyle } from "./chart/style";
 import { buildLegend, traitColorsFor, type TraitColors } from "./chart/svgExport";
 import { saveTextFile } from "./lib/saveFile";
+import { markerColoring, type MarkerColoringChoice, type MarkerColoringMode } from "./lib/genotypeCodes";
+import ChartLegend from "./components/ChartLegend";
+import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
 import { exportBaseName } from "./lib/fileNames";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
@@ -50,6 +53,13 @@ import { useUpdater } from "./hooks/useUpdater";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // Keep exported file names portable: letters, digits, dot, dash, underscore.
+// "Color by" entries for marker colorings. They start with a NUL character,
+// which no trait name read from a file can.
+const MARKER_OPTION: Record<MarkerColoringMode, string> = {
+  code:   "\u0000genotype-code",
+  allele: "\u0000allele",
+};
+
 // ── Per-view settings ─────────────────────────────────────────────────────────
 // Pedimap 1.x stores display options per view. This mirrors that surface so
 // later options are field additions rather than a refactor. Wired up today:
@@ -258,6 +268,15 @@ export default function App() {
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
   const [activeTrait, setActiveTrait] = useState<string>("");
+  // The selected individual and its details panel, and the sidebar's search
+  // text: all of them belong to the dataset shown, so a new one clears them.
+  const [selectedId,     setSelectedId] = useState<string | null>(null);
+  const [selectedDetail, setDetail]     = useState<IndividualDetail | null>(null);
+  const [search,         setSearch]     = useState("");
+  // Coloring by a marker (genotype code, or copies of an allele) instead of a
+  // trait, and every individual's genotype at that marker.
+  const [markerChoice, setMarkerChoice] = useState<MarkerColoringChoice | null>(null);
+  const [markerValues, setMarkerValues] = useState<MarkerValues | null>(null);
   // The selection behind the displayed subpopulation; null for the whole population.
   const [subpop,      setSubpop]      = useState<SubpopSelection | null>(null);
 
@@ -317,7 +336,7 @@ export default function App() {
   traitColorsRef.current = view.traitColors;
   const colorOverrides = useCallback((trait: string) => traitColorsRef.current[trait] ?? {}, []);
 
-  // Fetch graph + colours whenever pedigree changes
+  // Fetch graph + colors whenever pedigree changes
   const [graphLoading, setGraphLoading] = useState(true);
   const loadGraph = useCallback(async (trait?: string) => {
     setGraphLoading(true);
@@ -343,13 +362,21 @@ export default function App() {
   // active dataset MUST call this instead of refetching an ad-hoc subset, so a
   // new loader cannot forget an endpoint (e.g. the sidebar's /api/individuals)
   // and leave a panel showing the previous dataset.
+  const datasetLoads = useRef(0);
   const reloadAllData = useCallback(async () => {
+    datasetLoads.current++;
+    // Nothing of the previous dataset may stay on screen: not its selected
+    // individual, details panel or Subpop button, nor the search text.
+    setSelectedId(null);
+    setDetail(null);
+    setSearch("");
+    setMarkerChoice(null);           // the new file may not have the marker
     reloadPedigree();
     reloadIndividuals();
     await loadGraph();
   }, [reloadPedigree, reloadIndividuals, loadGraph]);
 
-  // Issue 2 + 3: initialise once, only after the backend reports healthy.
+  // Issue 2 + 3: initialize once, only after the backend reports healthy.
   // loadGraph catches its own errors, so this fire-and-forget call can't reject.
   const didInit = useRef(false);
   useEffect(() => {
@@ -360,16 +387,19 @@ export default function App() {
   }, [ready, loadGraph]);
 
   // ── Selection ─────────────────────────────────────────────────────────────
-  const [selectedId,     setSelectedId] = useState<string | null>(null);
-  const [selectedDetail, setDetail]     = useState<IndividualDetail | null>(null);
 
   const handleSelect = useCallback(async (id: string) => {
     setSelectedId(id);
-    try { setDetail(await api.getIndividual(id)); }
+    const dataset = datasetLoads.current;
+    try {
+      const detail = await api.getIndividual(id);
+      // A dataset loaded meanwhile: its panel must not show the old individual.
+      if (dataset === datasetLoads.current) setDetail(detail);
+    }
     catch { /* silently ignore */ }
   }, [api]);
 
-  // ── Trait colouring ───────────────────────────────────────────────────────
+  // ── Trait coloring ───────────────────────────────────────────────────────
   const handleTraitChange = useCallback(async (name: string) => {
     setActiveTrait(name);
     try {
@@ -381,6 +411,23 @@ export default function App() {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
   }, [api, colorOverrides]);
+
+  // ── Marker coloring ──────────────────────────────────────────────────────
+  const chooseMarkerColoring = useCallback((choice: MarkerColoringChoice) => {
+    setActiveTrait("");
+    setColorMap({});
+    setMarkerChoice(choice);
+  }, []);
+
+  useEffect(() => {
+    if (!markerChoice) { setMarkerValues(null); return; }
+    if (markerValues?.marker === markerChoice.marker) return;
+    let current = true;
+    api.getMarkerValues(markerChoice.marker).then(values => {
+      if (current) setMarkerValues(values);
+    }, e => setLoadError(e instanceof Error ? e.message : String(e)));
+    return () => { current = false; };
+  }, [api, markerChoice, markerValues]);
 
   // Continuous-trait colors: store per trait (per view) and recolor. Color
   // pickers fire while dragging, so only the latest request's answer is kept.
@@ -506,6 +553,21 @@ export default function App() {
     [graphData, showCrossSymbols]);
   const tooLargeToDraw = !!graphData && graphData.nodes.length > drawingLimit;
 
+  // The marker coloring of the displayed individuals, when one is chosen.
+  // Coloring by copies of an allele starts with the marker's first allele.
+  const loadedValues = markerChoice && markerValues?.marker === markerChoice.marker ? markerValues : null;
+  const flexqtlCodes = pedigree?.marker_summary?.flexqtl_codes ?? false;
+  const chosenAllele = markerChoice?.mode === "allele" && loadedValues
+    && (loadedValues.allele_names.includes(markerChoice.allele ?? "")
+      ? markerChoice.allele : loadedValues.allele_names[0]);
+  const coloring = useMemo(() => (
+    markerChoice && graphData && loadedValues && (markerChoice.mode === "code" || chosenAllele)
+      ? markerColoring(loadedValues, { ...markerChoice, allele: chosenAllele || undefined },
+                       graphData.nodes.map(n => n.id), flexqtlCodes)
+      : null
+  ), [markerChoice, loadedValues, chosenAllele, graphData, flexqtlCodes]);
+  const chartColors = coloring?.colorMap ?? colorMap;
+
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const closeImageDialog = useCallback(() => setImageDialogOpen(false), []);
 
@@ -515,10 +577,11 @@ export default function App() {
     const meta = pedigree?.traits.find(t => t.name === activeTrait);
     const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
     return {
-      model: chartModel, ...geometry, colorMap, style: displayStyle, orientation, crossSymbolSize,
-      legend: buildLegend(meta, chartModel.individuals, colorMap, colors),
+      model: chartModel, ...geometry, colorMap: chartColors, hatched: coloring?.hatched,
+      style: displayStyle, orientation, crossSymbolSize,
+      legend: coloring?.legend ?? buildLegend(meta, chartModel.individuals, colorMap, colors),
     };
-  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, displayStyle, orientation, crossSymbolSize]);
+  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, displayStyle, orientation, crossSymbolSize]);
 
   const handleLoadExample = useCallback(async () => {
     try {
@@ -549,8 +612,8 @@ export default function App() {
   }, [api, reloadAllData]);
 
   // ── Search filter ─────────────────────────────────────────────────────────
-  // (indList is fetched near the top so its reload can join reloadAllData.)
-  const [search, setSearch] = useState("");
+  // (indList and the search text are declared near the top so that
+  // reloadAllData can refresh and clear them.)
   const filtered = (indList ?? []).filter(i =>
     i.name.toLowerCase().includes(search.toLowerCase()) ||
     i.id.toLowerCase().includes(search.toLowerCase())
@@ -691,18 +754,49 @@ export default function App() {
           ⤢ Fit to window
         </button>
 
-        {traits.length > 0 && (
+        {(traits.length > 0 || markers.length > 0) && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-            <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap" }}>Colour by:</span>
+            <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap" }}>Color by:</span>
             <select
-              value={activeTrait}
-              onChange={e => handleTraitChange(e.target.value)}
-              style={{ width: 160 }}>
+              aria-label="Color by"
+              value={markerChoice ? MARKER_OPTION[markerChoice.mode] : activeTrait}
+              onChange={e => {
+                const mode = (Object.keys(MARKER_OPTION) as MarkerColoringMode[])
+                  .find(m => MARKER_OPTION[m] === e.target.value);
+                if (mode) {
+                  chooseMarkerColoring({ mode, marker: markerChoice?.marker ?? markers[0].name,
+                                         allele: markerChoice?.allele });
+                } else {
+                  setMarkerChoice(null);
+                  void handleTraitChange(e.target.value);
+                }
+              }}
+              style={{ width: 200 }}>
               <option value="">None</option>
               {traits.map(t => (
                 <option key={t.name} value={t.name}>{t.name}</option>
               ))}
+              {markers.length > 0 && (
+                <>
+                  <option value={MARKER_OPTION.code}>Genotype code at marker…</option>
+                  <option value={MARKER_OPTION.allele}>Allele at marker…</option>
+                </>
+              )}
             </select>
+            {markerChoice && (
+              <select aria-label="Marker" value={markerChoice.marker} style={{ width: 120 }}
+                onChange={e => setMarkerChoice({ ...markerChoice, marker: e.target.value, allele: undefined })}>
+                {markers.map(m => (
+                  <option key={m.name} value={m.name}>{m.name}{m.linkage_group ? ` (LG ${m.linkage_group})` : ""}</option>
+                ))}
+              </select>
+            )}
+            {markerChoice?.mode === "allele" && loadedValues && (
+              <select aria-label="Allele" value={chosenAllele || ""} style={{ width: 80 }}
+                onChange={e => setMarkerChoice({ ...markerChoice, allele: e.target.value })}>
+                {loadedValues.allele_names.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            )}
             {activeTraitMeta?.type === "continuous" && (() => {
               const colors = traitColorsFor(activeTraitMeta, view.traitColors[activeTrait]);
               const picker = (key: keyof TraitColors, label: string) => (
@@ -751,6 +845,9 @@ export default function App() {
           {pedigree?.population ?? ""}
           {pedigree ? ` · ${graphData?.nodes?.length ?? 0} individuals` : ""}
         </span>
+        {(pedigree?.marker_summary?.loci ?? 0) > 0 && (
+          <MarkerSummaryMenu summary={pedigree!.marker_summary!} />
+        )}
         <SettingsMenu
           showCrossSymbols={showCrossSymbols}
           crossSymbolSize={crossSymbolSize}
@@ -881,14 +978,17 @@ export default function App() {
               <PedigreeCanvas
                 ref={canvasRef}
                 model={chartModel}         // built from GraphData, null excluded
-                colorMap={colorMap}
+                colorMap={chartColors}
                 selected={selectedId}
                 onSelect={handleSelect}
                 orientation={orientation}
                 style={displayStyle}
                 crossSymbolSize={crossSymbolSize}
+                parentLabels={pedigree?.parent_labels}
+                hatched={coloring?.hatched}
               />
             )}
+          {coloring && !tooLargeToDraw && <ChartLegend legend={coloring.legend} />}
         </div>
 
         {/* Detail panel */}
@@ -897,7 +997,8 @@ export default function App() {
             key={selectedDetail.id}      // collapse relative lists on a new selection
             individual={selectedDetail}
             traits={traits}
-            markers={markers}
+            parentLabels={pedigree?.parent_labels}
+            markerSummary={pedigree?.marker_summary}
             onSelectId={handleSelect}
             onClose={() => { setSelectedId(null); setDetail(null); }}
           />
