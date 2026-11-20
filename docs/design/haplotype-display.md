@@ -62,10 +62,17 @@ length is the group's map; its top is the group's start.
   rather than a reshuffle. For drawing, the probabilities of a homologue are
   divided by their sum (FlexQTL's rounded values sum to 0.98–1.02); the values
   shown on hover are the values as read.
-- **Narrow segments.** A segment narrower than one device pixel at the current
-  zoom is merged into a single neutral segment (light gray, see §2.4) at the
-  band's end, so tiny probabilities do not turn into colored noise; hover lists
-  them.
+- **Narrow segments.** A segment narrower than one chart pixel (one pixel at
+  100 % zoom) is merged into a single neutral segment (dark gray, see §2.4)
+  at the band's end, so tiny probabilities do not turn into colored noise;
+  hover lists them. The threshold is in chart units, not screen pixels, so the
+  screen and the export (drawn at 100 %) merge the same segments. **The
+  threshold therefore follows the bar width:** a bar *w* pixels wide merges
+  probabilities below 1/*w* of a homologue (below 0.1 with the default
+  10-pixel bar, below 0.05 at 20 pixels). Since the bar width decides which
+  probabilities are drawn separately, its setting (PR 4) must be prominent:
+  in the "Haplotypes" section of ⚙, next to the color scheme, with its effect
+  stated ("probabilities below 0.10 are drawn as one gray remainder").
 - **Founders without data** have rows supplied by the parser (probability 1 on
   their own alleles), so their bars show their own two founder alleles, one per
   homologue, like every founder. Nothing extra is needed.
@@ -96,9 +103,11 @@ probability]` pairs of homologue *h*. `founders` is `null` for an exported
 subset; the display then names founder alleles by number only. The response
 is cached per group in the frontend.
 
-Separately, `/api/pedigree` stops sending `ibd` and the per-individual data it
-duplicates (§10, PR 1), which removes 1.86 MB from every load of the FlexQTL
-file. The JSON export (`/api/export/json`) keeps everything.
+Separately, `/api/pedigree` stops sending `ibd` (§10, PR 1), which takes the
+FlexQTL file's reply from 2.07 MB to 0.21 MB. The JSON export
+(`/api/export/json`) keeps everything. Measured on the fixtures:
+`/api/haplotypes` sends 75 kB for one FlexQTL group and 396 kB for the
+synthetic 300-individual group of §8.
 
 ## 2. Color schemes
 
@@ -115,20 +124,35 @@ with "by founder" as the default.
 
 ### 2.2 How colors are generated
 
-Colors are defined in OKLCH (perceptually even lightness and hue) and clamped
-to sRGB:
+Colors are chosen from a grid in OKLCH (perceptually even lightness and hue:
+36 hues, four chromas, several lightnesses, clamped to sRGB) and stored as
+fixed sequences in `frontend/src/lib/palettes.ts`, written by
+`paletteGenerator.ts`:
 
 - **By founder.** Founder *r* (its rank among the contributing founders, see
-  below)
-  gets hue *h<sub>r</sub>* = *r* × 137.5° (the golden angle, so consecutive
-  founders are far apart on the hue circle). Its two alleles get lightness 0.80
-  and 0.58 at chroma 0.12. Founders alternate between two lightness pairs
-  (0.80/0.58 and 0.72/0.50) so that founders whose hues end up close differ in
-  lightness too.
-- **By founder allele.** The same generator over founder-allele ranks, with
-  three lightness tiers (0.82, 0.66, 0.50) cycling.
+  below) takes pair *r* of a sequence of pairs of shades of one hue (light for
+  its first founder allele, dark for its second; 0.22 or 0.30 apart in
+  lightness). The sequence is built greedily: each next pair is the candidate
+  farthest (CIEDE2000) from every color already chosen, under normal vision
+  and the three simulated color-vision deficiencies at once, so the first few
+  pairs, all a subpopulation usually needs, are the most separated. Up to 22
+  contributing founders use this sequence; beyond that, a second sequence,
+  refined so that the whole set is as separated as possible, separates them
+  better (§2.5). No generated color comes within ΔE 10 of the remainder gray
+  (§2.4), under any of the four visions. Beyond the 30 stored pairs, colors
+  continue around the hue
+  circle by the golden angle, and telling them apart relies on the legend,
+  the hover and the highlight scheme.
+- **By founder allele.** A greedy sequence of 60 single colors, built the same
+  way.
 - **Highlight.** Highlights take the eight colors of the Okabe–Ito set (chosen
   for color-blind viewers), in order; everything else is `#E5E7EB`.
+
+The first draft generated colors by formula (golden-angle hues at fixed
+lightness pairs). Measured, it kept 58 alleles ΔE 7.1 apart for normal vision
+but collapsed under the simulations (ΔE 0.0 under deuteranopia), and kept the
+4 founders of G3_010 only ΔE 2.1 apart under protanopia; hence the generated
+sequences.
 
 **Which founders get colors: the contributing founders.** The palette is
 assigned only over the founders that contribute IBD probability to the
@@ -148,39 +172,58 @@ No palette makes 58 colors individually nameable at a glance. The design
 promises measurable separation, and gives other ways to identify an allele
 where color alone cannot:
 
-- **Targets** (CIEDE2000 ΔE between colors, under normal vision and under
-  simulated protanopia, deuteranopia and tritanopia, Machado et al. 2009):
-  - the two alleles of one founder: ΔE ≥ 15 (the lightness step);
-  - up to 12 contributing founders: every pair of founders ΔE ≥ 12;
-  - all 29 founders of the FlexQTL fixture (58 alleles): the nearest pair
-    ΔE ≥ 5, and adjacent segments within a band always differ (they belong to
-    different founder alleles, ordered by number, and consecutive founders are
-    far apart in hue).
+- **Guarantees** (CIEDE2000 ΔE between any two founder-allele colors, the
+  smallest over normal vision and simulated protanopia, deuteranopia and
+  tritanopia, Machado et al. 2009). These are the measured values of the
+  stored palettes, and `palettes.test.ts` keeps them as lower bounds:
 
-  The palette tests (PR 1) compute these for 1–60 founder alleles; if a target
-  is missed, the lightness pairs and chroma are adjusted, not the targets.
+  | Contributing founders (by founder) | 4 | 8 | 12 | 22 | 30 |
+  |---|---|---|---|---|---|
+  | Closest pair, ΔE ≥ | 11.9 | 7.3 | 6.4 | 4.2 | 4 |
+
+  | Founder alleles (by founder allele) | 8 | 16 | 30 | 58 |
+  |---|---|---|---|---|
+  | Closest pair, ΔE ≥ | 11.8 | 8.7 | 6.3 | 4.5 |
+
+  A founder's two shades are ΔE ≥ 15 apart (measured: at least 17.7). The
+  draft's targets (ΔE ≥ 12 up to 12 founders, ≥ 5 at 29) proved out of reach
+  when all four visions must hold at once: color-blind vision leaves
+  essentially two dimensions (lightness and blue–yellow) for the colors to
+  spread in. Above about 12 founders, a pair of colors can therefore be
+  similar, and identifying a founder allele relies on what follows.
 - **Beyond color:** hover (§9) names the founder allele, its founder and the
   probability; the legend (§7) lists exactly the founder alleles shown; the
   highlight scheme isolates a few; and in the details panel the same data is
   available as text.
-- **Measured** separations for the FlexQTL fixture (whole population, and the
-  subpopulation of G3_010) are recorded in PR 1 and in §2.5 once the palette
-  exists.
-- **Color-blind aware:** lightness carries part of every distinction (the two
-  shades, the alternating pairs, the tiers), so no distinction relies on hue
-  alone; the highlight scheme uses Okabe–Ito.
+- **Color-blind aware:** the palettes are chosen and measured under the three
+  simulated deficiencies as well as normal vision, a founder's two shades
+  differ in lightness, and the highlight scheme uses Okabe–Ito.
 
 ### 2.4 Neutral fills
 
-- Narrow-segment remainder (§1.1): `#D1D5DB`.
+- Narrow-segment remainder (§1.1): `#4B5563`, a dark neutral gray. Under all
+  four visions it is at least ΔE 10 from every generated palette color (the
+  generator excludes candidates closer than that), 17 from the highlight
+  colors, 30 from the hatched gray of an unknown value (`#9CA3AF`) and 47 from
+  the light gray of the hatch's stripes and of the highlight scheme
+  (`#E5E7EB`); `palettes.test.ts` checks these. (The first choice,
+  `#D1D5DB`, was only ΔE 4.2 from that light gray.)
 - Highlight scheme, not highlighted: `#E5E7EB`.
 - A founder allele of a subset whose founders are not named: its color by
   number, legend by number.
 
-### 2.5 Measured separation
+### 2.5 Measured separation (FlexQTL fixture)
 
-To be filled in by PR 1 (closest pair of founder-allele colors, CIEDE2000,
-normal vision and the three simulations).
+Closest pair of founder-allele colors, by founder, CIEDE2000 (the same on
+both linkage groups, which have the same contributing founders):
+
+| Displayed | Contributing founders | Normal | Protanopia | Deuteranopia | Tritanopia | A founder's two shades |
+|---|---|---|---|---|---|---|
+| Whole population | 29 (58 founder alleles) | 4.58 | 4.20 | 4.04 | 4.20 | ≥ 17.8 |
+| Subpopulation of G3_010 (Subpop: ancestors and descendants, 9 individuals) | 4 (F002, F003, F010, F018) | 13.53 | 13.11 | 12.55 | 11.97 | ≥ 19.7 |
+
+Keeping every color ΔE 10 from the remainder gray cost some separation:
+before that rule the same cases measured 4.16 and 13.90 at their worst.
 
 ## 3. Markers inside the box (optional)
 
@@ -220,7 +263,7 @@ haplotype: {
   highlighted:   number[];            // founder alleles, at most 8
   markerColumns: { mostProbable: boolean; observed: boolean };
   thresholds:    { certain: number; likely: number };     // 0.95, 0.75
-  barWidth:      number;              // px per bar, default 10
+  barWidth:      number;              // px per bar, default 10; sets the merge threshold (§1.1)
   barHeight:     number;              // px, default 90
   markerTicks:   boolean;             // ticks at markers; default true
 }                                     // (ticks at IBD positions always shown)
@@ -327,8 +370,16 @@ time (the drawing of one frame, wrapped in `performance.mark`/`measure`, which
 the WebKit test reads with `performance.getEntriesByName`), each in name-only
 and IBD mode, in WebKit on macOS. Payload size of `/api/haplotypes`.
 
-**Budgets** (macOS, WebKit; to be confirmed against the baseline measured in
-PR 1):
+**Baseline** (PR 1, name-only display, WebKit on macOS, three runs):
+
+| | FlexQTL fixture | Synthetic 300 × 50 |
+|---|---|---|
+| Layout | 25–26 ms | 63–64 ms |
+| Redraw, median (largest) | 1 ms (4 ms) | 2 ms (3 ms) |
+
+WebKit reports times in whole milliseconds.
+
+**Budgets** (macOS, WebKit):
 
 | | FlexQTL fixture | Synthetic 300 × 50 |
 |---|---|---|

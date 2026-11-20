@@ -127,8 +127,13 @@ def health():
 @app.get("/api/pedigree")
 def get_pedigree():
     """The engine's data, plus how to label the parents (from the file's
-    caption) and a summary of the marker data."""
-    return {**_engine.to_dict(),
+    caption) and a summary of the marker data. Without the IBD probabilities:
+    no screen reads them from here (the haplotype display fetches one linkage
+    group at a time from /api/haplotypes), and they are most of the data of a
+    FlexQTL file. /api/export/json keeps everything."""
+    data = _engine.to_dict()
+    del data["ibd"]
+    return {**data,
             "parent_labels":  marker_data.parent_labels(_engine),
             "marker_summary": marker_data.marker_summary(_engine)}
 
@@ -179,6 +184,15 @@ def get_individual(ind_id: str):
         "genotypes":     marker_data.genotypes(eng, ind_id),
         "ibd":           marker_data.ibd_summary(eng, ind_id),
     }
+
+
+@app.get("/api/haplotypes")
+def get_haplotypes(linkage_group: str):
+    """One linkage group's IBD probabilities for the haplotype display, sparse."""
+    data = marker_data.haplotypes(get_engine(), linkage_group)
+    if data is None:
+        raise HTTPException(404, f"Linkage group '{linkage_group}' has no IBD positions.")
+    return data
 
 
 @app.get("/api/marker-values")

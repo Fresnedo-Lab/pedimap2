@@ -10,6 +10,11 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+### Changed
+- Files with IBD data open with much less data passed around inside the app:
+  the pedigree data no longer carries the IBD probabilities, which no screen
+  reads from it (for the FlexQTL test file, 0.21 MB instead of 2.07 MB).
+
 ## [2.3.0] — 2026-11-20
 
 Pedimap 2 now reads FlexQTL and Binko files correctly and shows their marker
