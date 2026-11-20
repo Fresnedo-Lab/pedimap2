@@ -24,11 +24,13 @@ function pedigreeOf(n: number): GraphData {
   return syntheticGraph(rows);
 }
 
-function serve(graph: GraphData, load: unknown = { loaded: "dat", individuals: 0 }) {
+function serve(graph: GraphData, load: unknown = { loaded: "dat", individuals: 0 },
+               population = "Synthetic") {
   const routes: Record<string, unknown> = {
     "/api/health":      { status: "ok", app: "pedimap2", version: "test" },
     "/api/load":        load,
-    "/api/pedigree":    { population: "Synthetic", ploidy: 2, traits: [], markers: [] },
+    "/api/export/dat":  "PEDIGREE",
+    "/api/pedigree":    { population, ploidy: 2, traits: [], markers: [] },
     "/api/individuals": graph.nodes.map(n => ({ id: n.id, name: n.label, generation: n.generation, cross_type: n.cross_type })),
     "/api/graph":       graph,
   };
@@ -125,5 +127,25 @@ describe("loading a file", () => {
 
     fireEvent.click(within(banner).getByText("Dismiss"));
     expect(screen.queryByRole("status", { name: "File warnings" })).toBeNull();
+  });
+});
+
+describe("exported file names", () => {
+  it("drop a data-file extension from the population name", async () => {
+    // FlexQTL and Binko write the data file's name as POPULATION.
+    serve(pedigreeOf(4), undefined, "pm_small.dat");
+    const url = URL as unknown as Record<string, unknown>;   // jsdom has no object URLs
+    url.createObjectURL = () => "blob:x";
+    url.revokeObjectURL = () => {};
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) { names.push(this.download); });
+    render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    fireEvent.click(screen.getByText(/Export \.dat/));
+    await vi.waitFor(() => expect(names).toEqual(["pm_small.dat"]));
+    click.mockRestore();
+    delete url.createObjectURL;
+    delete url.revokeObjectURL;
   });
 });

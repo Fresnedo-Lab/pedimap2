@@ -6,6 +6,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 
 const backendPort = Number(process.env.E2E_BACKEND_PORT ?? 8765);
 const backend = `http://127.0.0.1:${backendPort}`;
@@ -97,8 +98,10 @@ async function load(page: Page, dataset: string) {
   else {
     // Uploaded straight to the backend, then shown by reloading the app.
     const file = path.resolve("../backend/tests/fixtures", dataset);
+    const gz = file.endsWith(".gz");                         // large fixtures are compressed
+    const bytes = gz ? zlib.gunzipSync(fs.readFileSync(file)) : fs.readFileSync(file);
     const form = new FormData();
-    form.append("dat_file", new Blob([fs.readFileSync(file)]), path.basename(file));
+    form.append("dat_file", new Blob([bytes]), path.basename(file, gz ? ".gz" : undefined));
     const res = await fetch(`${backend}/api/load`, { method: "POST", body: form });
     expect(res.ok, `load ${dataset}`).toBe(true);
     await page.reload();
@@ -147,7 +150,8 @@ async function expectNoCrossings(page: Page, dataset: string) {
   expect(failures).toEqual([]);
 }
 
-for (const dataset of ["Example", "apple_public.dat", "Demo Data"]) {
+for (const dataset of ["Example", "apple_public.dat", "Demo Data", "flexqtl_binko/binko_ibd.ped",
+                       "flexqtl_binko/flexqtl_routeB_sim_small.ped.gz"]) {
   test(`${dataset}: exported links cross no other individual or ×, in all 8 settings`,
        ({ page }) => expectNoCrossings(page, dataset));
 }

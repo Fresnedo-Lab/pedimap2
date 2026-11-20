@@ -91,12 +91,49 @@ function hierarchicalFor(
     direction:            orientation,
     sortMethod:           "directed",
     levelSeparation:      generationSpacing / levelsPerGeneration,
-    nodeSpacing:          lr ? 60 : Math.max(100, longestLabel + 40),
+    // Whole pixels: vis-network's sibling gaps come out whole, and the
+    // unconnected individuals are packed at this spacing (packUnconnected).
+    nodeSpacing:          lr ? 60 : Math.round(Math.max(100, longestLabel + 40)),
     treeSpacing:          160,
     blockShifting:        true,
     edgeMinimization:     !large,
     parentCentralization: true,
   };
+}
+
+// vis-network lays out every individual without links (a founder without
+// offspring) as a tree of its own, a tree spacing apart beyond the pedigree:
+// in LR, where a generation is a column, they stack below it one by one. Put
+// them in their own row instead, after its last node, at the node spacing of
+// siblings. No link passes beyond a row's last node (a link crosses a row only
+// at a waypoint, which is a node of the row), so the routing keeps its lanes.
+export function packUnconnected(net: Network, model: ChartModel, orientation: Orientation,
+                                nodeSpacing: number): void {
+  const linked = new Set(model.links.flatMap(l => [l.from, l.to]));
+  const unconnected = model.individuals.map(n => n.id).filter(id => !linked.has(id));
+  if (unconnected.length === 0) return;
+  const lr = orientation === "LR";
+  const along = (p: Point) => (lr ? p.y : p.x);              // position within a row
+  const positions = net.getPositions() as Record<string, Point>;
+  const lonely = new Set(unconnected);
+  const end = new Map<number, number>();                     // a row's last position
+  for (const [id, level] of model.levels) {
+    const p = positions[id];
+    if (p && !lonely.has(id)) end.set(level, Math.max(end.get(level) ?? -Infinity, along(p)));
+  }
+  for (const id of unconnected) {
+    const level = model.levels.get(id)!;
+    const p = positions[id];
+    const last = end.get(level);
+    const next = last === undefined ? along(p) : last + nodeSpacing;
+    net.moveNode(id, lr ? p.x : next, lr ? next : p.y);
+    end.set(level, next);
+  }
+}
+
+// The part of vis-network's internals the canvas listens to (not in its types).
+interface VisInternals {
+  body: { emitter: { on(event: string, handler: () => void): void } };
 }
 
 // Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
@@ -360,6 +397,20 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
         },
         configure: { enabled: false },
       });
+      // vis-network lays the chart out again whenever its data or layout
+      // options change (a "_dataChanged" or "_resetHierarchicalLayout" event of
+      // its internal emitter); repack after each of those layouts, too. These
+      // listeners are added after vis's own, so they run after its layout.
+      const net = network;
+      const pack = () => {
+        const o = latest.current.orientation;
+        packUnconnected(net, model, o,
+                        hierarchicalFor(o, longest, model.levelsPerGeneration, false).nodeSpacing);
+      };
+      pack();
+      const emitter = (net as unknown as VisInternals).body.emitter;
+      emitter.on("_dataChanged", pack);
+      emitter.on("_resetHierarchicalLayout", pack);
       networkRef.current = network;
       appliedOrientation.current = orientation;
       stale.current = true;

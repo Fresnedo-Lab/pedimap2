@@ -169,24 +169,24 @@ async fn open_file_dialog(app: AppHandle) -> Result<Vec<String>, String> {
         .unwrap_or_default())
 }
 
-/// Save-dialog filters, grouped so that an image export offers only image
-/// formats and a data export only data formats.
-const SAVE_FILTERS: [(&str, &str, u8); 5] = [
-    ("dat", "Pedimap Data", 0),
-    ("json", "Pedigree JSON", 0),
-    ("png", "PNG image", 1),
-    ("svg", "SVG image", 1),
-    ("pdf", "PDF document", 1),
+/// Save-dialog filters by file extension.
+const SAVE_FILTERS: [(&str, &str); 5] = [
+    ("dat", "Pedimap Data"),
+    ("json", "Pedigree JSON"),
+    ("png", "PNG image"),
+    ("svg", "SVG image"),
+    ("pdf", "PDF document"),
 ];
 
-/// Filters for a suggested file name: the one matching its extension first
-/// (so it is preselected), then the rest of its group.
+/// Filters for a suggested file name: only the one of its format, since the
+/// content is already made in that format (picking "SVG" in the dialog for a
+/// PNG export would only change the name). An unknown extension gets them all.
 fn save_filters_for(name: &str) -> Vec<(&'static str, &'static str)> {
     let ext = name.rsplit('.').next().unwrap_or("").to_lowercase();
-    let group = SAVE_FILTERS.iter().find(|f| f.0 == ext).map_or(0, |f| f.2);
-    let mut filters: Vec<_> = SAVE_FILTERS.iter().filter(|f| f.2 == group).collect();
-    filters.sort_by_key(|f| f.0 != ext);
-    filters.into_iter().map(|f| (f.0, f.1)).collect()
+    match SAVE_FILTERS.iter().find(|f| f.0 == ext) {
+        Some(&filter) => vec![filter],
+        None => SAVE_FILTERS.to_vec(),
+    }
 }
 
 /// Open a native save dialog suggesting `default_name` (default
@@ -588,10 +588,13 @@ mod tests {
     }
 
     #[test]
-    fn save_filters_offer_the_matching_group_first() {
+    fn save_filters_offer_only_the_chosen_format() {
         let exts = |n| save_filters_for(n).into_iter().map(|f| f.0).collect::<Vec<_>>();
-        assert_eq!(exts("tree.svg"), ["svg", "png", "pdf"]);
-        assert_eq!(exts("pop.dat"), ["dat", "json"]);
-        assert_eq!(exts("pedigree.json"), ["json", "dat"]);
+        assert_eq!(exts("tree.svg"), ["svg"]);
+        assert_eq!(exts("pm_small.png"), ["png"]);
+        assert_eq!(exts("pm_small.PDF"), ["pdf"]);
+        assert_eq!(exts("pop.dat"), ["dat"]);
+        assert_eq!(exts("pedigree.json"), ["json"]);
+        assert_eq!(exts("notes"), ["dat", "json", "png", "svg", "pdf"]);
     }
 }

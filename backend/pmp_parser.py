@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import heapq
 from collections import Counter
+from difflib import SequenceMatcher
 import math
 import re
 from decimal import Decimal
@@ -246,13 +247,20 @@ def _edit_distance(a: str, b: str, limit: int) -> int:
 
 def _closest_name(name: str, names: Iterable[str]) -> Optional[str]:
     """The name nearest to ``name`` ignoring case, if it is within a small edit
-    distance: 1 for names up to 5 characters, 2 for longer ones."""
+    distance: 1 for names up to 5 characters, 2 for longer ones.
+
+    Among names equally near, the most similar one wins: F001 is one edit from
+    F002 and from F0001, but F0001 keeps all four of its characters in order."""
     limit = 1 if len(name) <= 5 else 2
-    best, best_distance = None, limit + 1
+    key = name.lower()
+    best, best_rank = None, (limit + 1, 0.0)
     for other in names:
-        d = _edit_distance(name.lower(), other.lower(), limit)
-        if d < best_distance:
-            best, best_distance = other, d
+        d = _edit_distance(key, other.lower(), limit)
+        if d > limit:
+            continue
+        rank = (d, -SequenceMatcher(None, key, other.lower()).ratio())
+        if rank < best_rank:
+            best, best_rank = other, rank
     return best
 
 

@@ -99,6 +99,11 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   NOTICE_LAYOUT_NODES it paints a "Laying out…" notice first. Both are in
   PedigreeCanvas.tsx; recheck them with synthetic pedigrees
   (src/test/syntheticPedigree.ts) if the layout changes.
+- vis-network lays out each individual without links as a separate tree;
+  packUnconnected (PedigreeCanvas.tsx) moves them into their row at the
+  sibling spacing. vis lays the chart out again on every "_dataChanged" and
+  "_resetHierarchicalLayout" of its internal emitter, so the canvas repacks
+  after each; anything else that adjusts vis's positions must do the same.
 - Release tags are created only by scripts/tag-release.sh VERSION (on main,
   clean, in sync with origin, all four version files and a CHANGELOG section
   at VERSION). Never `git tag` a release by hand: a hand-made v2.2.2 once

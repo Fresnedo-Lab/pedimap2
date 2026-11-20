@@ -116,6 +116,63 @@ describe("links never cross a node they do not connect", () => {
     const graph = fixture("example.json");
     await expectNoViolations("Example", [graph, ...subpopulations(graph).map(s => s.graph)]);
   });
+
+  // Simulated FlexQTL and Binko files, with founders that have no offspring.
+  it("pm_small (Binko): whole population and every subpopulation", async () => {
+    const graph = fixture("pm_small.json");
+    await expectNoViolations("pm_small", [graph, ...subpopulations(graph).map(s => s.graph)]);
+  });
+
+  it("sim_small (FlexQTL): whole population, also after dragging", async () => {
+    await expectNoViolations("sim_small", [fixture("sim_small.json")]);
+    await expectNoViolations("sim_small dragged", [fixture("sim_small.json")], CONFIGS, true);
+  }, 120_000);
+});
+
+describe("individuals without links", () => {
+  // vis-network gives each its own tree, a tree spacing apart beyond the
+  // pedigree; they go in their row instead, after its last node, as far apart
+  // as siblings are.
+  const within = (o: "UD" | "LR", p: { x: number; y: number }) => (o === "UD" ? p.x : p.y);
+  const row = (o: "UD" | "LR", p: { x: number; y: number }) => (o === "UD" ? p.y : p.x);
+
+  function expectPacked(model: ChartModel, positions: Record<string, { x: number; y: number }>,
+                        o: "UD" | "LR") {
+    const linked = new Set(model.links.flatMap(l => [l.from, l.to]));
+    const lonely = model.individuals.filter(n => !linked.has(n.id)).map(n => n.id);
+    expect(lonely.length).toBeGreaterThan(0);
+    const level = model.levels.get(lonely[0])!;
+    const inRow = [...model.levels].filter(([, l]) => l === level).map(([id]) => id)
+      .sort((a, b) => within(o, positions[a]) - within(o, positions[b]));
+    const gaps = inRow.slice(1).map((id, i) => within(o, positions[id]) - within(o, positions[inRow[i]]));
+    const sibling = Math.min(...gaps.slice(0, inRow.length - 1 - lonely.length));
+    // The unconnected ones come last in the row, in order, at the sibling spacing.
+    expect(inRow.slice(-lonely.length)).toEqual(lonely);
+    expect(gaps.slice(-lonely.length)).toEqual(lonely.map(() => sibling));
+    for (const id of lonely) expect(row(o, positions[id])).toBe(row(o, positions[inRow[0]]));
+  }
+
+  it("sit in their row at the sibling spacing (sim_small: eleven founders)", async () => {
+    const graph = fixture("sim_small.json");
+    for (const config of CONFIGS) {
+      const { model, geometry } = await drawn(graph, config);
+      const linked = new Set(model.links.flatMap(l => [l.from, l.to]));
+      expect(model.individuals.filter(n => !linked.has(n.id))).toHaveLength(11);
+      expectPacked(model, geometry.positions, config.orientation);
+    }
+  });
+
+  it("stay packed when the orientation changes", async () => {
+    const model = buildChartModel(fixture("pm_small.json"), true);
+    const props = { model, colorMap: {}, selected: null, onSelect: () => {}, style: "classic" as const,
+                    crossSymbolSize: CROSS_SIZE };
+    const { rerender } = render(<PedigreeCanvas {...props} orientation="UD" />);
+    await vi.waitFor(() => expect(networks.length).toBe(1));
+    const net = networks.pop()!;
+    rerender(<PedigreeCanvas {...props} orientation="LR" />);       // laid out again in place
+    expectPacked(model, net.getPositions(), "LR");
+    cleanup();
+  });
 });
 
 // The private file is never committed, so this runs only locally (skipped in

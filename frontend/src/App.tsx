@@ -42,6 +42,7 @@ import { buildChartModel } from "./chart/model";
 import type { DisplayStyle } from "./chart/style";
 import { buildLegend, traitColorsFor, type TraitColors } from "./chart/svgExport";
 import { saveTextFile } from "./lib/saveFile";
+import { exportBaseName } from "./lib/fileNames";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
 import { useUpdater } from "./hooks/useUpdater";
@@ -49,10 +50,6 @@ import { useUpdater } from "./hooks/useUpdater";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // Keep exported file names portable: letters, digits, dot, dash, underscore.
-function safeFileName(name: string): string {
-  return name.replace(/[^\w.-]+/g, "_");
-}
-
 // ── Per-view settings ─────────────────────────────────────────────────────────
 // Pedimap 1.x stores display options per view. This mirrors that surface so
 // later options are field additions rather than a refactor. Wired up today:
@@ -496,9 +493,7 @@ export default function App() {
             replace_outside_parents: replaceOutside }
         : {};
       const text = await api.exportDat(req);
-      const population = pedigree?.population || "pedigree";
-      const name = subpop ? `${population}_${subpop.focal_id}_subpop.dat` : `${population}.dat`;
-      await saveTextFile(safeFileName(name), text);
+      await saveTextFile(`${exportBaseName(pedigree?.population, subpop?.focal_id)}.dat`, text);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
@@ -914,9 +909,7 @@ export default function App() {
       {imageDialogOpen && (
         <ExportImageDialog
           buildInput={buildImageInput}
-          baseName={safeFileName(subpop
-            ? `${pedigree?.population || "pedigree"}_${subpop.focal_id}_subpop`
-            : pedigree?.population || "pedigree")}
+          baseName={exportBaseName(pedigree?.population, subpop?.focal_id)}
           scope={subpop ? `the subpopulation around ${subpop.focal_id}` : "the whole population"}
           onClose={closeImageDialog}
         />

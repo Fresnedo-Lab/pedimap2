@@ -281,6 +281,20 @@ def test_parent_without_row_names_the_closest_individual():
     assert "added as a founder without data; a name may be a misspelling" in warning
 
 
+def test_renamed_founder_is_suggested_for_its_old_name():
+    # binko_legacy.ped with the row of F001 renamed F0001: its offspring still
+    # name F001. F002 to F006 are one edit from F001 too; F0001 is the nearest.
+    text = _text("binko_legacy.ped")
+    number = _line(text, "F001 ")
+    renamed = _replace_line(text, number, "F0001" + text.split("\n")[number - 1][4:])
+    warning, = _parse(renamed).warnings
+    assert warning.startswith("1 parent(s) have no row of their own: 'F001' (closest "
+                              "existing individual: 'F0001'). ")
+    # The same when an equally near name comes first in the table.
+    swapped = _parse("PEDIGREE\nNAME FEMALE MALE\nF002 - -\nF0001 - -\nKid F001 F002\n")
+    assert "'F001' (closest existing individual: 'F0001')" in swapped.warnings[0]
+
+
 def _with_allele(settings: str, allele: str) -> str:
     return (f"{settings}PEDIGREE\nNAME PARENT1 PARENT2\nP - -\n"
             "LINKAGEGROUP 1\nMAP\nM 0\nLOCUS M\nALLELENAMES A B\n"
