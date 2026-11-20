@@ -124,6 +124,25 @@
     "Gala-self-01"
    ],
    "ibd_positions": {}
+  },
+  "parent_labels": {
+   "female": "Female parent",
+   "male": "Male parent",
+   "columns": [
+    "Female parent",
+    "Male parent"
+   ]
+  },
+  "marker_summary": {
+   "loci": 0,
+   "linkage_groups": [],
+   "ibd_positions": 0,
+   "genotype_rows": 0,
+   "individuals_with_genotypes": 0,
+   "codes": [],
+   "nalleles": null,
+   "founders_named": false,
+   "flexqtl_codes": false
   }
  },
  "graph": {

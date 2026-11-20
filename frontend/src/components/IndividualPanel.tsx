@@ -1,17 +1,156 @@
 // components/IndividualPanel.tsx
 // ================================
 // Side panel that shows full detail for a selected individual.
-// Order: parentage, traits (what users look up most), relatives, markers, notes.
+// Order: parentage, traits (what users look up most), relatives, markers, IBD,
+// notes.
 
 import { useState } from "react";
-import type { IndividualDetail, RelativeRef, TraitMeta, MarkerMeta } from "../hooks/useApi";
+import {
+  DEFAULT_PARENT_LABELS,
+  type GenotypeRow, type IbdAllele, type IbdPosition, type IndividualDetail,
+  type MarkerSummary, type ParentLabels, type RelativeRef, type TraitMeta,
+} from "../hooks/useApi";
+import { codeColor, codeTitle } from "../lib/genotypeCodes";
 
 interface Props {
-  individual:  IndividualDetail;
-  traits:      TraitMeta[];
-  markers:     MarkerMeta[];
-  onSelectId:  (id: string) => void;
-  onClose:     () => void;
+  individual:     IndividualDetail;
+  traits:         TraitMeta[];
+  parentLabels?:  ParentLabels;
+  markerSummary?: MarkerSummary;
+  onSelectId:     (id: string) => void;
+  onClose:        () => void;
+}
+
+const sectionTitle = (text: string, color: string) => (
+  <div style={{ fontSize: 11, fontWeight: 700, color, textTransform: "uppercase",
+    letterSpacing: 1, marginTop: 14, marginBottom: 6 }}>
+    {text}
+  </div>
+);
+
+/** A genotype code as a small colored badge; its meaning on hover. */
+export function CodeBadge({ code, flexqtl }: { code: number; flexqtl: boolean }) {
+  return (
+    <span title={codeTitle(code, flexqtl)} aria-label={codeTitle(code, flexqtl)} data-code={code}
+      style={{ display: "inline-block", minWidth: 18, padding: "0 4px", borderRadius: 4,
+        background: codeColor(code), color: "#0f1117", fontSize: 10, fontWeight: 700,
+        textAlign: "center", lineHeight: "16px", cursor: "help" }}>
+      {code}
+    </span>
+  );
+}
+
+const muted = { color: "#4b5563" };
+
+/** Genotype rows by linkage group: locus, the two alleles in the order of the
+ *  caption's parent columns, and the code (two badges if the codes differ). */
+function MarkersSection({ rows, columns, flexqtl }: {
+  rows: GenotypeRow[]; columns: [string, string]; flexqtl: boolean;
+}) {
+  if (rows.length === 0) return <div style={{ ...muted, fontSize: 12 }}>No genotype data</div>;
+  const groups: [string, GenotypeRow[]][] = [];
+  for (const r of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last[0] === r.linkage_group) last[1].push(r);
+    else groups.push([r.linkage_group, [r]]);
+  }
+  const cell = { padding: "2px 4px", borderBottom: "1px solid #1e2535" } as const;
+  return (
+    <table aria-label="Genotypes" style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+      <thead>
+        <tr style={{ color: "#64748b", textAlign: "left" }}>
+          <th style={{ ...cell, fontWeight: 400 }}>Locus</th>
+          <th style={{ ...cell, fontWeight: 400 }}>{columns[0]}</th>
+          <th style={{ ...cell, fontWeight: 400 }}>{columns[1]}</th>
+          <th style={{ ...cell, fontWeight: 400 }}>Code</th>
+        </tr>
+      </thead>
+      {groups.map(([group, members]) => (
+        <tbody key={group} aria-label={`Linkage group ${group || "(none)"}`}>
+          <tr>
+            <td colSpan={4} style={{ padding: "6px 4px 2px", color: "#f59e0b", fontSize: 10 }}>
+              {group ? `Linkage group ${group}` : "Not on the map"}
+            </td>
+          </tr>
+          {members.map(r => (
+            <tr key={r.marker} data-marker={r.marker}>
+              <td style={{ ...cell, color: "#e8ecf4" }}
+                title={r.position_cM !== null ? `${r.position_cM} cM` : undefined}>
+                {r.marker}
+              </td>
+              {[0, 1].map(k => (
+                <td key={k} style={{ ...cell, fontFamily: "monospace", color: "#a0aec0" }}>
+                  {r.alleles[k] ?? <span style={muted} title="Unknown allele">–</span>}
+                </td>
+              ))}
+              <td style={cell}>
+                {[...new Set(r.codes)].map(c => <CodeBadge key={c} code={c} flexqtl={flexqtl} />)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      ))}
+    </table>
+  );
+}
+
+const percent = (p: number) => p.toFixed(2);
+
+function IbdAlleleLine({ a, second }: { a: IbdAllele; second?: boolean }) {
+  return (
+    <div style={{ fontSize: second ? 11 : 12, color: second ? "#a0aec0" : "#e8ecf4",
+      display: "flex", gap: 6 }}>
+      <span style={{ minWidth: 34, textAlign: "right", fontFamily: "monospace" }}>
+        {percent(a.probability)}
+      </span>
+      <span>
+        {a.founder ? <>{a.founder} · </> : null}
+        <span style={{ color: "#64748b" }}>founder allele {a.allele}</span>
+      </span>
+    </div>
+  );
+}
+
+/** The likely founder alleles of each homologue at a chosen IBD position. */
+function IbdSection({ positions, columns }: { positions: IbdPosition[]; columns: [string, string] }) {
+  const groups = [...new Set(positions.map(p => p.linkage_group))];
+  const [group, setGroup] = useState<string | undefined>(groups[0]);
+  const inGroup = positions.filter(p => p.linkage_group === group);
+  const [position, setPosition] = useState<string | undefined>(inGroup[0]?.position);
+  const shown = inGroup.find(p => p.position === position) ?? inGroup[0];
+  const select = { fontSize: 11, padding: "2px 4px" } as const;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+        <label style={{ fontSize: 11, color: "#64748b", display: "flex", gap: 4, alignItems: "center" }}>
+          Linkage group
+          <select aria-label="IBD linkage group" value={group} style={select}
+            onChange={e => {
+              setGroup(e.target.value);
+              setPosition(positions.find(p => p.linkage_group === e.target.value)?.position);
+            }}>
+            {groups.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </label>
+        <label style={{ fontSize: 11, color: "#64748b", display: "flex", gap: 4, alignItems: "center" }}>
+          Position
+          <select aria-label="IBD position" value={shown?.position} style={select}
+            onChange={e => setPosition(e.target.value)}>
+            {inGroup.map(p => <option key={p.position} value={p.position}>{p.position} cM</option>)}
+          </select>
+        </label>
+      </div>
+      {shown?.homologues.map((alleles, h) => (
+        <div key={h} aria-label={`Homologue from ${columns[h] ?? `parent ${h + 1}`}`}
+          style={{ padding: "3px 0", borderBottom: "1px solid #1e2535" }}>
+          <div style={{ color: "#64748b", fontSize: 11, marginBottom: 2 }}>
+            Homologue from {(columns[h] ?? `parent ${h + 1}`).toLowerCase()}
+          </div>
+          {alleles.map((a, k) => <IbdAlleleLine key={a.allele} a={a} second={k > 0} />)}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function TraitBar({ value, meta }: { value: number | string; meta?: TraitMeta }) {
@@ -88,9 +227,11 @@ function RelativeList({ singular, plural, people, onSelectId }: {
   );
 }
 
-export default function IndividualPanel({ individual: ind, traits, markers, onSelectId, onClose }: Props) {
+export default function IndividualPanel({
+  individual: ind, traits, parentLabels = DEFAULT_PARENT_LABELS, markerSummary, onSelectId, onClose,
+}: Props) {
   const traitMap  = Object.fromEntries(traits.map(t => [t.name, t]));
-  const markerMap = Object.fromEntries(markers.map(m => [m.name, m]));
+  const hasMarkerData = (markerSummary?.loci ?? 0) > 0 || (ind.genotypes?.length ?? 0) > 0;
 
   const row = (label: string, val: React.ReactNode) => (
     <div key={label} style={{ display: "flex", gap: 8, padding: "3px 0",
@@ -144,8 +285,8 @@ export default function IndividualPanel({ individual: ind, traits, markers, onSe
           textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
           Parentage
         </div>
-        {row("Mother (♀)", parentLink(ind.female_parent, "female"))}
-        {row("Father (♂)", parentLink(ind.male_parent, "male"))}
+        {row(parentLabels.female, parentLink(ind.female_parent, "female"))}
+        {row(parentLabels.male, parentLink(ind.male_parent, "male"))}
 
         {/* Traits — directly under the parents, above anything that can grow */}
         {Object.keys(ind.traits).length > 0 && (
@@ -177,35 +318,21 @@ export default function IndividualPanel({ individual: ind, traits, markers, onSe
         <RelativeList singular="sibling"    plural="siblings"
           people={ind.siblings}    onSelectId={onSelectId} />
 
-        {/* Markers */}
-        {Object.keys(ind.markers).length > 0 && (
-          <>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b",
-              textTransform: "uppercase", letterSpacing: 1,
-              marginTop: 14, marginBottom: 6 }}>
-              Markers
-            </div>
-            {Object.entries(ind.markers).map(([mk, alleles]) => {
-              const mm = markerMap[mk];
-              return (
-                <div key={mk} style={{ padding: "4px 0",
-                  borderBottom: "1px solid #1e2535" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#e8ecf4", fontSize: 12 }}>{mk}</span>
-                    {mm && (
-                      <span style={{ fontSize: 10, color: "#64748b" }}>
-                        {mm.linkage_group} · {mm.position_cM} cM
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontFamily: "monospace", fontSize: 11,
-                    color: "#a0aec0", marginTop: 2 }}>
-                    {alleles.join(" / ")}
-                  </div>
-                </div>
-              );
-            })}
-          </>
+        {/* Markers: genotype rows by linkage group */}
+        {hasMarkerData && (
+          <section aria-label="Markers">
+            {sectionTitle("Markers", "#f59e0b")}
+            <MarkersSection rows={ind.genotypes ?? []} columns={parentLabels.columns}
+              flexqtl={markerSummary?.flexqtl_codes ?? false} />
+          </section>
+        )}
+
+        {/* IBD: likely founder alleles per homologue at a chosen position */}
+        {(ind.ibd?.length ?? 0) > 0 && (
+          <section aria-label="IBD">
+            {sectionTitle("IBD", "#22d3ee")}
+            <IbdSection positions={ind.ibd!} columns={parentLabels.columns} />
+          </section>
         )}
 
         {/* Notes */}

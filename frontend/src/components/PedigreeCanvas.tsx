@@ -12,7 +12,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Network, DataSet } from "vis-network/standalone";
-import type { GraphNode } from "../hooks/useApi";
+import { DEFAULT_PARENT_LABELS, type GraphNode, type ParentLabels } from "../hooks/useApi";
 import { linkColor, linkPath, type ChartModel } from "../chart/model";
 import { CHART_FONT, THEMES, labelInside, type DisplayStyle, type StyleTheme } from "../chart/style";
 import { CLASSIC_BOX } from "../chart/svgExport";
@@ -70,6 +70,8 @@ interface Props {
   orientation:     Orientation;   // "UD" = top-to-bottom, "LR" = left-to-right
   style:           DisplayStyle;
   crossSymbolSize: number;
+  /** How the tooltip names the parents (from the file's caption). */
+  parentLabels?:   ParentLabels;
 }
 
 // Hierarchical-layout config. With cross symbols, individuals sit on even
@@ -147,7 +149,7 @@ const UNKNOWN_PARENT = "-";
 // element. We build every text node with textContent (never innerHTML), so an
 // individual or trait value containing "<" or "&" cannot break the markup or
 // inject content.
-function buildTooltip(ind: GraphNode): HTMLElement {
+export function buildTooltip(ind: GraphNode, labels: ParentLabels): HTMLElement {
   const el = document.createElement("div");
   el.className = "pedimap-tooltip";
 
@@ -163,8 +165,8 @@ function buildTooltip(ind: GraphNode): HTMLElement {
 
   const parent = (p?: string | null) => (p && p.length > 0 ? p : UNKNOWN_PARENT);
 
-  addRow("Female parent", parent(ind.female_parent));
-  addRow("Male parent",   parent(ind.male_parent));
+  addRow(labels.female, parent(ind.female_parent));
+  addRow(labels.male,   parent(ind.male_parent));
   addRow("Generation",    String(ind.generation));
 
   for (const [trait, value] of Object.entries(ind.traits ?? {})) {
@@ -228,7 +230,8 @@ function individualColors(
 }
 
 const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function PedigreeCanvas(
-  { model, colorMap, selected, onSelect, orientation, style, crossSymbolSize }, ref,
+  { model, colorMap, selected, onSelect, orientation, style, crossSymbolSize,
+    parentLabels = DEFAULT_PARENT_LABELS }, ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef   = useRef<Network | null>(null);
@@ -237,8 +240,8 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   const theme        = THEMES[style];
 
   // Latest props, read when the network is created after the chart font loads.
-  const latest = useRef({ colorMap, selected, orientation, onSelect });
-  latest.current = { colorMap, selected, orientation, onSelect };
+  const latest = useRef({ colorMap, selected, orientation, onSelect, parentLabels });
+  latest.current = { colorMap, selected, orientation, onSelect, parentLabels };
 
   // Link routes as drawn, and whether node geometry changed since they were
   // computed (new layout, orientation, drag, selection border).
@@ -338,7 +341,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
             shapeProperties:  { borderRadius: 0 },
           }),
           shadow: classic ? false : { enabled: true, color: "rgba(0,0,0,.4)", size: 8, x: 2, y: 2 },
-          title:  buildTooltip(n),
+          title:  buildTooltip(n, latest.current.parentLabels),
         };
       });
       const crosses = model.crosses.map(c => ({
@@ -493,6 +496,16 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, style, crossSymbolSize]);
+
+  // ── Tooltip parent labels: they come with the file's caption, which may
+  // arrive after its graph; update the tooltips without a new layout ─────────
+  useEffect(() => {
+    if (!networkRef.current) return;
+    nodesDS.current.update(model.individuals.map(n => ({
+      id: n.id, title: buildTooltip(n, parentLabels),
+    })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parentLabels.female, parentLabels.male]);
 
   // ── Update colours / selection without re-creating the network ────────────
   useEffect(() => {

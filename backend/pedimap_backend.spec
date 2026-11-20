@@ -76,6 +76,7 @@ a = Analysis(
             'h11',
             'pmp_parser',
             'text_decoding',
+            'marker_data',
             'pydantic',
             'pydantic.deprecated.class_validators',
             'email.mime.text',

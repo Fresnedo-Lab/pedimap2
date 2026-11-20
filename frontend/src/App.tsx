@@ -28,7 +28,7 @@ import {
   useApi, useFetch, useBackendHealth, explainBackendFailure,
   type BackendFailure, type GraphData, type PedigreeData,
   type IndividualDetail, type IndividualSummary,
-  type DatExportRequest, type SubpopSelection, type LoadResult,
+  type DatExportRequest, type SubpopSelection, type LoadResult, type MarkerValues,
   LEGACY_ENCODING,
 } from "./hooks/useApi";
 import PedigreeCanvas, {
@@ -42,6 +42,9 @@ import { buildChartModel } from "./chart/model";
 import type { DisplayStyle } from "./chart/style";
 import { buildLegend, traitColorsFor, type TraitColors } from "./chart/svgExport";
 import { saveTextFile } from "./lib/saveFile";
+import { markerColoring, type MarkerColoringChoice, type MarkerColoringMode } from "./lib/genotypeCodes";
+import ChartLegend from "./components/ChartLegend";
+import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
 import { exportBaseName } from "./lib/fileNames";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
@@ -50,6 +53,13 @@ import { useUpdater } from "./hooks/useUpdater";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // Keep exported file names portable: letters, digits, dot, dash, underscore.
+// "Colour by" entries for marker colorings. They start with a NUL character,
+// which no trait name read from a file can.
+const MARKER_OPTION: Record<MarkerColoringMode, string> = {
+  code:   "\u0000genotype-code",
+  allele: "\u0000allele",
+};
+
 // ── Per-view settings ─────────────────────────────────────────────────────────
 // Pedimap 1.x stores display options per view. This mirrors that surface so
 // later options are field additions rather than a refactor. Wired up today:
@@ -258,6 +268,10 @@ export default function App() {
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
   const [activeTrait, setActiveTrait] = useState<string>("");
+  // Coloring by a marker (genotype code, or copies of an allele) instead of a
+  // trait, and every individual's genotype at that marker.
+  const [markerChoice, setMarkerChoice] = useState<MarkerColoringChoice | null>(null);
+  const [markerValues, setMarkerValues] = useState<MarkerValues | null>(null);
   // The selection behind the displayed subpopulation; null for the whole population.
   const [subpop,      setSubpop]      = useState<SubpopSelection | null>(null);
 
@@ -344,6 +358,7 @@ export default function App() {
   // new loader cannot forget an endpoint (e.g. the sidebar's /api/individuals)
   // and leave a panel showing the previous dataset.
   const reloadAllData = useCallback(async () => {
+    setMarkerChoice(null);           // the new file may not have the marker
     reloadPedigree();
     reloadIndividuals();
     await loadGraph();
@@ -381,6 +396,23 @@ export default function App() {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
   }, [api, colorOverrides]);
+
+  // ── Marker colouring ──────────────────────────────────────────────────────
+  const chooseMarkerColoring = useCallback((choice: MarkerColoringChoice) => {
+    setActiveTrait("");
+    setColorMap({});
+    setMarkerChoice(choice);
+  }, []);
+
+  useEffect(() => {
+    if (!markerChoice) { setMarkerValues(null); return; }
+    if (markerValues?.marker === markerChoice.marker) return;
+    let current = true;
+    api.getMarkerValues(markerChoice.marker).then(values => {
+      if (current) setMarkerValues(values);
+    }, e => setLoadError(e instanceof Error ? e.message : String(e)));
+    return () => { current = false; };
+  }, [api, markerChoice, markerValues]);
 
   // Continuous-trait colors: store per trait (per view) and recolor. Color
   // pickers fire while dragging, so only the latest request's answer is kept.
@@ -506,6 +538,21 @@ export default function App() {
     [graphData, showCrossSymbols]);
   const tooLargeToDraw = !!graphData && graphData.nodes.length > drawingLimit;
 
+  // The marker coloring of the displayed individuals, when one is chosen.
+  // Coloring by copies of an allele starts with the marker's first allele.
+  const loadedValues = markerChoice && markerValues?.marker === markerChoice.marker ? markerValues : null;
+  const flexqtlCodes = pedigree?.marker_summary?.flexqtl_codes ?? false;
+  const chosenAllele = markerChoice?.mode === "allele" && loadedValues
+    && (loadedValues.allele_names.includes(markerChoice.allele ?? "")
+      ? markerChoice.allele : loadedValues.allele_names[0]);
+  const coloring = useMemo(() => (
+    markerChoice && graphData && loadedValues && (markerChoice.mode === "code" || chosenAllele)
+      ? markerColoring(loadedValues, { ...markerChoice, allele: chosenAllele || undefined },
+                       graphData.nodes.map(n => n.id), flexqtlCodes)
+      : null
+  ), [markerChoice, loadedValues, chosenAllele, graphData, flexqtlCodes]);
+  const chartColors = coloring?.colorMap ?? colorMap;
+
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const closeImageDialog = useCallback(() => setImageDialogOpen(false), []);
 
@@ -515,10 +562,10 @@ export default function App() {
     const meta = pedigree?.traits.find(t => t.name === activeTrait);
     const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
     return {
-      model: chartModel, ...geometry, colorMap, style: displayStyle, orientation, crossSymbolSize,
-      legend: buildLegend(meta, chartModel.individuals, colorMap, colors),
+      model: chartModel, ...geometry, colorMap: chartColors, style: displayStyle, orientation, crossSymbolSize,
+      legend: coloring?.legend ?? buildLegend(meta, chartModel.individuals, colorMap, colors),
     };
-  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, displayStyle, orientation, crossSymbolSize]);
+  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, displayStyle, orientation, crossSymbolSize]);
 
   const handleLoadExample = useCallback(async () => {
     try {
@@ -691,18 +738,49 @@ export default function App() {
           ⤢ Fit to window
         </button>
 
-        {traits.length > 0 && (
+        {(traits.length > 0 || markers.length > 0) && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
             <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap" }}>Colour by:</span>
             <select
-              value={activeTrait}
-              onChange={e => handleTraitChange(e.target.value)}
-              style={{ width: 160 }}>
+              aria-label="Colour by"
+              value={markerChoice ? MARKER_OPTION[markerChoice.mode] : activeTrait}
+              onChange={e => {
+                const mode = (Object.keys(MARKER_OPTION) as MarkerColoringMode[])
+                  .find(m => MARKER_OPTION[m] === e.target.value);
+                if (mode) {
+                  chooseMarkerColoring({ mode, marker: markerChoice?.marker ?? markers[0].name,
+                                         allele: markerChoice?.allele });
+                } else {
+                  setMarkerChoice(null);
+                  void handleTraitChange(e.target.value);
+                }
+              }}
+              style={{ width: 200 }}>
               <option value="">None</option>
               {traits.map(t => (
                 <option key={t.name} value={t.name}>{t.name}</option>
               ))}
+              {markers.length > 0 && (
+                <>
+                  <option value={MARKER_OPTION.code}>Genotype code at marker…</option>
+                  <option value={MARKER_OPTION.allele}>Allele at marker…</option>
+                </>
+              )}
             </select>
+            {markerChoice && (
+              <select aria-label="Marker" value={markerChoice.marker} style={{ width: 120 }}
+                onChange={e => setMarkerChoice({ ...markerChoice, marker: e.target.value, allele: undefined })}>
+                {markers.map(m => (
+                  <option key={m.name} value={m.name}>{m.name}{m.linkage_group ? ` (LG ${m.linkage_group})` : ""}</option>
+                ))}
+              </select>
+            )}
+            {markerChoice?.mode === "allele" && loadedValues && (
+              <select aria-label="Allele" value={chosenAllele || ""} style={{ width: 80 }}
+                onChange={e => setMarkerChoice({ ...markerChoice, allele: e.target.value })}>
+                {loadedValues.allele_names.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            )}
             {activeTraitMeta?.type === "continuous" && (() => {
               const colors = traitColorsFor(activeTraitMeta, view.traitColors[activeTrait]);
               const picker = (key: keyof TraitColors, label: string) => (
@@ -751,6 +829,9 @@ export default function App() {
           {pedigree?.population ?? ""}
           {pedigree ? ` · ${graphData?.nodes?.length ?? 0} individuals` : ""}
         </span>
+        {(pedigree?.marker_summary?.loci ?? 0) > 0 && (
+          <MarkerSummaryMenu summary={pedigree!.marker_summary!} />
+        )}
         <SettingsMenu
           showCrossSymbols={showCrossSymbols}
           crossSymbolSize={crossSymbolSize}
@@ -881,14 +962,16 @@ export default function App() {
               <PedigreeCanvas
                 ref={canvasRef}
                 model={chartModel}         // built from GraphData, null excluded
-                colorMap={colorMap}
+                colorMap={chartColors}
                 selected={selectedId}
                 onSelect={handleSelect}
                 orientation={orientation}
                 style={displayStyle}
                 crossSymbolSize={crossSymbolSize}
+                parentLabels={pedigree?.parent_labels}
               />
             )}
+          {coloring && !tooLargeToDraw && <ChartLegend legend={coloring.legend} />}
         </div>
 
         {/* Detail panel */}
@@ -897,7 +980,8 @@ export default function App() {
             key={selectedDetail.id}      // collapse relative lists on a new selection
             individual={selectedDetail}
             traits={traits}
-            markers={markers}
+            parentLabels={pedigree?.parent_labels}
+            markerSummary={pedigree?.marker_summary}
             onSelectId={handleSelect}
             onClose={() => { setSelectedId(null); setDetail(null); }}
           />

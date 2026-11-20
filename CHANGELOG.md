@@ -10,6 +10,20 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+### Added
+- The details panel shows an individual's **marker data**. Under **Markers**,
+  each linkage group's loci are listed with the two alleles in the file's
+  order and the genotype code as a colored badge; hovering over the badge
+  gives the code's meaning as FlexQTL and Binko use it. Individuals without
+  genotype rows say so. Under **IBD**, a linkage group and position can be
+  chosen; for each homologue the panel shows the most probable founder allele,
+  its founder and the probability, and the next most probable when above 0.10.
+- **Colour by** offers **Genotype code at marker…** and **Allele at marker…**
+  (the number of copies of a chosen allele), with a legend on the chart and in
+  image exports.
+- A **Marker data** button beside the population name summarizes the file's
+  loci, linkage groups, IBD positions and the genotype codes in use.
+
 ### Fixed
 - FlexQTL and Binko files are read correctly, and the IBD data of FlexQTL
   files with several linkage groups is no longer mixed up. Pedimap filed all
@@ -30,6 +44,10 @@ release notes, so every release needs its own section here before it is tagged.
   saved.
 
 ### Changed
+- Parents are labeled as the file's caption names them: "Female parent" and
+  "Male parent" for FEMALE/MALE or MOTHER/FATHER, "Parent 1" and "Parent 2" for
+  PARENT1/PARENT2 (as in FlexQTL and Binko files), in the details panel and the
+  chart's tooltips. The panel used to say "Mother" and "Father" for every file.
 - Errors in a data file now give the line number, and more mistakes are caught
   (for example an allele that is not listed for its locus, or an IBD section
   that does not match the positions listed for its linkage group).

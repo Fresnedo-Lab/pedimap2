@@ -1279,6 +1279,54 @@
      }
     }
    }
+  },
+  "parent_labels": {
+   "female": "Female parent",
+   "male": "Male parent",
+   "columns": [
+    "Female parent",
+    "Male parent"
+   ]
+  },
+  "marker_summary": {
+   "loci": 5,
+   "linkage_groups": [
+    {
+     "name": "A",
+     "loci": 3,
+     "ibd_positions": 3
+    },
+    {
+     "name": "B",
+     "loci": 1,
+     "ibd_positions": 1
+    },
+    {
+     "name": "C",
+     "loci": 1,
+     "ibd_positions": 1
+    }
+   ],
+   "ibd_positions": 5,
+   "genotype_rows": 40,
+   "individuals_with_genotypes": 8,
+   "codes": [
+    {
+     "code": 0,
+     "count": 32
+    },
+    {
+     "code": 1,
+     "count": 1
+    },
+    {
+     "code": 2,
+     "count": 7
+    }
+   ],
+   "nalleles": 8,
+   "founders_named": true,
+   "flexqtl_codes": false
   }
  },
  "graph": {

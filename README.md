@@ -301,6 +301,7 @@ users never install Python.
 - [ ] Full `.pmp` support — subpopulations, saved views, notes
 - [ ] Smarter lane ordering — shorter detours for links that span
       generations, and fewer places where several links cross at one point
+- [ ] On-screen legend for trait colourings
 
 **Then**
 - [ ] IBD haplotype rectangles per linkage group
