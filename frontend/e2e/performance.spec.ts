@@ -37,16 +37,27 @@ const durations = (page: Page, name: string) =>
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
-for (const [label, dataset] of Object.entries(DATASETS)) {
-  test(`${label}: layout and redraw times`, async ({ page }) => {
+for (const [label, dataset] of Object.entries(DATASETS)) for (const ibdBars of [false, true]) {
+  test(`${label}${ibdBars ? " with IBD bars" : ""}: layout and redraw times`, async ({ page }) => {
     const form = new FormData();
     form.append("dat_file", new Blob([dataset.file()]), dataset.name);
     expect((await fetch(`${backend}/api/load`, { method: "POST", body: form })).ok).toBe(true);
     await page.goto("/");
     await page.getByText(/individuals/).first().waitFor();
     await page.waitForTimeout(1000);                          // layout, fit and first frames
+    if (ibdBars) {
+      // Turn the bars on, then reload: the setting is kept, so the layout and
+      // first frame measured are the page's first, as for names only.
+      await page.getByLabel("IBD bars").selectOption({ index: 1 });
+      await page.waitForTimeout(500);
+      await page.reload();
+      await page.getByText(/individuals/).first().waitFor();
+      await page.waitForTimeout(1500);
+      await expect(page.getByLabel("IBD bars")).not.toHaveValue("");
+    }
 
     const layout = await durations(page, "pedimap:layout");
+    const firstFrame = (await durations(page, "pedimap:draw"))[0];
     expect(layout.length).toBeGreaterThan(0);
 
     // Pan/zoom frames: zoom in and out over the chart.
@@ -62,7 +73,8 @@ for (const [label, dataset] of Object.entries(DATASETS)) {
     expect(draws.length).toBeGreaterThan(10);
 
     const result = {
-      dataset: label, layout_ms: Math.round(layout[0]),
+      dataset: label, ibd_bars: ibdBars, layout_ms: Math.round(layout[0]),
+      first_frame_ms: Math.round(firstFrame),
       redraw_median_ms: +median(draws).toFixed(1), redraw_max_ms: +Math.max(...draws).toFixed(1),
       frames: draws.length,
     };

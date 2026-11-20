@@ -154,3 +154,32 @@ describe("routed links in the export", () => {
     expect(parse(exportOf(appleGala).svg).querySelectorAll("polygon.arrow")).toHaveLength(0);  // Classic: none
   });
 });
+
+describe("haplotype boxes in the export", () => {
+  it("are written item for item as the canvas draws them", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const { DEFAULT_HAPLOTYPE_SETTINGS, palette } = await import("../lib/haplotype");
+    const { haplotypeBoxes } = await import("../components/PedigreeCanvas");
+    const { THEMES } = await import("./style");
+    const read = (f: string) => JSON.parse(readFileSync(resolve("src/test/fixtures", f), "utf-8"));
+    const graph = read("pm_small.json").graph as GraphData;
+    const data = read("haplotypes.json").binko_ibd.groups["1"];
+    const model = buildChartModel(graph, true);
+    const view = { data, settings: DEFAULT_HAPLOTYPE_SETTINGS, columns: ["Parent 1", "Parent 2"] as [string, string],
+                   colorOf: palette(data, graph.nodes.map(n => n.id), "founder").colorOf };
+    for (const style of ["classic", "modern"] as const) {
+      const boxes = haplotypeBoxes(model, view, THEMES[style], {}, new Set());
+      const doc = parse(exportOf(graph, { style, haplotypeBoxes: boxes, positions: gridLayout(model, { level: 90, sibling: 200 }) }).svg);
+      expect(doc.querySelectorAll("g.node.haplotype")).toHaveLength(model.individuals.length);
+      const count = (role: string) => Object.values(boxes).reduce((n, b) => n + b.items.filter(i => i.role === role).length, 0);
+      expect(doc.querySelectorAll("rect.segment")).toHaveLength(count("segment"));
+      expect(doc.querySelectorAll("line.position-tick")).toHaveLength(count("position-tick"));
+      expect(doc.querySelectorAll("text.individual")).toHaveLength(model.individuals.length);
+      expect(doc.querySelectorAll("ellipse, polygon:not(.arrow)")).toHaveLength(0);     // no node shapes
+      // A dummy founder's bars: its own two founder alleles (rows the parser supplied).
+      const dummy = [...doc.querySelectorAll("g.node.haplotype")].find(g => g.textContent === "DUMMY_G1_007_F")!;
+      expect(new Set([...dummy.querySelectorAll("rect.segment")].map(r => r.getAttribute("fill"))).size).toBe(2);
+    }
+  });
+});
