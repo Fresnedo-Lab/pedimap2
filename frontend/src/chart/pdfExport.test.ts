@@ -46,6 +46,18 @@ describe("PDF export", () => {
     expect(text).toContain("Šampion");
   }, 30_000);
 
+  it("keeps the hatching of unknown values as a PDF pattern", async () => {
+    const hatchedSvg = buildSvg({
+      model, positions: gridLayout(model), colorMap: {}, style: "classic", orientation: "UD",
+      crossSymbolSize: 12, hatched: [appleGraph.nodes[0].id],
+      legend: { trait: "Copies", kind: "discrete", entries: [{ label: "Unknown", color: "#9CA3AF", hatch: true }] },
+    });
+    const bytes = await svgToPdf(hatchedSvg.svg, hatchedSvg.width, hatchedSvg.height, "fit",
+                                 notoSansBase64(), await loadPdfLibraries());
+    const raw = new TextDecoder("latin1").decode(bytes);
+    expect(raw).toMatch(/\/PatternType 1/);                    // a tiling pattern
+  }, 30_000);
+
   it("fits the chart on a landscape A4 page", async () => {
     const bytes = await svgToPdf(svg, width, height, "a4", notoSansBase64(), await loadPdfLibraries());
     const { text, size } = await pdfText(bytes);

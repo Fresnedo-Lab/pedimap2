@@ -153,7 +153,7 @@ describe("exported file names", () => {
   });
 });
 
-describe("colour by a marker", () => {
+describe("color by a marker", () => {
   it("by genotype code or copies of an allele, with a legend", async () => {
     const marker = { name: "M1", linkage_group: "1", position_cM: 0 };
     serve(pedigreeOf(4), undefined, "Synthetic", {
@@ -173,20 +173,43 @@ describe("colour by a marker", () => {
     const legend = (title: string) =>
       [...screen.getByRole("group", { name: `Legend: ${title}` }).children].slice(1).map(e => e.textContent);
 
-    fireEvent.change(screen.getByLabelText("Colour by"), { target: { value: "\u0000genotype-code" } });
+    fireEvent.change(screen.getByLabelText("Color by"), { target: { value: "\u0000genotype-code" } });
     await vi.waitFor(() => expect(legend("Genotype code at M1"))
       .toEqual(["0 · OC", "5 · IM", "11 · OPhE", "No genotype data"]));
     expect(colors().I0).not.toBe(colors().I1);
     expect(colors().I3).toBe("#6B7280");                       // no genotype row
 
-    fireEvent.change(screen.getByLabelText("Colour by"), { target: { value: "\u0000allele" } });
+    fireEvent.change(screen.getByLabelText("Color by"), { target: { value: "\u0000allele" } });
     await vi.waitFor(() => expect((screen.getByLabelText("Allele") as HTMLSelectElement).value).toBe("A"));
     expect(legend("Copies of allele A at M1")).toEqual(["1 copy", "2 copies", "Unknown", "No genotype data"]);
     fireEvent.change(screen.getByLabelText("Allele"), { target: { value: "G" } });
     expect(legend("Copies of allele G at M1")).toEqual(["0 copies", "1 copy", "Unknown", "No genotype data"]);
 
-    fireEvent.change(screen.getByLabelText("Colour by"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Color by"), { target: { value: "" } });
     expect(screen.queryByRole("group", { name: /^Legend/ })).toBeNull();
     expect(colors()).toEqual({});
+  });
+});
+
+describe("loading a new dataset", () => {
+  it("closes the details panel, clears the selection, the Subpop button and the search", async () => {
+    serve(pedigreeOf(4), { loaded: "dat", individuals: 4 }, "Example", {
+      "/api/individual/I1": { id: "I1", name: "I1", female_parent: "I0", male_parent: null,
+        cross_type: "cross", ploidy: 2, generation: 1, traits: {}, markers: {}, notes: "",
+        ancestors: [], descendants: [], siblings: [], genotypes: [], ibd: [] },
+    });
+    const { container } = render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+
+    fireEvent.change(screen.getByPlaceholderText("Search individuals…"), { target: { value: "I1" } });
+    fireEvent.click(screen.getAllByText("I1")[0]);
+    await screen.findByText(/Gen 1 · cross/);                      // the details panel
+    expect(screen.getByText(/Subpop: I1/)).toBeTruthy();
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x"], "pm_small.dat")] } });
+    await vi.waitFor(() => expect(screen.queryByText(/Gen 1 · cross/)).toBeNull());
+    expect(screen.queryByText(/Subpop:/)).toBeNull();
+    expect((screen.getByPlaceholderText("Search individuals…") as HTMLInputElement).value).toBe("");
   });
 });

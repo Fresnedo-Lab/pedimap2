@@ -53,7 +53,7 @@ import { useUpdater } from "./hooks/useUpdater";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // Keep exported file names portable: letters, digits, dot, dash, underscore.
-// "Colour by" entries for marker colorings. They start with a NUL character,
+// "Color by" entries for marker colorings. They start with a NUL character,
 // which no trait name read from a file can.
 const MARKER_OPTION: Record<MarkerColoringMode, string> = {
   code:   "\u0000genotype-code",
@@ -268,6 +268,11 @@ export default function App() {
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
   const [activeTrait, setActiveTrait] = useState<string>("");
+  // The selected individual and its details panel, and the sidebar's search
+  // text: all of them belong to the dataset shown, so a new one clears them.
+  const [selectedId,     setSelectedId] = useState<string | null>(null);
+  const [selectedDetail, setDetail]     = useState<IndividualDetail | null>(null);
+  const [search,         setSearch]     = useState("");
   // Coloring by a marker (genotype code, or copies of an allele) instead of a
   // trait, and every individual's genotype at that marker.
   const [markerChoice, setMarkerChoice] = useState<MarkerColoringChoice | null>(null);
@@ -331,7 +336,7 @@ export default function App() {
   traitColorsRef.current = view.traitColors;
   const colorOverrides = useCallback((trait: string) => traitColorsRef.current[trait] ?? {}, []);
 
-  // Fetch graph + colours whenever pedigree changes
+  // Fetch graph + colors whenever pedigree changes
   const [graphLoading, setGraphLoading] = useState(true);
   const loadGraph = useCallback(async (trait?: string) => {
     setGraphLoading(true);
@@ -357,14 +362,21 @@ export default function App() {
   // active dataset MUST call this instead of refetching an ad-hoc subset, so a
   // new loader cannot forget an endpoint (e.g. the sidebar's /api/individuals)
   // and leave a panel showing the previous dataset.
+  const datasetLoads = useRef(0);
   const reloadAllData = useCallback(async () => {
+    datasetLoads.current++;
+    // Nothing of the previous dataset may stay on screen: not its selected
+    // individual, details panel or Subpop button, nor the search text.
+    setSelectedId(null);
+    setDetail(null);
+    setSearch("");
     setMarkerChoice(null);           // the new file may not have the marker
     reloadPedigree();
     reloadIndividuals();
     await loadGraph();
   }, [reloadPedigree, reloadIndividuals, loadGraph]);
 
-  // Issue 2 + 3: initialise once, only after the backend reports healthy.
+  // Issue 2 + 3: initialize once, only after the backend reports healthy.
   // loadGraph catches its own errors, so this fire-and-forget call can't reject.
   const didInit = useRef(false);
   useEffect(() => {
@@ -375,16 +387,19 @@ export default function App() {
   }, [ready, loadGraph]);
 
   // ── Selection ─────────────────────────────────────────────────────────────
-  const [selectedId,     setSelectedId] = useState<string | null>(null);
-  const [selectedDetail, setDetail]     = useState<IndividualDetail | null>(null);
 
   const handleSelect = useCallback(async (id: string) => {
     setSelectedId(id);
-    try { setDetail(await api.getIndividual(id)); }
+    const dataset = datasetLoads.current;
+    try {
+      const detail = await api.getIndividual(id);
+      // A dataset loaded meanwhile: its panel must not show the old individual.
+      if (dataset === datasetLoads.current) setDetail(detail);
+    }
     catch { /* silently ignore */ }
   }, [api]);
 
-  // ── Trait colouring ───────────────────────────────────────────────────────
+  // ── Trait coloring ───────────────────────────────────────────────────────
   const handleTraitChange = useCallback(async (name: string) => {
     setActiveTrait(name);
     try {
@@ -397,7 +412,7 @@ export default function App() {
     }
   }, [api, colorOverrides]);
 
-  // ── Marker colouring ──────────────────────────────────────────────────────
+  // ── Marker coloring ──────────────────────────────────────────────────────
   const chooseMarkerColoring = useCallback((choice: MarkerColoringChoice) => {
     setActiveTrait("");
     setColorMap({});
@@ -562,7 +577,8 @@ export default function App() {
     const meta = pedigree?.traits.find(t => t.name === activeTrait);
     const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
     return {
-      model: chartModel, ...geometry, colorMap: chartColors, style: displayStyle, orientation, crossSymbolSize,
+      model: chartModel, ...geometry, colorMap: chartColors, hatched: coloring?.hatched,
+      style: displayStyle, orientation, crossSymbolSize,
       legend: coloring?.legend ?? buildLegend(meta, chartModel.individuals, colorMap, colors),
     };
   }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, displayStyle, orientation, crossSymbolSize]);
@@ -596,8 +612,8 @@ export default function App() {
   }, [api, reloadAllData]);
 
   // ── Search filter ─────────────────────────────────────────────────────────
-  // (indList is fetched near the top so its reload can join reloadAllData.)
-  const [search, setSearch] = useState("");
+  // (indList and the search text are declared near the top so that
+  // reloadAllData can refresh and clear them.)
   const filtered = (indList ?? []).filter(i =>
     i.name.toLowerCase().includes(search.toLowerCase()) ||
     i.id.toLowerCase().includes(search.toLowerCase())
@@ -740,9 +756,9 @@ export default function App() {
 
         {(traits.length > 0 || markers.length > 0) && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-            <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap" }}>Colour by:</span>
+            <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap" }}>Color by:</span>
             <select
-              aria-label="Colour by"
+              aria-label="Color by"
               value={markerChoice ? MARKER_OPTION[markerChoice.mode] : activeTrait}
               onChange={e => {
                 const mode = (Object.keys(MARKER_OPTION) as MarkerColoringMode[])
@@ -969,6 +985,7 @@ export default function App() {
                 style={displayStyle}
                 crossSymbolSize={crossSymbolSize}
                 parentLabels={pedigree?.parent_labels}
+                hatched={coloring?.hatched}
               />
             )}
           {coloring && !tooLargeToDraw && <ChartLegend legend={coloring.legend} />}

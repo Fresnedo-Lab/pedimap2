@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { MarkerValues } from "../hooks/useApi";
-import { CODE_INFO, NO_GENOTYPE_COLOR, OTHER_CODE_COLOR, codeColor, codeTitle, markerColoring } from "./genotypeCodes";
+import {
+  CODE_INFO, COPY_COLORS, NO_GENOTYPE_COLOR, OTHER_CODE_COLOR, UNKNOWN_COPIES_COLOR,
+  codeColor, codeTitle, markerColoring,
+} from "./genotypeCodes";
+import { relativeLuminance } from "../chart/style";
 
 const panels = JSON.parse(readFileSync(resolve("src/test/fixtures/panels.json"), "utf-8"));
 const legacy = panels.binko_legacy;
@@ -19,9 +23,9 @@ describe("genotype codes", () => {
     expect(codeTitle(42, true)).toContain("No statement");
   });
 
-  it("are only colour codes in files without FACTOR0 (native Pedimap files)", () => {
-    expect(codeTitle(1, false)).toBe("Colour code 1");
-    expect(codeTitle(11, false)).toBe("Colour code 11");
+  it("are only color codes in files without FACTOR0 (native Pedimap files)", () => {
+    expect(codeTitle(1, false)).toBe("Color code 1");
+    expect(codeTitle(11, false)).toBe("Color code 11");
   });
 
   it("color 0-9 distinctly and every other code gray", () => {
@@ -53,6 +57,24 @@ describe("coloring by a marker (binko_legacy.ped, M1_001)", () => {
     expect(label("G1_001")).toBe("1 copy");
     expect(label("F003")).toBe("Unknown");
     expect(legend.kind === "discrete" && legend.entries.map(e => e.label).at(-1)).toBe("No genotype data");
+  });
+
+  it("draws an unknown count hatched, in the legend and on the chart", () => {
+    const { hatched, legend } = markerColoring(values, { mode: "allele", marker: "M1_001", allele: "A" }, ids, true);
+    expect(hatched).toEqual(["F003"]);
+    const entries = legend.kind === "discrete" ? legend.entries : [];
+    expect(entries.filter(e => e.hatch).map(e => e.label)).toEqual(["Unknown"]);
+    expect(entries.find(e => e.label === "Unknown")!.color).toBe(UNKNOWN_COPIES_COLOR);
+  });
+
+  it("orders the copy colors by lightness, so they read for color-blind viewers too", () => {
+    // Viridis steps: luminance falls with the count, well apart, and none is a gray.
+    const lum = COPY_COLORS.map(relativeLuminance);
+    expect(lum[0] - lum[1]).toBeGreaterThan(0.25);
+    expect(lum[1] - lum[2]).toBeGreaterThan(0.15);
+    for (const c of COPY_COLORS) expect(new Set([c.slice(1, 3), c.slice(3, 5), c.slice(5, 7)]).size).toBe(3);
+    expect(COPY_COLORS).not.toContain(UNKNOWN_COPIES_COLOR);
+    expect(COPY_COLORS).not.toContain(NO_GENOTYPE_COLOR);
   });
 });
 

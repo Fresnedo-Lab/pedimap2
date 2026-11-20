@@ -10,12 +10,14 @@
 // pedigree. The visible links are drawn here from chart/routing.ts, the same
 // routes the image export writes.
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Network, DataSet } from "vis-network/standalone";
 import { DEFAULT_PARENT_LABELS, type GraphNode, type ParentLabels } from "../hooks/useApi";
 import { linkColor, linkPath, type ChartModel } from "../chart/model";
-import { CHART_FONT, THEMES, labelInside, type DisplayStyle, type StyleTheme } from "../chart/style";
-import { CLASSIC_BOX } from "../chart/svgExport";
+import {
+  CHART_FONT, THEMES, labelInside, nodeLabelColor, type DisplayStyle, type NodeShape, type StyleTheme,
+} from "../chart/style";
+import { CLASSIC_BOX, HATCH } from "../chart/svgExport";
 import {
   constrainDrag, dragRange, drawRoutes, routeLinks, routingProblems, routingWarning,
   type Box, type DragRange, type Point, type RoutedLink,
@@ -72,6 +74,8 @@ interface Props {
   crossSymbolSize: number;
   /** How the tooltip names the parents (from the file's caption). */
   parentLabels?:   ParentLabels;
+  /** Individuals drawn hatched (an unknown value), as the export draws them. */
+  hatched?:        string[];
 }
 
 // Hierarchical-layout config. With cross symbols, individuals sit on even
@@ -213,12 +217,73 @@ function labelWidth(label: string, theme: StyleTheme): number {
 // A waypoint is laid out but never drawn.
 const invisible = () => ({ drawNode() {}, nodeDimensions: { width: 0, height: 0 } });
 
-function individualColors(
+const NONE: string[] = [];
+
+// A hatched individual: its fill is see-through so the hatching drawn under
+// it (drawHatching) shows, and its label stays on top.
+const HATCHED_FILL = `rgba(${[1, 3, 5].map(i => parseInt(HATCH.fill.slice(i, i + 2), 16)).join(",")},0.55)`;
+
+/** Clip `ctx` to a node's shape, slightly inside it so no line shows past it. */
+function clipToShape(ctx: CanvasRenderingContext2D, shape: NodeShape, p: Point, box: Box) {
+  ctx.beginPath();
+  if (shape === "box") {
+    ctx.rect(box.left + 1, box.top + 1, box.right - box.left - 2, box.bottom - box.top - 2);
+  } else if (shape === "ellipse") {
+    ctx.ellipse(p.x, p.y, (box.right - box.left) / 2 - 1, (box.bottom - box.top) / 2 - 1, 0, 0, 2 * Math.PI);
+  } else if (shape === "square") {
+    const r = SYMBOL_SIZE * 0.9;
+    ctx.rect(p.x - r, p.y - r, 2 * r, 2 * r);
+  } else {
+    const r = SYMBOL_SIZE * 0.8;
+    const n = shape === "diamond" ? 4 : shape === "triangle" ? 3 : 6;
+    const rot = shape === "hexagon" ? 0 : -Math.PI / 2;
+    for (let i = 0; i < n; i++) {
+      const a = rot + (i * 2 * Math.PI) / n;
+      ctx.lineTo(p.x + r * Math.cos(a), p.y + r * Math.sin(a));
+    }
+    ctx.closePath();
+  }
+  ctx.clip();
+}
+
+/** Diagonal hatching over the shape of each hatched individual. */
+function drawHatching(ctx: CanvasRenderingContext2D, net: Network, model: ChartModel,
+                      theme: StyleTheme, hatched: Set<string>) {
+  if (hatched.size === 0) return;
+  for (const n of model.individuals) {
+    if (!hatched.has(n.id)) continue;
+    const p = (net.getPositions([n.id]) as Record<string, Point>)[n.id];
+    if (!p) continue;
+    const box = net.getBoundingBox(n.id) as Box;
+    ctx.save();
+    clipToShape(ctx, theme.shape(n.cross_type), p, box);
+    ctx.fillStyle = HATCH.fill;
+    ctx.fillRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
+    ctx.strokeStyle = HATCH.ink;
+    ctx.lineWidth = HATCH.width;
+    ctx.beginPath();
+    const h = box.bottom - box.top, step = HATCH.spacing * Math.SQRT2;
+    for (let x = box.left - h; x < box.right; x += step) {
+      ctx.moveTo(x, box.bottom);
+      ctx.lineTo(x + h, box.top);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+export function individualColors(
   n: GraphNode, theme: StyleTheme, colorMap: Record<string, string>, selected: string | null,
+  hatched: Set<string> = new Set(),
 ) {
-  const fill = colorMap[n.id] ?? theme.defaultFill;
+  const isHatched = hatched.has(n.id);
+  const fill = isHatched ? HATCHED_FILL : colorMap[n.id] ?? theme.defaultFill;
   const isSelected = n.id === selected;
+  // A label inside the shape takes black or white by its fill (WCAG AA); one
+  // below sits on the canvas background. Selecting changes only the border.
+  const label = nodeLabelColor(theme.shape(n.cross_type), isHatched ? HATCH.fill : fill, theme.text);
   return {
+    font: { color: label, size: theme.fontSize, face: theme.fontFace },
     color: {
       background: fill,
       border:     isSelected ? theme.selected : theme.border,
@@ -231,7 +296,7 @@ function individualColors(
 
 const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function PedigreeCanvas(
   { model, colorMap, selected, onSelect, orientation, style, crossSymbolSize,
-    parentLabels = DEFAULT_PARENT_LABELS }, ref,
+    parentLabels = DEFAULT_PARENT_LABELS, hatched = NONE }, ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef   = useRef<Network | null>(null);
@@ -240,8 +305,9 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   const theme        = THEMES[style];
 
   // Latest props, read when the network is created after the chart font loads.
-  const latest = useRef({ colorMap, selected, orientation, onSelect, parentLabels });
-  latest.current = { colorMap, selected, orientation, onSelect, parentLabels };
+  const hatchedSet = useMemo(() => new Set(hatched), [hatched]);
+  const latest = useRef({ colorMap, selected, orientation, onSelect, parentLabels, hatched: hatchedSet });
+  latest.current = { colorMap, selected, orientation, onSelect, parentLabels, hatched: hatchedSet };
 
   // Link routes as drawn, and whether node geometry changed since they were
   // computed (new layout, orientation, drag, selection border).
@@ -315,11 +381,11 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     const container = containerRef.current;
     if (!container) return;
     let network: Network | null = null;
-    let cancelled = false;
+    let canceled = false;
     const individualIds = new Set(model.individuals.map(n => n.id));
 
     const create = () => {
-      if (cancelled) return;
+      if (canceled) return;
       const { colorMap, selected, orientation } = latest.current;
       const classic = style === "classic";
 
@@ -330,8 +396,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
           label: n.label,
           level: model.levels.get(n.id),
           shape,
-          ...individualColors(n, theme, colorMap, selected),
-          font:  { color: theme.text, size: theme.fontSize, face: theme.fontFace },
+          ...individualColors(n, theme, colorMap, selected, latest.current.hatched),
           ...(labelInside(shape)
             ? { widthConstraint: { minimum: CLASSIC_BOX.minWidth } } : { size: SYMBOL_SIZE }),
           ...(classic && {
@@ -421,8 +486,10 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       // Links go under the nodes. Node boxes are only known once vis-network
       // has drawn them, so stale routes are recomputed after a frame and the
       // chart drawn again.
-      network.on("beforeDrawing", (ctx: CanvasRenderingContext2D) =>
-        drawRoutes(ctx, routesRef.current, role => linkColor(role, theme.ink)));
+      network.on("beforeDrawing", (ctx: CanvasRenderingContext2D) => {
+        drawRoutes(ctx, routesRef.current, role => linkColor(role, theme.ink));
+        if (network) drawHatching(ctx, network, model, theme, latest.current.hatched);
+      });
       network.on("afterDrawing", () => {
         if (!stale.current) return;
         reroute();
@@ -486,11 +553,11 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     else {
       Promise.all([fontReady, slow ? afterPaint() : null])
         .then(create)
-        .finally(() => { if (!cancelled) setLayingOut(null); });
+        .finally(() => { if (!canceled) setLayingOut(null); });
     }
 
     return () => {
-      cancelled = true;
+      canceled = true;
       network?.destroy();
       if (networkRef.current === network) networkRef.current = null;
     };
@@ -507,14 +574,14 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentLabels.female, parentLabels.male]);
 
-  // ── Update colours / selection without re-creating the network ────────────
+  // ── Update colors / selection without re-creating the network ────────────
   useEffect(() => {
     if (!networkRef.current) return;
     nodesDS.current.update(model.individuals.map(n => ({
-      id: n.id, ...individualColors(n, theme, colorMap, selected),
+      id: n.id, ...individualColors(n, theme, colorMap, selected, hatchedSet),
     })));
     applySelection(networkRef.current);
-  }, [colorMap, selected, model, theme, applySelection]);
+  }, [colorMap, selected, model, theme, applySelection, hatchedSet]);
 
   // ── Orientation changes: apply in place, preserving selection ─────────────
   // setOptions re-lays out the existing network (synchronously) rather than

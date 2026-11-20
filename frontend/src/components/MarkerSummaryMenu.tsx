@@ -72,7 +72,7 @@ export default function MarkerSummaryMenu({ summary }: { summary: MarkerSummary 
                 <div key={code} style={{ display: "flex", alignItems: "center", gap: 6, padding: "1px 0" }}>
                   <CodeBadge code={code} flexqtl={summary.flexqtl_codes} />
                   <span style={{ flex: 1, color: "#a0aec0" }}>
-                    {summary.flexqtl_codes ? CODE_INFO[code]?.short ?? "no statement" : "colour code"}
+                    {summary.flexqtl_codes ? CODE_INFO[code]?.short ?? "no statement" : "color code"}
                   </span>
                   <span style={{ fontFamily: "monospace" }}>{n.toLocaleString("en-US")}</span>
                 </div>

@@ -356,7 +356,7 @@ export function useBackendHealth(): {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const started = Date.now();
     let url: string | null = null;
@@ -369,20 +369,20 @@ export function useBackendHealth(): {
     const fail = async (foreign: boolean) => {
       const report = isTauri()
         ? await invoke<BackendReport>("backend_report").catch(() => null) : null;
-      if (cancelled) return;
+      if (canceled) return;
       setFailure({ url, lastError, foreign, report });
       setStatus("error");
     };
 
     const poll = async () => {
-      if (cancelled) return;
+      if (canceled) return;
       try {
         url = await resolveBackendUrl();
         const res = await fetch(`${url}/api/health`);
-        if (cancelled) return;
+        if (canceled) return;
         if (res.ok) {
           const body = await res.json().catch(() => null);
-          if (cancelled) return;
+          if (canceled) return;
           if (isPedimapHealth(body)) { setStatus("ready"); return; }
           // Another program answers on this port: never talk to it.
           lastError = `${url} answered, but it is not Pedimap's backend.`;
@@ -391,7 +391,7 @@ export function useBackendHealth(): {
         }
         lastError = `Health check returned HTTP ${res.status}`;
       } catch (e) {
-        if (cancelled) return;
+        if (canceled) return;
         lastError = e instanceof Error ? e.message : String(e);
       }
       // Still not ready: give up after the timeout, otherwise poll again.
@@ -403,7 +403,7 @@ export function useBackendHealth(): {
     };
 
     void poll();
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+    return () => { canceled = true; if (timer) clearTimeout(timer); };
   }, [attempt]);
 
   // Retry restarts the backend if it has stopped (possibly on a new port).

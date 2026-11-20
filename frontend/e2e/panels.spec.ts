@@ -1,4 +1,4 @@
-// The details panel's Markers and IBD sections, colouring by a marker, and the
+// The details panel's Markers and IBD sections, coloring by a marker, and the
 // marker data summary, in WebKit on the simulated FlexQTL/Binko fixtures and
 // Example.dat.
 import { test, expect, type Page } from "@playwright/test";
@@ -63,15 +63,15 @@ test("IBD section: each FlexQTL linkage group shows its own positions", async ({
   await expect(first).not.toHaveText(group1!);
 });
 
-test("Colour by genotype code at a marker, with a legend; the marker data summary", async ({ page }) => {
+test("Color by genotype code at a marker, with a legend; the marker data summary", async ({ page }) => {
   await load(page, "flexqtl_binko/binko_legacy.ped");
-  await page.getByLabel("Colour by").selectOption({ label: "Genotype code at marker…" });
+  await page.getByLabel("Color by").selectOption({ label: "Genotype code at marker…" });
   await page.getByLabel("Marker", { exact: true }).selectOption("M1_001");
   const legend = page.getByRole("group", { name: "Legend: Genotype code at M1_001" });
   await expect(legend).toContainText("0 · OC");
   await expect(legend).toContainText("No genotype data");
 
-  await page.getByLabel("Colour by").selectOption({ label: "Allele at marker…" });
+  await page.getByLabel("Color by").selectOption({ label: "Allele at marker…" });
   await expect(page.getByRole("group", { name: "Legend: Copies of allele A at M1_001" })).toBeVisible();
 
   await page.getByRole("button", { name: /Marker data/ }).click();
@@ -88,9 +88,9 @@ test("Example.dat: parents labeled by sex, as its caption says", async ({ page }
   await expect(page.getByText("Female parent").first()).toBeVisible();
   const markers = page.getByRole("region", { name: "Markers" });
   await expect(markers.locator('tr[data-marker="SSR1"] td')).toHaveText(["SSR1", "180", "$", "2"]);
-  // No FACTOR0 in Example.dat's caption: its codes are colour codes, not FlexQTL's classes.
-  await expect(markers.locator('tr[data-marker="SSR1"] [data-code="2"]')).toHaveAttribute("title", "Colour code 2");
-  await page.getByLabel("Colour by").selectOption({ label: "Genotype code at marker…" });
+  // No FACTOR0 in Example.dat's caption: its codes are color codes, not FlexQTL's classes.
+  await expect(markers.locator('tr[data-marker="SSR1"] [data-code="2"]')).toHaveAttribute("title", "Color code 2");
+  await page.getByLabel("Color by").selectOption({ label: "Genotype code at marker…" });
   await page.getByLabel("Marker", { exact: true }).selectOption("SSR1");
   const legend = page.getByRole("group", { name: "Legend: Genotype code at SSR1" });
   await expect(legend).toContainText("Code 2");

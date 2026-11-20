@@ -72,11 +72,11 @@ describe("Markers section", () => {
     expect(within(screen.getByRole("region", { name: "Markers" })).getByText("No genotype data")).toBeTruthy();
   });
 
-  it("Example.dat (no FACTOR0): codes are colour codes, without FlexQTL's meanings", () => {
+  it("Example.dat (no FACTOR0): codes are color codes, without FlexQTL's meanings", () => {
     show("example", "Elstar");
     const badges = [...screen.getByRole("table", { name: "Genotypes" }).querySelectorAll("[data-code]")];
     expect(badges.length).toBeGreaterThan(0);
-    for (const b of badges) expect(b.getAttribute("title")).toBe(`Colour code ${b.textContent}`);
+    for (const b of badges) expect(b.getAttribute("title")).toBe(`Color code ${b.textContent}`);
     expect(document.body.textContent).not.toMatch(/FlexQTL|\(MA\)|\(OEA\)/);
   });
 
@@ -148,8 +148,8 @@ describe("marker data summary", () => {
     const dialog = screen.getByRole("dialog", { name: "Marker data" });
     const codes = [...dialog.querySelectorAll("[data-code]")];
     expect(codes.map(b => b.parentElement!.textContent)).toEqual(
-      ["0colour code32", "1colour code1", "2colour code7"]);
+      ["0color code32", "1color code1", "2color code7"]);
     expect(codes.map(b => b.getAttribute("title"))).toEqual(
-      ["Colour code 0", "Colour code 1", "Colour code 2"]);
+      ["Color code 0", "Color code 1", "Color code 2"]);
   });
 });

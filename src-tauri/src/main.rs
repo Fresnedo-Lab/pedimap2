@@ -156,7 +156,7 @@ fn backend_report(state: State<'_, BackendState>) -> BackendReport {
 
 /// Open a native file-picker that allows several files, so a .dat can be
 /// selected together with its .pmp. FlexQTL and Binko name their Pedimap data
-/// file pedimap.ped. Returns the selected paths (empty if the user cancelled).
+/// file pedimap.ped. Returns the selected paths (empty if the user canceled).
 #[tauri::command]
 async fn open_file_dialog(app: AppHandle) -> Result<Vec<String>, String> {
     let paths = app

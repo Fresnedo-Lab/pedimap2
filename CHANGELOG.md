@@ -13,18 +13,26 @@ release notes, so every release needs its own section here before it is tagged.
 ### Added
 - The details panel shows an individual's **marker data**. Under **Markers**,
   each linkage group's loci are listed with the two alleles in the file's
-  order and the genotype code as a colored badge; hovering over the badge
-  gives the code's meaning as FlexQTL and Binko use it. Individuals without
+  order and the genotype code as a colored badge. In FlexQTL and Binko files,
+  hovering over the badge gives the code's meaning as those programs use it;
+  in other files the codes are color codes. Individuals without
   genotype rows say so. Under **IBD**, a linkage group and position can be
   chosen; for each homologue the panel shows the most probable founder allele,
   its founder and the probability, and the next most probable when above 0.10.
-- **Colour by** offers **Genotype code at marker…** and **Allele at marker…**
+- **Color by** offers **Genotype code at marker…** and **Allele at marker…**
   (the number of copies of a chosen allele), with a legend on the chart and in
-  image exports.
+  image exports. The copy counts use color-blind-safe colors that also read in
+  grayscale; an unknown count is hatched gray, on screen and in exports.
 - A **Marker data** button beside the population name summarizes the file's
   loci, linkage groups, IBD positions and the genotype codes in use.
 
 ### Fixed
+- Loading a new dataset closes the details panel and clears the selected
+  individual, the **Subpop** button and the search box. Before, the panel and
+  the button could still show an individual of the previous file.
+- Names inside a node are black or white, whichever stands out from its fill
+  (at least WCAG AA contrast), in both display styles and in image exports.
+  In the Modern style they were always white and vanished on light colors.
 - FlexQTL and Binko files are read correctly, and the IBD data of FlexQTL
   files with several linkage groups is no longer mixed up. Pedimap filed all
   IBD positions of such a file under one linkage group, so positions that two
@@ -44,6 +52,8 @@ release notes, so every release needs its own section here before it is tagged.
   saved.
 
 ### Changed
+- The interface uses American English throughout: **Color by** (was "Colour
+  by"), and the demo population is "Apple Breeding Program – Demo".
 - Parents are labeled as the file's caption names them: "Female parent" and
   "Male parent" for FEMALE/MALE or MOTHER/FATHER, "Parent 1" and "Parent 2" for
   PARENT1/PARENT2 (as in FlexQTL and Binko files), in the details panel and the

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildChartModel, gridLayout } from "./model";
 import { buildLegend, buildSvg, type SvgExportInput } from "./svgExport";
 import { pngScale, MAX_PNG_DIMENSION } from "./imageExport";
+import { contrastRatio, labelColorOn } from "./style";
 import { appleColorS1S2, appleGala, appleGraph, applePedigree, syntheticGraph } from "../test/fixtures";
 import type { GraphData } from "../hooks/useApi";
 
@@ -129,7 +130,10 @@ describe("export background", () => {
     const doc = modern();
     expect(doc.querySelector("rect.background")!.getAttribute("fill")).toBe("#FFFFFF");
     expect(labelColor(doc, "Gala-self-01")).toBe("#1F2937");          // label under a selfing's diamond
-    expect(labelColor(doc, "Gala")).toBe("#e8ecf4");                  // inside its node: unchanged
+    // Inside its node, the name takes black or white by the node's fill (its
+    // S1_S2 color here), not the page.
+    expect(labelColor(doc, "Gala")).toBe(labelColorOn(appleColorS1S2.Gala));
+    expect(contrastRatio(labelColor(doc, "Gala")!, appleColorS1S2.Gala)).toBeGreaterThanOrEqual(4.5);
     expect(doc.querySelector("text.legend")!.getAttribute("fill")).toBe("#1F2937");
   });
 

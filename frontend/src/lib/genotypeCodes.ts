@@ -9,7 +9,7 @@
 // native Pedimap files the codes are only colors (dat-format.md §6.1).
 
 import type { MarkerValues } from "../hooks/useApi";
-import type { Legend } from "../chart/svgExport";
+import { HATCH, type Legend } from "../chart/svgExport";
 
 export interface CodeInfo { short: string; meaning: string }
 
@@ -33,7 +33,7 @@ export const NO_STATEMENT = "No statement: not one of FlexQTL's codes.";
 /** The hover text of a code: FlexQTL's meaning in a FlexQTL or Binko file,
  *  otherwise only that it is a color code. */
 export function codeTitle(code: number, flexqtl: boolean): string {
-  if (!flexqtl) return `Colour code ${code}`;
+  if (!flexqtl) return `Color code ${code}`;
   const info = CODE_INFO[code];
   return info
     ? `Code ${code} (${info.short}): ${info.meaning} (Meaning as FlexQTL and Binko use the code.)`
@@ -55,10 +55,14 @@ export function codeColor(code: number): string {
 
 export type MarkerColoringMode = "code" | "allele";
 export interface MarkerColoringChoice { mode: MarkerColoringMode; marker: string; allele?: string }
-export interface MarkerColoring { colorMap: Record<string, string>; legend: Legend }
+/** Colors per individual, the individuals drawn hatched, and the legend. */
+export interface MarkerColoring { colorMap: Record<string, string>; hatched: string[]; legend: Legend }
 
-const COPY_COLORS = ["#DBEAFE", "#60A5FA", "#1D4ED8"];   // 0, 1, 2 copies
-const UNKNOWN_COPIES_COLOR = "#CBD5E1";
+// 0, 1 and 2 copies: three steps of viridis, a color-blind-safe scale whose
+// lightness falls with the count, so the order reads in grayscale too. An
+// unknown count is the hatched mid-gray (HATCH), unlike any solid fill.
+export const COPY_COLORS = ["#FDE725", "#35B779", "#31688E"];
+export const UNKNOWN_COPIES_COLOR = HATCH.fill;
 const plural = (n: number) => (n === 1 ? "copy" : "copies");
 
 /**
@@ -71,9 +75,10 @@ const plural = (n: number) => (n === 1 ? "copy" : "copies");
 export function markerColoring(values: MarkerValues, choice: MarkerColoringChoice,
                                ids: string[], flexqtl: boolean): MarkerColoring {
   const colorMap: Record<string, string> = {};
-  const used = new Map<string, { label: string; color: string; order: number }>();
-  const use = (key: string, label: string, color: string, order: number) => {
-    if (!used.has(key)) used.set(key, { label, color, order });
+  const hatched: string[] = [];
+  const used = new Map<string, { label: string; color: string; order: number; hatch?: boolean }>();
+  const use = (key: string, label: string, color: string, order: number, hatch?: boolean) => {
+    if (!used.has(key)) used.set(key, { label, color, order, ...(hatch && { hatch }) });
     return color;
   };
   for (const id of ids) {
@@ -87,7 +92,8 @@ export function markerColoring(values: MarkerValues, choice: MarkerColoringChoic
         : info ? `${code} · ${info.short}` : `${code} · no statement`;
       colorMap[id] = use(`c${code}`, label, codeColor(code), code);
     } else if (v.alleles.some(a => a === null)) {
-      colorMap[id] = use("unknown", "Unknown", UNKNOWN_COPIES_COLOR, 1e9);
+      colorMap[id] = use("unknown", "Unknown", UNKNOWN_COPIES_COLOR, 1e9, true);
+      hatched.push(id);
     } else {
       const n = v.alleles.filter(a => a === choice.allele).length;
       colorMap[id] = use(`n${n}`, `${n} ${plural(n)}`, COPY_COLORS[Math.min(n, 2)], n);
@@ -97,6 +103,6 @@ export function markerColoring(values: MarkerValues, choice: MarkerColoringChoic
     ? `Genotype code at ${choice.marker}`
     : `Copies of allele ${choice.allele} at ${choice.marker}`;
   const entries = [...used.values()].sort((a, b) => a.order - b.order)
-    .map(({ label, color }) => ({ label, color }));
-  return { colorMap, legend: { trait: title, kind: "discrete", entries } };
+    .map(({ label, color, hatch }) => ({ label, color, ...(hatch && { hatch }) }));
+  return { colorMap, hatched, legend: { trait: title, kind: "discrete", entries } };
 }

@@ -6,7 +6,7 @@ from pedigree_engine import PedigreeEngine, Individual, TraitMeta, MarkerMeta, C
 
 def load_sample_data() -> PedigreeEngine:
     eng = PedigreeEngine()
-    eng.population_name = "Apple Breeding Programme – Demo"
+    eng.population_name = "Apple Breeding Program – Demo"
     eng.ploidy = 2
 
     eng.traits = [
