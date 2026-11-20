@@ -9,9 +9,11 @@ vi.mock("./components/PedigreeCanvas", async () => {
   const { forwardRef } = await import("react");
   return {
     default: forwardRef(function Canvas(props: { model: { individuals: unknown[]; crosses: unknown[] };
-                                             colorMap: Record<string, string> }, _ref) {
+                                             colorMap: Record<string, string>;
+                                             haplotype?: { data: { linkage_group: string } } | null }, _ref) {
       const { individuals, crosses } = props.model;
-      return <div data-testid="pedigree-canvas" data-colors={JSON.stringify(props.colorMap)}>
+      return <div data-testid="pedigree-canvas" data-colors={JSON.stringify(props.colorMap)}
+        data-haplotype={props.haplotype?.data.linkage_group ?? ""}>
         {individuals.length} drawn, {crosses.length} crosses</div>;
     }),
   };
@@ -211,5 +213,43 @@ describe("loading a new dataset", () => {
     await vi.waitFor(() => expect(screen.queryByText(/Gen 1 · cross/)).toBeNull());
     expect(screen.queryByText(/Subpop:/)).toBeNull();
     expect((screen.getByPlaceholderText("Search individuals…") as HTMLInputElement).value).toBe("");
+  });
+});
+
+describe("IBD bars", () => {
+  const summary = (ibd: number) => ({ loci: 1, ibd_positions: ibd, genotype_rows: 0,
+    individuals_with_genotypes: 0, codes: [], nalleles: ibd ? 4 : null, founders_named: !!ibd,
+    flexqtl_codes: false,
+    linkage_groups: [{ name: "1", loci: 1, ibd_positions: ibd }, { name: "2", loci: 1, ibd_positions: 0 }] });
+  const haplotypes = {
+    linkage_group: "1", start_cM: 0, end_cM: 10, positions: [{ position: "0", cM: 0 }], markers: [],
+    nalleles: 4, founders: ["I0", "I2"], founder_alleles: {},
+    rows: { I0: [[[[1, 1]]], [[[2, 1]]]], I1: [[[[1, 1]]], [[[2, 1]]]] },
+  };
+
+  it("offers the linkage groups with IBD positions, and draws the one chosen", async () => {
+    serve(pedigreeOf(4), undefined, "Synthetic", {
+      "/api/pedigree": { population: "Synthetic", ploidy: 2, traits: [], markers: [], marker_summary: summary(1) },
+      "/api/haplotypes": haplotypes,
+    });
+    render(<App />);
+    const canvas = await screen.findByTestId("pedigree-canvas");
+    const select = await screen.findByLabelText("IBD bars") as HTMLSelectElement;
+    expect([...select.options].map(o => o.textContent)).toEqual(["Off", "Linkage group 1"]);  // not 2
+    expect(canvas.getAttribute("data-haplotype")).toBe("");
+
+    fireEvent.change(select, { target: { value: "1" } });
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe("1"));
+    fireEvent.change(select, { target: { value: "" } });
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe(""));
+  });
+
+  it("is not offered for a file without IBD positions", async () => {
+    serve(pedigreeOf(4), undefined, "Synthetic", {
+      "/api/pedigree": { population: "Synthetic", ploidy: 2, traits: [], markers: [], marker_summary: summary(0) },
+    });
+    render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    expect(screen.queryByLabelText("IBD bars")).toBeNull();
   });
 });

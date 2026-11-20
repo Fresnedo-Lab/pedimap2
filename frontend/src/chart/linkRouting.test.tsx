@@ -31,8 +31,9 @@ vi.mock("vis-network/standalone", async (importOriginal) => {
   return { ...vis, Network: Recorded };
 });
 import PedigreeCanvas, {
-  NOTICE_LAYOUT_NODES, layoutNodeCount, type PedigreeCanvasHandle,
+  NOTICE_LAYOUT_NODES, layoutNodeCount, type HaplotypeView, type PedigreeCanvasHandle,
 } from "../components/PedigreeCanvas";
+import { DEFAULT_HAPLOTYPE_SETTINGS, palette, type HaplotypeData } from "../lib/haplotype";
 
 installFakeCanvas();
 
@@ -47,11 +48,11 @@ const CROSS_SIZE = 12;
  * `drag`, every individual and cross is then dragged far off its row and past
  * its neighbors (as the mouse would move it), one after another.
  */
-async function drawn(graph: GraphData, c: Config, drag = false) {
+async function drawn(graph: GraphData, c: Config, drag = false, haplotype: HaplotypeView | null = null) {
   const model = buildChartModel(graph, c.crosses);
   const ref = createRef<PedigreeCanvasHandle>();
   render(<PedigreeCanvas ref={ref} model={model} colorMap={{}} selected={null} onSelect={() => {}}
-    orientation={c.orientation} style={c.style} crossSymbolSize={CROSS_SIZE} />);
+    orientation={c.orientation} style={c.style} crossSymbolSize={CROSS_SIZE} haplotype={haplotype} />);
   // Large charts are laid out after a "Laying out…" notice has painted.
   await vi.waitFor(() => expect(networks.length).toBe(1));
   const net = networks.pop()!;
@@ -283,4 +284,49 @@ describe("image export", () => {
         .toBe(routes.filter(r => r.role === "female").length);
     }
   });
+});
+
+// ── Haplotype display: boxes with IBD bars ────────────────────────────────────
+
+const haplotypes = JSON.parse(readFileSync(resolve("src/test/fixtures/haplotypes.json"), "utf-8"));
+const haplotypeView = (data: HaplotypeData, graph: GraphData): HaplotypeView => ({
+  data, colorOf: palette(data, graph.nodes.map(n => n.id), "founder").colorOf,
+  settings: DEFAULT_HAPLOTYPE_SETTINGS, columns: ["Parent 1", "Parent 2"],
+});
+const IBD_CASES: [string, string, () => HaplotypeData][] = [
+  ["Example.dat, LG A", "example.json", () => haplotypes.example.groups.A],
+  ["binko_ibd.ped, LG 1", "pm_small.json", () => haplotypes.binko_ibd.groups["1"]],
+  ["FlexQTL fixture, LG 1", "sim_small.json", () => haplotypes.flexqtl.groups["1"]],
+];
+
+describe("haplotype display: links never cross a box they do not connect", () => {
+  for (const [name, file, data] of IBD_CASES) {
+    it(`${name}, all 8 settings`, async () => {
+      const graph = fixture(file), view = haplotypeView(data(), graph);
+      for (const config of CONFIGS) {
+        await new Promise(r => setTimeout(r, 0));
+        const { model, geometry, routes } = await drawn(graph, config, false, view);
+        expect(routes).toHaveLength(model.links.length);
+        expect(check(model, geometry, routes).map(v => `${v.from} → ${v.to} crosses ${v.crosses}`),
+               `${name} ${JSON.stringify(config)}`).toEqual([]);
+        // The boxes are the drawn boxes: as large as the geometry says, apart.
+        const boxes = model.individuals.map(n => [n.id, geometry.boxes[n.id]] as const);
+        for (const [, b] of boxes) expect(b.right - b.left).toBeGreaterThan(50);
+        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+          const [a, p] = boxes[i], [c, q] = boxes[j];
+          const overlap = p.left < q.right && q.left < p.right && p.top < q.bottom && q.top < p.bottom;
+          expect(overlap, `${a} overlaps ${c} (${JSON.stringify(config)})`).toBe(false);
+        }
+      }
+    }, 120_000);
+  }
+
+  it("FlexQTL fixture, after dragging every box", async () => {
+    const graph = fixture("sim_small.json"), view = haplotypeView(haplotypes.flexqtl.groups["1"], graph);
+    for (const config of CONFIGS) {
+      await new Promise(r => setTimeout(r, 0));
+      const { model, geometry, routes } = await drawn(graph, config, true, view);
+      expect(check(model, geometry, routes), JSON.stringify(config)).toEqual([]);
+    }
+  }, 120_000);
 });

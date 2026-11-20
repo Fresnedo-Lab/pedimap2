@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { LATEST_RELEASE_URL } from "../lib/links";
+import type { HaplotypeData } from "../lib/haplotype";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -190,6 +191,7 @@ export interface ApiClient {
   listIndividuals():                       Promise<IndividualSummary[]>;
   getIndividual(id: string):               Promise<IndividualDetail>;
   getMarkerValues(marker: string):         Promise<MarkerValues>;
+  getHaplotypes(linkageGroup: string):     Promise<HaplotypeData>;
   getColorMap(traitName: string, colors?: ColorOverrides): Promise<Record<string, string>>;
   buildSubpop(params: {
     focal_id: string;
@@ -244,6 +246,8 @@ export function useApi(): ApiClient {
     getLayout:      ()   => apiFetch("/api/layout"),
     listIndividuals:()   => apiFetch("/api/individuals"),
     getIndividual:  (id) => apiFetch(`/api/individual/${encodeURIComponent(id)}`),
+    getHaplotypes: (group) =>
+      apiFetch(`/api/haplotypes?${new URLSearchParams({ linkage_group: group }).toString()}`),
     getMarkerValues: (marker) =>
       apiFetch(`/api/marker-values?${new URLSearchParams({ marker }).toString()}`),
     getColorMap:    (t, colors = {}) => {

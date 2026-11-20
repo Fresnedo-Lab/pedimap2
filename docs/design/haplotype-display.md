@@ -81,8 +81,9 @@ length is the group's map; its top is the group's start.
   defaults to the first.
 - **Ticks.** A short tick on the outer side of each bar marks each actual IBD
   position, so the midpoint bands can be read against the positions they
-  stand for. A second, optional kind of tick marks the group's markers (on by
-  default), so bands can be read against loci too.
+  stand for. A second, optional kind of tick marks the group's markers that
+  are not IBD positions (on by default), so bands can be read against loci
+  too; a marker at an IBD position already has that tick.
 
 ### 1.2 Data
 
@@ -419,9 +420,12 @@ fully tested, so the visible PRs build on settled numbers.
 2. **IBD bars on the chart** (default scheme). Custom-shape boxes in both
    styles, spacing from box sizes, the group selector, band hover; routing
    invariant in jsdom and WebKit for both styles and orientations; performance
-   measured against the budgets. Draft PR, tested on macOS.
-3. **Export** of IBD mode (SVG/PDF/PNG) with the founder-allele legend, and its
-   WebKit test.
+   measured against the budgets. Draft PR, tested on macOS. The SVG export
+   already writes the boxes item for item (the WebKit routing check reads the
+   exported SVG, so it needs them); while the bars' data loads, the chart
+   waits instead of laying out a name-only chart first.
+3. **Export** of IBD mode: the founder-allele legend, and the PDF and PNG
+   checks, with their WebKit test.
 4. **Color schemes and settings**: by founder allele, highlight (with legend
    clicks), the "Haplotypes" ⚙ section and per-view persistence.
 5. **Markers in the box**: most probable allele with thresholds, observed
