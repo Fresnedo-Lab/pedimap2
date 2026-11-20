@@ -284,7 +284,8 @@ async def load_file(
 
     Files are decoded as UTF-8, falling back to Windows-1252 for legacy
     Pedimap 1.x files (see text_decoding.py). The response reports the
-    encoding used: ``encoding`` for the data file and ``files`` per file.
+    encoding used: ``encoding`` for the data file and ``files`` per file,
+    and for a .dat file ``warnings``: problems that did not stop it loading.
     """
     global _engine
     fname = dat_file.filename or ""
@@ -308,7 +309,7 @@ async def load_file(
             result = PmpParser.from_dat_text(dat_text)
         _engine = result.engine
         return {"loaded": "dat", "individuals": _engine.count(),
-                "encoding": dat_encoding, "files": files}
+                "encoding": dat_encoding, "files": files, "warnings": result.warnings}
     except ImportError:
         raise HTTPException(501, "pmp_parser module not available in this build.")
     except Exception as exc:
@@ -388,7 +389,7 @@ def demo_load(name: str):
 
     _engine = result.engine
     return {"loaded": name, "individuals": _engine.count(),
-            "encoding": dat_encoding, "files": files}
+            "encoding": dat_encoding, "files": files, "warnings": result.warnings}
 
 
 @app.get("/api/export/json")

@@ -24,9 +24,10 @@ function pedigreeOf(n: number): GraphData {
   return syntheticGraph(rows);
 }
 
-function serve(graph: GraphData) {
+function serve(graph: GraphData, load: unknown = { loaded: "dat", individuals: 0 }) {
   const routes: Record<string, unknown> = {
     "/api/health":      { status: "ok", app: "pedimap2", version: "test" },
+    "/api/load":        load,
     "/api/pedigree":    { population: "Synthetic", ploidy: 2, traits: [], markers: [] },
     "/api/individuals": graph.nodes.map(n => ({ id: n.id, name: n.label, generation: n.generation, cross_type: n.cross_type })),
     "/api/graph":       graph,
@@ -106,5 +107,23 @@ describe("view settings", () => {
     expect(screen.getByTestId("pedigree-canvas").textContent).toBe("4 drawn, 2 crosses");
     expect(JSON.parse(localStorage.getItem("pedimap.viewSettings")!)["view-1"].showCrossSymbols)
       .toEqual({ modern: true, classic: false });
+  });
+});
+
+describe("loading a file", () => {
+  it("shows the warnings of a file that loaded", async () => {
+    const warning = "FACTOR0 does not match the pedigree for 1 individual(s)";
+    serve(pedigreeOf(4), { loaded: "dat", individuals: 4, warnings: [warning] });
+    const { container } = render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    expect(screen.queryByRole("status", { name: "File warnings" })).toBeNull();
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x"], "b.ped")] } });
+    const banner = await screen.findByRole("status", { name: "File warnings" });
+    expect(banner.textContent).toContain(warning);
+
+    fireEvent.click(within(banner).getByText("Dismiss"));
+    expect(screen.queryByRole("status", { name: "File warnings" })).toBeNull();
   });
 });

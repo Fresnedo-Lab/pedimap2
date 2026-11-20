@@ -190,11 +190,16 @@ def test_reversed_parent_order_detected():
     assert kid.female_parent == "Dam" and kid.male_parent == "Sire"
 
 
-def test_ibd_bad_sum_rejected():
-    bad = ("NALLELES = 2\nPEDIGREE\nNAME FEMALE MALE\nX - -\n"
-           "IBDPOSITION 0 ; LG A\nX 0.3 0.3 1.0 0.0\n")
-    with pytest.raises(DatParseError):
-        PmpParser.from_dat_text(bad)
+def test_ibd_bad_sum_warns_and_keeps_the_values():
+    # A sum outside the rounding of its values is reported, not rejected
+    # (docs/reference/flexqtl-binko-pedimap, 5.6), and the values stay as read.
+    bad = ("NALLELES = 4\nPEDIGREE\nNAME FEMALE MALE\nP - -\nQ - -\nX P Q\n"
+           "LINKAGEGROUP A\nIBDPOSITIONS 0\n"
+           "IBDPOSITION 0 ; LG A\nX 0.3 0.3 0 0 0 0 0.9 0\n")
+    result = PmpParser.from_dat_text(bad)
+    assert result.engine.ibd["A"]["0"]["X"] == [[0.3, 0.3, 0.0, 0.0], [0.0, 0.0, 0.9, 0.0]]
+    assert len(result.warnings) == 1 and "2 IBD homologue(s) do not sum to 1" in result.warnings[0]
+    assert "line 10" in result.warnings[0]
 
 
 def test_pedigree_only_subset_parses():

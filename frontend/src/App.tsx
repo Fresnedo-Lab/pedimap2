@@ -408,17 +408,22 @@ export default function App() {
 
   // Notice shown when a file was read as Windows-1252 rather than UTF-8.
   const [encodingNotice, setEncodingNotice] = useState<string | null>(null);
+  // Problems the backend found in a file that still loaded (e.g. IBD sums
+  // outside their rounding, FACTOR0 against the pedigree).
+  const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
 
-  // `readEncodings` covers the desktop app, where the shell decodes files before
-  // upload (so the backend only ever sees UTF-8); in the browser the backend's
-  // per-file report is the only source.
-  const noteEncodings = useCallback((res: LoadResult, readEncodings: Record<string, string> = {}) => {
+  // Shows the encoding notice and the warnings of a load. `readEncodings` covers
+  // the desktop app, where the shell decodes files before upload (so the backend
+  // only ever sees UTF-8); in the browser the backend's per-file report is the
+  // only source.
+  const noteLoadResult = useCallback((res: LoadResult, readEncodings: Record<string, string> = {}) => {
     const legacy = (res.files ?? [])
       .filter(f => f.encoding === LEGACY_ENCODING || readEncodings[f.name] === LEGACY_ENCODING)
       .map(f => f.name);
     setEncodingNotice(legacy.length === 0 ? null :
       `${legacy.join(" and ")} ${legacy.length === 1 ? "uses" : "use"} an older text ` +
       "encoding (Windows-1252). Accented names were read correctly; exports are saved as UTF-8.");
+    setLoadWarnings(res.warnings ?? []);
   }, []);
 
   const handleOpenFile = useCallback(async () => {
@@ -434,7 +439,7 @@ export default function App() {
           return { file: new File([text], name, { type: "text/plain" }), name, encoding };
         }));
         const res = await api.loadFile(read.map(r => r.file));
-        noteEncodings(res, Object.fromEntries(read.map(r => [r.name, r.encoding])));
+        noteLoadResult(res, Object.fromEntries(read.map(r => [r.name, r.encoding])));
         await reloadAllData();
         setLoadError(null);
       } catch (e) {
@@ -443,7 +448,7 @@ export default function App() {
     } else {
       fileInputRef.current?.click();
     }
-  }, [api, reloadAllData, noteEncodings]);
+  }, [api, reloadAllData, noteLoadResult]);
 
   const handleFileInputChange = useCallback(async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -451,14 +456,14 @@ export default function App() {
     const files = e.target.files;
     if (!files?.length) return;
     try {
-      noteEncodings(await api.loadFile(files));
+      noteLoadResult(await api.loadFile(files));
       await reloadAllData();
       setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
     }
     e.target.value = "";
-  }, [api, reloadAllData, noteEncodings]);
+  }, [api, reloadAllData, noteLoadResult]);
 
   // ── Subpopulation ─────────────────────────────────────────────────────────
   const handleSubpop = useCallback(async () => {
@@ -524,6 +529,7 @@ export default function App() {
     try {
       await api.loadDemo("Example");
       setEncodingNotice(null);
+      setLoadWarnings([]);
       await reloadAllData();
       setSelectedId(null);
       setDetail(null);
@@ -537,6 +543,7 @@ export default function App() {
     try {
       await api.reset();
       setEncodingNotice(null);
+      setLoadWarnings([]);
       await reloadAllData();
       setSelectedId(null);
       setDetail(null);
@@ -777,6 +784,21 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Warnings from the file just loaded ───────────────────────────── */}
+      {loadWarnings.length > 0 && (
+        <div role="status" aria-label="File warnings" style={{ background: "#3a2e12",
+          color: "#f3d68a", padding: "6px 14px", fontSize: 12, borderBottom: "1px solid #6b5420",
+          display: "flex", alignItems: "flex-start", gap: 10, flexShrink: 0 }}>
+          <div style={{ flex: 1 }}>
+            {loadWarnings.map((w, k) => <div key={k}>⚠︎ {w}</div>)}
+          </div>
+          <button onClick={() => setLoadWarnings([])}
+            style={{ background: "transparent", color: "#f3d68a", fontSize: 11 }}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* ── Error banner (Issue 3) ───────────────────────────────────────── */}
       {loadError && (
         <div style={{ background: "#3b1d1d", color: "#fca5a5",
@@ -904,7 +926,7 @@ export default function App() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".dat,.pmp,.json"
+        accept=".dat,.ped,.pmp,.json"
         multiple
         style={{ display: "none" }}
         onChange={handleFileInputChange}

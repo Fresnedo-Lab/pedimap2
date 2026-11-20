@@ -10,6 +10,33 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+### Fixed
+- FlexQTL and Binko files are read correctly, and the IBD data of FlexQTL
+  files with several linkage groups is no longer mixed up. Pedimap filed all
+  IBD positions of such a file under one linkage group, so positions that two
+  groups share (such as 0 cM) kept only the last group's values: a file with
+  42 positions showed 21. A `.dat` export made from such a file with
+  Pedimap 2.2.2 or earlier has the same loss; export it again from the
+  original file.
+- Binko files with IBD data are no longer rejected because Binko's dummy
+  founders have no IBD rows.
+
+### Changed
+- Errors in a data file now give the line number, and more mistakes are caught
+  (for example an allele that is not listed for its locus, or an IBD section
+  that does not match the positions listed for its linkage group).
+- Problems that do not stop a file from loading are shown above the chart:
+  IBD probabilities whose sum is off by more than their rounding allows, and
+  `FACTOR0` values that disagree with the pedigree. An IBD sum is no longer a
+  reason to reject a file.
+- The `FACTOR0` column of FlexQTL and Binko files is no longer offered as a
+  trait to color by.
+- A file with IBD data and a ploidy other than 2 is refused, with a message
+  that IBD data for that ploidy is not supported yet. Files of other ploidies
+  without IBD data load as before.
+- **Open File** accepts `.ped` files, the name FlexQTL and Binko give their
+  Pedimap file.
+
 ## [2.2.2] — 2026-10-10
 
 Pedimap 2 now starts even when another program uses its usual port, and

@@ -106,6 +106,14 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
 - Test a macOS build only after checking which branch it was built from:
   the app embeds frontend/dist as built at that moment. A build made right
   after switching branches tests that branch, not the open PR.
+- FlexQTL and Binko files (pedimap.ped) are read as
+  docs/reference/flexqtl-binko-pedimap/ specifies. Never take an IBDPOSITION
+  section's linkage group from its comment: the k-th section belongs to the
+  k-th position of the IBDPOSITIONS lines (reading the comment mixed up the
+  groups of FlexQTL files through 2.2.2). Founder alleles come from the
+  founders' own IBD rows (dat_meta.founder_order). backend/tests/
+  test_flexqtl_binko.py compares the three fixtures with the spec's expected
+  JSON through tests/reader_spec.py; keep it passing.
 - To run frontend tests on the private TransApple file, generate its graph
   (gitignored) with `cd backend && python -m tests.test_frontend_fixture`.
 - frontend/src/test/fixtures/apple_public.json is generated from the backend.
