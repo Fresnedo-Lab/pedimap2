@@ -193,11 +193,14 @@ in="$WORK/nochangelog/in"; make_bundles "$in" 9.9.9
 expect_failure no-changelog-section 9.9.9 "$in" "no '## [9.9.9]' section"
 
 echo "Dry run before the CHANGELOG rename"
+# Its own CHANGELOG: the repository's [Unreleased] is empty right after a release.
 in="$WORK/unreleased/in"; make_bundles "$in" 9.9.9
-CHANGELOG_ALLOW_UNRELEASED=true run_case unreleased 9.9.9 "$in"
+printf '%s\n' "# Changelog" "" "## [Unreleased]" "" "### Fixed" "- A fix not released yet." "" \
+  "## [2.1.0] — 2026-01-01" "" "- Pedigree orientation toggle." > "$WORK/unreleased/CHANGELOG.md"
+CHANGELOG="$WORK/unreleased/CHANGELOG.md" CHANGELOG_ALLOW_UNRELEASED=true run_case unreleased 9.9.9 "$in"
 check "dry-run fallback: exits 0" [ "$status" -eq 0 ]
 check "dry-run fallback: warns about the missing section" contains "$log" "dry run uses [Unreleased]"
-check "dry-run fallback: notes use the [Unreleased] text" contains "$notes" "2.1.1 was built but never released"
+check "dry-run fallback: notes use the [Unreleased] text" contains "$notes" "A fix not released yet."
 check "dry-run fallback: notes stop before [2.1.0]" bash -c "! grep -q 'Pedigree orientation toggle' '$notes'"
 
 in="$WORK/badversion/in"; make_bundles "$in" "$VERSION"

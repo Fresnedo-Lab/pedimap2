@@ -1,10 +1,12 @@
-// The interface is in American English (CLAUDE.md, CONTRIBUTING.md). Every
+// Pedimap 2 is written in American English (CLAUDE.md, CONTRIBUTING.md). Every
 // frontend source file is checked, comments included, so that no British
-// spelling can reach a label, tooltip, legend, warning or dialog.
+// spelling can reach a label, tooltip, legend, warning or dialog; and so are
+// the README, CHANGELOG, CONTRIBUTING and everything under docs/.
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
+const REPO = resolve("..");
 const SELF = resolve("src/lib/spelling.test.ts");
 
 /** British spellings (with their inflections), and the American form. */
@@ -21,28 +23,63 @@ const BRITISH: [RegExp, string][] = [
    "-ize"],
 ];
 
-function sources(dir: string): string[] {
+/** Quotations, each kept exactly as written: a line of `file` that contains
+ *  `quote` may spell it so. */
+const QUOTED: { file: string; quote: string; why: string }[] = [
+  { file: "CHANGELOG.md", quote: '(was "Colour', why: "2.3.0 names the label it replaced" },
+  { file: "CHANGELOG.md", quote: "**Colour by**; the chart and the export legend use them.",
+    why: "the 2.2.0 entry gives the label of that release" },
+  { file: "docs/announcements/2.2.0-email.md", quote: "to **Colour by**.",
+    why: "the 2.2.0 announcement gives the label of that release" },
+  { file: "docs/reference/flexqtl-binko-pedimap/pedimap-input-file-reader-spec.md",
+    quote: "; Output from FlexQTL software for visualisation by Pedimap software",
+    why: "FlexQTL's own first line, quoted from its files" },
+];
+
+function files(dir: string, extensions: RegExp, skip = (_name: string) => false): string[] {
   return readdirSync(dir).flatMap(name => {
     const path = join(dir, name);
-    if (statSync(path).isDirectory()) return name === "fixtures" || name === "assets" ? [] : sources(path);
-    return /\.(tsx?|html|css)$/.test(name) && path !== SELF ? [path] : [];
+    if (statSync(path).isDirectory()) return skip(name) ? [] : files(path, extensions, skip);
+    return extensions.test(name) && path !== SELF ? [path] : [];
   });
+}
+
+function britishIn(paths: string[]): string[] {
+  const found: string[] = [];
+  for (const path of paths) {
+    const file = relative(REPO, path);
+    readFileSync(path, "utf-8").split("\n").forEach((line, i) => {
+      if (QUOTED.some(q => q.file === file && line.includes(q.quote))) return;
+      for (const [pattern, american] of BRITISH) {
+        const m = line.match(pattern);
+        if (m) found.push(`${file}:${i + 1}: "${m[0]}" (American: ${american})`);
+      }
+    });
+  }
+  return found;
 }
 
 describe("American English", () => {
   it("no British spelling in the frontend's sources", () => {
-    const files = [...sources(resolve("src")), ...sources(resolve("e2e")), resolve("index.html")];
-    expect(files.length).toBeGreaterThan(20);
-    const found: string[] = [];
-    for (const file of files) {
-      readFileSync(file, "utf-8").split("\n").forEach((line, i) => {
-        for (const [pattern, american] of BRITISH) {
-          const m = line.match(pattern);
-          if (m) found.push(`${relative(resolve("."), file)}:${i + 1}: "${m[0]}" (American: ${american})`);
-        }
-      });
+    const skip = (name: string) => name === "fixtures" || name === "assets";
+    const sources = [...files(resolve("src"), /\.(tsx?|css)$/, skip),
+                     ...files(resolve("e2e"), /\.ts$/), resolve("index.html")];
+    expect(sources.length).toBeGreaterThan(20);
+    expect(britishIn(sources)).toEqual([]);
+  });
+
+  it("no British spelling in the README, CHANGELOG, CONTRIBUTING or docs/", () => {
+    const docs = [...["README.md", "CHANGELOG.md", "CONTRIBUTING.md"].map(f => join(REPO, f)),
+                  ...files(join(REPO, "docs"), /\.(md|jl|txt)$/)];
+    expect(docs.length).toBeGreaterThan(10);
+    expect(britishIn(docs)).toEqual([]);
+  });
+
+  it("allows only quotations that are still there", () => {
+    for (const q of QUOTED) {
+      const path = join(REPO, q.file);
+      expect(existsSync(path) && readFileSync(path, "utf-8").includes(q.quote), `${q.file}: ${q.why}`).toBe(true);
     }
-    expect(found).toEqual([]);
   });
 
   it("catches each British form", () => {
