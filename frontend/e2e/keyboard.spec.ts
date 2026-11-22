@@ -42,8 +42,15 @@ test("typing in the search box types, and leaves the chart where it is", async (
   const box = (await canvas.boundingBox())!;
   await page.mouse.click(box.x + 8, box.y + 8);             // an empty corner of the chart
   await page.waitForTimeout(300);
+  expect(await page.evaluate(() => document.activeElement?.classList.contains("vis-network")),
+         "a click on the chart did not give it the focus").toBe(true);
   const focused = await chartPixels(page);
-  await page.keyboard.press("-");
+  // vis-network zooms a step on each frame while the key is down, so hold it
+  // as a person does: keydown and keyup in the same instant (press) can fall
+  // between two frames and zoom nothing on a slow machine.
+  await page.keyboard.down("-");
+  await page.waitForTimeout(250);
+  await page.keyboard.up("-");
   await page.waitForTimeout(400);
   expect(await chartPixels(page), "the focused chart did not zoom").not.toBe(focused);
 });
