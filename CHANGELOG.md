@@ -10,6 +10,14 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.3.1] — 2026-11-22
+
+### Fixed
+- Typing in the search box no longer zooms or pans the chart; names with _
+  or - can be searched. The chart's own keys (arrows to pan, + and - to
+  zoom) now work after a click on the chart. The bug was in every release
+  since 2.0.0.
+
 ## [2.3.0] — 2026-11-20
 
 Pedimap 2 now reads FlexQTL and Binko files correctly and shows their marker
@@ -259,7 +267,8 @@ _2.1.1 was built but never released (macOS backend failed to start)._
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.2...v2.3.0
 [2.2.2]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.0...v2.2.1
