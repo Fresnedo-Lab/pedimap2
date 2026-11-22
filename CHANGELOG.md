@@ -22,6 +22,14 @@ release notes, so every release needs its own section here before it is tagged.
   a subpopulation gets more distinct colors. Image exports include the bars;
   their legend of founder alleles comes in a later release.
 
+### Fixed
+- Typing in the search box (or any other field) no longer zooms or moves the
+  chart, and "-" and "_" are typed instead of swallowed: the chart's keys
+  (arrows to move, + and - to zoom) now act only after you click the chart.
+  Every version since 2.0.0 had this.
+- Error messages above the chart are plain sentences, not the raw replies of
+  Pedimap's background service.
+
 ### Changed
 - Files with IBD data open with much less data passed around inside the app:
   the pedigree data no longer carries the IBD probabilities, which no screen

@@ -163,12 +163,32 @@ export function isPedimapHealth(body: unknown): boolean {
 
 // ── Core fetch helper ─────────────────────────────────────────────────────────
 
+/** An error reply of the backend, with its message in plain words. */
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/** The plain message of an error reply: FastAPI's `detail` text, a short plain
+ *  body, or a general sentence; never the raw reply. */
+export function apiErrorMessage(status: number, body: string): string {
+  try {
+    const detail = (JSON.parse(body) as { detail?: unknown }).detail;
+    if (typeof detail === "string" && detail.trim()) return detail.trim();
+  } catch { /* not JSON */ }
+  const text = body.trim();
+  if (text && text.length <= 300 && !/[<{]/.test(text)) return text;
+  return `The Pedimap service could not complete the request (error ${status}).`;
+}
+
 async function apiResponse(path: string, options?: RequestInit): Promise<Response> {
   const base = await resolveBackendUrl();
   const res  = await fetch(`${base}${path}`, options);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${body}`);
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
   }
   return res;
 }
@@ -238,53 +258,58 @@ export interface DatExportRequest extends Partial<SubpopSelection> {
   replace_outside_parents?: boolean;
 }
 
+// One client for the whole app: it holds no state, and a stable object keeps
+// effects that depend on it from running again on every render (which sent
+// duplicate requests).
+const client: ApiClient = {
+  getStats:       ()   => apiFetch("/api/stats"),
+  getPedigree:    ()   => apiFetch("/api/pedigree"),
+  getGraph:       ()   => apiFetch("/api/graph"),
+  getLayout:      ()   => apiFetch("/api/layout"),
+  listIndividuals:()   => apiFetch("/api/individuals"),
+  getIndividual:  (id) => apiFetch(`/api/individual/${encodeURIComponent(id)}`),
+  getHaplotypes: (group) =>
+    apiFetch(`/api/haplotypes?${new URLSearchParams({ linkage_group: group }).toString()}`),
+  getMarkerValues: (marker) =>
+    apiFetch(`/api/marker-values?${new URLSearchParams({ marker }).toString()}`),
+  getColorMap:    (t, colors = {}) => {
+    // Issue 1: a color request must never be issued without a trait name.
+    // The backend route is /api/color/{trait_name}; calling it with an empty
+    // trait produces /api/color/ → 404. Treat empty/null/undefined as "no
+    // coloring" and return the default (empty) map without hitting the API.
+    if (!t) return Promise.resolve<Record<string, string>>({});
+    const query = new URLSearchParams(
+      Object.entries(colors).filter((e): e is [string, string] => !!e[1])).toString();
+    return apiFetch(`/api/color/${encodeURIComponent(t)}${query ? `?${query}` : ""}`);
+  },
+  buildSubpop:    (p)  => apiFetch("/api/subpop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(p),
+  }),
+  loadFile: async (files) => {
+    const fd = new FormData();
+    const arr = Array.from(files);
+    // The data file: .dat, or .ped as FlexQTL and Binko name it, or .json.
+    const dat = arr.find(f => /\.(dat|ped|json)$/i.test(f.name));
+    const pmp = arr.find(f => /\.pmp$/i.test(f.name));
+    if (!dat) throw new Error("Please select a .dat, .ped or .json file.");
+    fd.append("dat_file", dat, dat.name);
+    if (pmp) fd.append("pmp_file", pmp, pmp.name);
+    return apiFetch("/api/load", { method: "POST", body: fd });
+  },
+  listDemo: ()     => apiFetch("/api/demo/list"),
+  loadDemo: (name) => apiFetch(`/api/demo/load/${encodeURIComponent(name)}`),
+  exportDat: (req = {}) => apiFetchText("/api/export/dat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  }),
+  reset: () => apiFetch("/api/reset", { method: "POST" }),
+};
+
 export function useApi(): ApiClient {
-  return {
-    getStats:       ()   => apiFetch("/api/stats"),
-    getPedigree:    ()   => apiFetch("/api/pedigree"),
-    getGraph:       ()   => apiFetch("/api/graph"),
-    getLayout:      ()   => apiFetch("/api/layout"),
-    listIndividuals:()   => apiFetch("/api/individuals"),
-    getIndividual:  (id) => apiFetch(`/api/individual/${encodeURIComponent(id)}`),
-    getHaplotypes: (group) =>
-      apiFetch(`/api/haplotypes?${new URLSearchParams({ linkage_group: group }).toString()}`),
-    getMarkerValues: (marker) =>
-      apiFetch(`/api/marker-values?${new URLSearchParams({ marker }).toString()}`),
-    getColorMap:    (t, colors = {}) => {
-      // Issue 1: a color request must never be issued without a trait name.
-      // The backend route is /api/color/{trait_name}; calling it with an empty
-      // trait produces /api/color/ → 404. Treat empty/null/undefined as "no
-      // coloring" and return the default (empty) map without hitting the API.
-      if (!t) return Promise.resolve<Record<string, string>>({});
-      const query = new URLSearchParams(
-        Object.entries(colors).filter((e): e is [string, string] => !!e[1])).toString();
-      return apiFetch(`/api/color/${encodeURIComponent(t)}${query ? `?${query}` : ""}`);
-    },
-    buildSubpop:    (p)  => apiFetch("/api/subpop", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(p),
-    }),
-    loadFile: async (files) => {
-      const fd = new FormData();
-      const arr = Array.from(files);
-      // The data file: .dat, or .ped as FlexQTL and Binko name it, or .json.
-      const dat = arr.find(f => /\.(dat|ped|json)$/i.test(f.name));
-      const pmp = arr.find(f => /\.pmp$/i.test(f.name));
-      if (!dat) throw new Error("Please select a .dat, .ped or .json file.");
-      fd.append("dat_file", dat, dat.name);
-      if (pmp) fd.append("pmp_file", pmp, pmp.name);
-      return apiFetch("/api/load", { method: "POST", body: fd });
-    },
-    listDemo: ()     => apiFetch("/api/demo/list"),
-    loadDemo: (name) => apiFetch(`/api/demo/load/${encodeURIComponent(name)}`),
-    exportDat: (req = {}) => apiFetchText("/api/export/dat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req),
-    }),
-    reset: () => apiFetch("/api/reset", { method: "POST" }),
-  };
+  return client;
 }
 
 // ── Convenience data-fetching hook ────────────────────────────────────────────

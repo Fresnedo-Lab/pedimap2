@@ -48,6 +48,7 @@ import { THEMES } from "./chart/style";
 import ChartLegend from "./components/ChartLegend";
 import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
 import { exportBaseName } from "./lib/fileNames";
+import { isEditableTarget } from "./lib/keyboard";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
 import { useUpdater } from "./hooks/useUpdater";
@@ -261,7 +262,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // ── Server data (deferred until the backend is ready) ─────────────────────
-  const { data: pedigree, reload: reloadPedigree } =
+  const { data: pedigree, loading: pedigreeLoading, error: pedigreeError, reload: reloadPedigree } =
     useFetch<PedigreeData>(() => api.getPedigree(), [], ready);
 
   const { data: indList, reload: reloadIndividuals } =
@@ -328,8 +329,7 @@ export default function App() {
       if (e.key !== "f" && e.key !== "F") return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Don't steal the key while the user is typing (e.g. in the search box).
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      if (isEditableTarget(e.target)) return;
       e.preventDefault();
       fitToWindow();
     };
@@ -577,8 +577,13 @@ export default function App() {
   const chartColors = coloring?.colorMap ?? colorMap;
 
   // ── Haplotype display: IBD bars of one linkage group in every box ────────
-  const ibdGroups = useMemo(() => (pedigree?.marker_summary?.linkage_groups ?? [])
-    .filter(g => g.ibd_positions > 0).map(g => g.name), [pedigree]);
+  // The groups with IBD positions of the file loaded. While a new file's
+  // pedigree is still loading (or failed to), `pedigree` may be the previous
+  // file's: decide nothing from it, so no request goes out for a group the new
+  // file does not have.
+  const pedigreeSettled = !pedigreeLoading && !pedigreeError;
+  const ibdGroups = useMemo(() => (pedigreeSettled ? pedigree?.marker_summary?.linkage_groups ?? [] : [])
+    .filter(g => g.ibd_positions > 0).map(g => g.name), [pedigree, pedigreeSettled]);
   const ibdGroup = ibdGroups.length === 0 || view.cellContents !== "name+ibd" ? null
     : ibdGroups.includes(view.ibdLinkageGroup ?? "") ? view.ibdLinkageGroup! : ibdGroups[0];
   useEffect(() => {
@@ -589,7 +594,9 @@ export default function App() {
     api.getHaplotypes(ibdGroup).then(data => {
       haplotypeCache.current.set(ibdGroup, data);
       if (current) setHaplotypeData(data);
-    }, e => setLoadError(e instanceof Error ? e.message : String(e)));
+    }, () => {
+      if (current) setLoadError(`Could not load the IBD data of linkage group ${ibdGroup}.`);
+    });
     return () => { current = false; };
   }, [api, ibdGroup]);
   // Colors over the founders that contribute to the individuals displayed.
@@ -601,7 +608,8 @@ export default function App() {
   }, [haplotypeData, graphData, ibdGroup, pedigree]);
   // While the bars' data loads, the chart waits: drawing it with names only
   // first would lay it out twice.
-  const haplotypePending = ibdGroup !== null && haplotypeView === null;
+  const haplotypePending = view.cellContents === "name+ibd" &&
+    (pedigreeLoading || (ibdGroup !== null && haplotypeView === null));
 
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const closeImageDialog = useCallback(() => setImageDialogOpen(false), []);

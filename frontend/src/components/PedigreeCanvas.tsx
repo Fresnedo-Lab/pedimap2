@@ -580,7 +580,11 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
           hover:                true,
           tooltipDelay:         200,
           navigationButtons:    false,
-          keyboard:             true,
+          // Keys (arrows to pan, +/- to zoom) only while the chart has focus:
+          // bound to the chart, not the window, so typing in the search box or
+          // any other field never moves it. No focus on hover, which would
+          // take the focus away from a field the user is typing in.
+          keyboard:             { enabled: true, bindToWindow: false, autoFocus: false },
           zoomView:             true,
           dragView:             true,
           selectConnectedEdges: false,
@@ -745,7 +749,12 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}
       onMouseMove={haplotype ? onHover : undefined}
-      onMouseLeave={() => setTooltip(null)}>
+      onMouseLeave={() => setTooltip(null)}
+      // A press on the chart gives it the keyboard focus (vis-network's
+      // pointer handling keeps the browser from doing so), so its keys work
+      // after a click, and only then.
+      onMouseDown={() => containerRef.current?.querySelector<HTMLElement>(".vis-network")
+        ?.focus({ preventScroll: true })}>
       <div
         ref={containerRef}
         data-testid="pedigree-canvas"
