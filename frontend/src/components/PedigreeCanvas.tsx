@@ -142,6 +142,10 @@ interface VisInternals {
   body: { emitter: { on(event: string, handler: () => void): void } };
 }
 
+/** What the WebKit tests may read of the chart: its zoom, nothing else. */
+interface ChartProbe { getScale(): number }
+const chartWindow = window as Window & { __pedimapChart?: ChartProbe; __PEDIMAP_E2E__?: boolean };
+
 // Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
 // currently plumbed to the frontend, so we use its default ("-") here.
 const UNKNOWN_PARENT = "-";
@@ -382,6 +386,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     if (!container) return;
     let network: Network | null = null;
     let canceled = false;
+    let removeProbe = () => {};
     const individualIds = new Set(model.individuals.map(n => n.id));
 
     const create = () => {
@@ -458,7 +463,11 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
           hover:                true,
           tooltipDelay:         200,
           navigationButtons:    false,
-          keyboard:             true,
+          // Keys (arrows to pan, +/- to zoom) only while the chart has focus:
+          // bound to the chart, not the window, so typing in the search box or
+          // any other field never moves it. No focus on hover, which would
+          // take the focus away from a field the user is typing in.
+          keyboard:             { enabled: true, bindToWindow: false, autoFocus: false },
           zoomView:             true,
           dragView:             true,
           selectConnectedEdges: false,
@@ -480,6 +489,12 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       emitter.on("_dataChanged", pack);
       emitter.on("_resetHierarchicalLayout", pack);
       networkRef.current = network;
+      // Exists only for the end-to-end tests, which set __PEDIMAP_E2E__ (e2e/keyboard.spec.ts).
+      if (chartWindow.__PEDIMAP_E2E__ === true) {
+        const probe: ChartProbe = { getScale: () => net.getScale() };
+        chartWindow.__pedimapChart = probe;
+        removeProbe = () => { if (chartWindow.__pedimapChart === probe) delete chartWindow.__pedimapChart; };
+      }
       appliedOrientation.current = orientation;
       stale.current = true;
 
@@ -558,6 +573,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
 
     return () => {
       canceled = true;
+      removeProbe();
       network?.destroy();
       if (networkRef.current === network) networkRef.current = null;
     };
@@ -608,7 +624,12 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   }, [orientation, applySelection, model, theme]);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}
+      // A press on the chart gives it the keyboard focus (vis-network's
+      // pointer handling keeps the browser from doing so), so its keys work
+      // after a click, and only then.
+      onMouseDown={() => containerRef.current?.querySelector<HTMLElement>(".vis-network")
+        ?.focus({ preventScroll: true })}>
       <div
         ref={containerRef}
         data-testid="pedigree-canvas"
