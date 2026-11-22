@@ -187,6 +187,10 @@ interface VisInternals {
   body: { emitter: { on(event: string, handler: () => void): void } };
 }
 
+/** What the WebKit tests may read of the chart: its zoom, nothing else. */
+interface ChartProbe { getScale(): number }
+const chartWindow = window as Window & { __pedimapChart?: ChartProbe; __PEDIMAP_E2E__?: boolean };
+
 // Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
 // currently plumbed to the frontend, so we use its default ("-") here.
 const UNKNOWN_PARENT = "-";
@@ -482,6 +486,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     if (!container) return;
     let network: Network | null = null;
     let canceled = false;
+    let removeProbe = () => {};
     const individualIds = new Set(model.individuals.map(n => n.id));
 
     const create = () => {
@@ -607,6 +612,12 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       emitter.on("_dataChanged", pack);
       emitter.on("_resetHierarchicalLayout", pack);
       networkRef.current = network;
+      // Exists only for the end-to-end tests, which set __PEDIMAP_E2E__ (e2e/keyboard.spec.ts).
+      if (chartWindow.__PEDIMAP_E2E__ === true) {
+        const probe: ChartProbe = { getScale: () => net.getScale() };
+        chartWindow.__pedimapChart = probe;
+        removeProbe = () => { if (chartWindow.__pedimapChart === probe) delete chartWindow.__pedimapChart; };
+      }
       appliedOrientation.current = orientation;
       stale.current = true;
 
@@ -687,6 +698,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
 
     return () => {
       canceled = true;
+      removeProbe();
       network?.destroy();
       if (networkRef.current === network) networkRef.current = null;
     };

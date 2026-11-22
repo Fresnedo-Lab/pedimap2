@@ -5,6 +5,8 @@ import { test, expect, type Page } from "@playwright/test";
 const backendPort = Number(process.env.E2E_BACKEND_PORT ?? 8765);
 
 test.beforeEach(async ({ page }) => {
+  // The chart exposes window.__pedimapChart (its zoom) only with this flag.
+  await page.addInitScript(() => { (window as Window & { __PEDIMAP_E2E__?: boolean }).__PEDIMAP_E2E__ = true; });
   if (backendPort !== 8765) {
     await page.route("http://127.0.0.1:8765/**", async route =>
       route.fulfill({ response: await route.fetch({ url: route.request().url().replace(":8765", `:${backendPort}`) }) }));
@@ -44,13 +46,17 @@ test("typing in the search box types, and leaves the chart where it is", async (
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => document.activeElement?.classList.contains("vis-network")),
          "a click on the chart did not give it the focus").toBe(true);
-  const focused = await chartPixels(page);
   // vis-network zooms a step on each frame while the key is down, so hold it
-  // as a person does: keydown and keyup in the same instant (press) can fall
-  // between two frames and zoom nothing on a slow machine.
+  // until the zoom has changed: a press (keydown and keyup at once), or any
+  // fixed hold time, can end before a frame on a slow machine.
+  const scale = () => page.evaluate(() =>
+    (window as Window & { __pedimapChart?: { getScale(): number } }).__pedimapChart!.getScale());
+  const start = await scale();
   await page.keyboard.down("-");
-  await page.waitForTimeout(250);
-  await page.keyboard.up("-");
-  await page.waitForTimeout(400);
-  expect(await chartPixels(page), "the focused chart did not zoom").not.toBe(focused);
+  try {
+    await expect.poll(scale, { message: "the focused chart did not zoom out", timeout: 3000 })
+      .toBeLessThan(start);
+  } finally {
+    await page.keyboard.up("-");
+  }
 });
