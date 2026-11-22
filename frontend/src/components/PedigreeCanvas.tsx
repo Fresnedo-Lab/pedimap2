@@ -18,7 +18,12 @@ import { linkColor, linkPath, type ChartModel } from "../chart/model";
 import {
   CHART_FONT, THEMES, labelInside, nodeLabelColor, type DisplayStyle, type NodeShape, type StyleTheme,
 } from "../chart/style";
-import { CLASSIC_BOX, HATCH } from "../chart/svgExport";
+import { CLASSIC_BOX, HATCH, textWidth } from "../chart/svgExport";
+import { drawHaplotypeBox } from "../chart/haplotypeCanvas";
+import {
+  describeSegment, haplotypeBox, largestBox, segmentAt,
+  type HaplotypeBox, type HaplotypeData, type HaplotypeSettings,
+} from "../lib/haplotype";
 import {
   constrainDrag, dragRange, drawRoutes, routeLinks, routingProblems, routingWarning,
   type Box, type DragRange, type Point, type RoutedLink,
@@ -77,7 +82,32 @@ interface Props {
   parentLabels?:   ParentLabels;
   /** Individuals drawn hatched (an unknown value), as the export draws them. */
   hatched?:        string[];
+  /** IBD bars in every box (docs/design/haplotype-display.md); null: names only. */
+  haplotype?:      HaplotypeView | null;
 }
+
+/** What the haplotype display draws: one linkage group's data, the palette's
+ *  founder-allele colors, the box settings, and the homologue labels. */
+export interface HaplotypeView {
+  data:     HaplotypeData;
+  colorOf:  (allele: number) => string;
+  settings: HaplotypeSettings;
+  columns:  [string, string];
+}
+
+/** The haplotype box of every individual, for the canvas and the export. */
+export function haplotypeBoxes(model: ChartModel, view: HaplotypeView, theme: StyleTheme,
+                               colorMap: Record<string, string>, hatched: Set<string>):
+    Record<string, HaplotypeBox> {
+  return Object.fromEntries(model.individuals.map(n => [n.id, haplotypeBox({
+    name: n.label, theme, data: view.data, settings: view.settings, colorOf: view.colorOf,
+    fill: hatched.has(n.id) ? HATCH.fill : colorMap[n.id] ?? theme.defaultFill,
+    homologues: view.data.rows[n.id] ?? null, textWidth,
+  })]));
+}
+
+// Rounded corners of a haplotype box in the Modern style; Classic is square.
+const MODERN_RADIUS = 4;
 
 // Hierarchical-layout config. With cross symbols, individuals sit on even
 // levels (2 × generation) and cross nodes on the odd level between, so each
@@ -88,10 +118,24 @@ interface Props {
 // Labels are not wrapped (so the export matches the screen), so the spacing
 // along the name grows with the longest name: between siblings in UD, and
 // between generations in LR, where same-rank nodes stack vertically.
+//
+// Haplotype boxes are larger and of one height; the spacing then follows the
+// largest box: across the layout direction the box plus 40 px, along it the
+// box plus room for the link bands.
 function hierarchicalFor(
   orientation: Orientation, longestLabel: number, levelsPerGeneration: number, large: boolean,
+  largest?: { width: number; height: number },
 ) {
   const lr = orientation === "LR";
+  if (largest) {
+    const generationSpacing = lr ? Math.max(220, largest.width + 70) : Math.max(140, largest.height + 70);
+    return {
+      enabled: true, direction: orientation, sortMethod: "directed",
+      levelSeparation: generationSpacing / levelsPerGeneration,
+      nodeSpacing: Math.round(lr ? Math.max(60, largest.height + 20) : Math.max(100, largest.width + 40)),
+      treeSpacing: 160, blockShifting: true, edgeMinimization: !large, parentCentralization: true,
+    };
+  }
   const generationSpacing = lr ? Math.max(220, longestLabel + 60) : 140;
   return {
     enabled:              true,
@@ -143,6 +187,10 @@ interface VisInternals {
   body: { emitter: { on(event: string, handler: () => void): void } };
 }
 
+/** What the WebKit tests may read of the chart: its zoom, nothing else. */
+interface ChartProbe { getScale(): number }
+const chartWindow = window as Window & { __pedimapChart?: ChartProbe; __PEDIMAP_E2E__?: boolean };
+
 // Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
 // currently plumbed to the frontend, so we use its default ("-") here.
 const UNKNOWN_PARENT = "-";
@@ -154,6 +202,14 @@ const UNKNOWN_PARENT = "-";
 // element. We build every text node with textContent (never innerHTML), so an
 // individual or trait value containing "<" or "&" cannot break the markup or
 // inject content.
+/** The lines of an individual's tooltip: name, parents, generation, traits. */
+export function tooltipLines(ind: GraphNode, labels: ParentLabels): string[] {
+  const parent = (p?: string | null) => (p && p.length > 0 ? p : UNKNOWN_PARENT);
+  return [ind.label, `${labels.female}: ${parent(ind.female_parent)}`,
+          `${labels.male}: ${parent(ind.male_parent)}`, `Generation: ${ind.generation}`,
+          ...Object.entries(ind.traits ?? {}).map(([t, v]) => `${t}: ${v}`)];
+}
+
 export function buildTooltip(ind: GraphNode, labels: ParentLabels): HTMLElement {
   const el = document.createElement("div");
   el.className = "pedimap-tooltip";
@@ -297,7 +353,7 @@ export function individualColors(
 
 const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function PedigreeCanvas(
   { model, colorMap, selected, onSelect, orientation, style, crossSymbolSize,
-    parentLabels = DEFAULT_PARENT_LABELS, hatched = NONE }, ref,
+    parentLabels = DEFAULT_PARENT_LABELS, hatched = NONE, haplotype = null }, ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef   = useRef<Network | null>(null);
@@ -307,6 +363,46 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
 
   // Latest props, read when the network is created after the chart font loads.
   const hatchedSet = useMemo(() => new Set(hatched), [hatched]);
+
+  // Haplotype boxes, read by the node renderer, the routing and the hover.
+  // They change with the colors (redrawn), the group and the box settings
+  // (laid out again: see `haplotypeKey`).
+  const boxes = useMemo(() => (haplotype
+    ? haplotypeBoxes(model, haplotype, theme, colorMap, hatchedSet) : null),
+  [haplotype, model, theme, colorMap, hatchedSet]);
+  const boxesRef = useRef(boxes);
+  boxesRef.current = boxes;
+  const haplotypeKey = haplotype
+    ? [haplotype.data.linkage_group, haplotype.settings.barWidth, haplotype.settings.barHeight,
+       haplotype.settings.markerTicks].join("|")
+    : "";
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
+  const haplotypeRef = useRef(haplotype);
+  haplotypeRef.current = haplotype;
+
+  // Hovering a haplotype box: over a band, the founder allele, its founder and
+  // the probability (design §9); elsewhere in the box, the individual.
+  const onHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const net = networkRef.current, all = boxesRef.current, view = haplotypeRef.current;
+    const container = containerRef.current;
+    if (!net || !all || !view || !container) return;
+    const rect = container.getBoundingClientRect();
+    const dom = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const p = net.DOMtoCanvas(dom);
+    const positions = net.getPositions() as Record<string, Point>;
+    for (const n of model.individuals) {
+      const box = all[n.id], q = positions[n.id];
+      if (!box || !q) continue;
+      const x = p.x - (q.x - box.width / 2), y = p.y - (q.y - box.height / 2);
+      if (x < 0 || y < 0 || x > box.width || y > box.height) continue;
+      const segment = segmentAt(box, x, y);
+      setTooltip({ x: dom.x, y: dom.y, text: segment
+        ? describeSegment(segment, view.data, view.columns)
+        : tooltipLines(n, latest.current.parentLabels).join("\n") });
+      return;
+    }
+    setTooltip(null);
+  }, [model]);
   const latest = useRef({ colorMap, selected, orientation, onSelect, parentLabels, hatched: hatchedSet });
   latest.current = { colorMap, selected, orientation, onSelect, parentLabels, hatched: hatchedSet };
 
@@ -330,6 +426,13 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     for (const n of model.individuals) {
       const p = positions[n.id];
       if (!p) continue;
+      // A haplotype box's size is known before it is drawn: use it exactly.
+      const hb = boxesRef.current?.[n.id];
+      if (hb) {
+        boxes[n.id] = { left: p.x - hb.width / 2, right: p.x + hb.width / 2,
+                        top: p.y - hb.height / 2, bottom: p.y + hb.height / 2 };
+        continue;
+      }
       const box = { ...net.getBoundingBox(n.id) };
       // vis-network places a label drawn below its symbol only when it paints
       // the node, so for nodes outside the last frame the box's horizontal
@@ -383,6 +486,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     if (!container) return;
     let network: Network | null = null;
     let canceled = false;
+    let removeProbe = () => {};
     const individualIds = new Set(model.individuals.map(n => n.id));
 
     const create = () => {
@@ -390,7 +494,27 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       const { colorMap, selected, orientation } = latest.current;
       const classic = style === "classic";
 
+      const haplotypeMode = !!boxesRef.current;
       const individuals = model.individuals.map(n => {
+        if (haplotypeMode) {
+          // The whole box, drawn from its geometry (rectangles in both styles).
+          return {
+            id: n.id, label: n.label, level: model.levels.get(n.id), shape: "custom",
+            ctxRenderer: ({ ctx, x, y, state }: { ctx: CanvasRenderingContext2D; x: number; y: number;
+                                                  state: { selected: boolean } }) => {
+              const box = boxesRef.current?.[n.id];
+              return {
+                drawNode() {
+                  if (box) drawHaplotypeBox(ctx, box, x - box.width / 2, y - box.height / 2, {
+                    theme, selected: state.selected, hatched: latest.current.hatched.has(n.id),
+                    radius: classic ? 0 : MODERN_RADIUS,
+                  });
+                },
+                nodeDimensions: { width: box?.width ?? 0, height: box?.height ?? 0 },
+              };
+            },
+          };
+        }
         const shape = theme.shape(n.cross_type);
         return {
           id:    n.id,
@@ -439,6 +563,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       edgesDS.current.add(edges);
 
       const longest = Math.max(0, ...model.individuals.map(n => estimateLabel(n.label, theme)));
+      const largest = boxesRef.current ? largestBox(Object.values(boxesRef.current)) : undefined;
       timingStart("layout");
       network = new Network(container, { nodes: nodesDS.current, edges: edgesDS.current }, {
         edges: {
@@ -453,14 +578,18 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
           improvedLayout: false,
           // Uses the current orientation; when the model or style changes this
           // effect re-runs with the latest orientation, so the choice survives.
-          hierarchical: hierarchicalFor(orientation, longest, model.levelsPerGeneration, isLargeLayout(model)),
+          hierarchical: hierarchicalFor(orientation, longest, model.levelsPerGeneration, isLargeLayout(model), largest),
         },
         physics: { enabled: false },
         interaction: {
           hover:                true,
           tooltipDelay:         200,
           navigationButtons:    false,
-          keyboard:             true,
+          // Keys (arrows to pan, +/- to zoom) only while the chart has focus:
+          // bound to the chart, not the window, so typing in the search box or
+          // any other field never moves it. No focus on hover, which would
+          // take the focus away from a field the user is typing in.
+          keyboard:             { enabled: true, bindToWindow: false, autoFocus: false },
           zoomView:             true,
           dragView:             true,
           selectConnectedEdges: false,
@@ -475,7 +604,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       const pack = () => {
         const o = latest.current.orientation;
         packUnconnected(net, model, o,
-                        hierarchicalFor(o, longest, model.levelsPerGeneration, false).nodeSpacing);
+                        hierarchicalFor(o, longest, model.levelsPerGeneration, false, largest).nodeSpacing);
       };
       pack();
       timingEnd("layout");
@@ -483,6 +612,12 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       emitter.on("_dataChanged", pack);
       emitter.on("_resetHierarchicalLayout", pack);
       networkRef.current = network;
+      // Exists only for the end-to-end tests, which set __PEDIMAP_E2E__ (e2e/keyboard.spec.ts).
+      if (chartWindow.__PEDIMAP_E2E__ === true) {
+        const probe: ChartProbe = { getScale: () => net.getScale() };
+        chartWindow.__pedimapChart = probe;
+        removeProbe = () => { if (chartWindow.__pedimapChart === probe) delete chartWindow.__pedimapChart; };
+      }
       appliedOrientation.current = orientation;
       stale.current = true;
 
@@ -492,7 +627,7 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       network.on("beforeDrawing", (ctx: CanvasRenderingContext2D) => {
         timingStart("draw");
         drawRoutes(ctx, routesRef.current, role => linkColor(role, theme.ink));
-        if (network) drawHatching(ctx, network, model, theme, latest.current.hatched);
+        if (network && !boxesRef.current) drawHatching(ctx, network, model, theme, latest.current.hatched);
       });
       network.on("afterDrawing", () => {
         timingEnd("draw");
@@ -563,11 +698,17 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
 
     return () => {
       canceled = true;
+      removeProbe();
       network?.destroy();
       if (networkRef.current === network) networkRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, style, crossSymbolSize]);
+  }, [model, style, crossSymbolSize, haplotypeKey]);
+
+  // ── Haplotype colors changed (palette, fill): redraw, no new layout ───────
+  useEffect(() => {
+    if (boxes) networkRef.current?.redraw();
+  }, [boxes]);
 
   // ── Tooltip parent labels: they come with the file's caption, which may
   // arrive after its graph; update the tooltips without a new layout ─────────
@@ -582,9 +723,11 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   // ── Update colors / selection without re-creating the network ────────────
   useEffect(() => {
     if (!networkRef.current) return;
-    nodesDS.current.update(model.individuals.map(n => ({
-      id: n.id, ...individualColors(n, theme, colorMap, selected, hatchedSet),
-    })));
+    if (!boxesRef.current) {
+      nodesDS.current.update(model.individuals.map(n => ({
+        id: n.id, ...individualColors(n, theme, colorMap, selected, hatchedSet),
+      })));
+    }
     applySelection(networkRef.current);
   }, [colorMap, selected, model, theme, applySelection, hatchedSet]);
 
@@ -600,10 +743,11 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
     if (appliedOrientation.current === orientation) return; // no-op on mount
     appliedOrientation.current = orientation;
     const longest = Math.max(0, ...model.individuals.map(n => estimateLabel(n.label, theme)));
+    const largest = boxesRef.current ? largestBox(Object.values(boxesRef.current)) : undefined;
     const relayout = () => {
       if (networkRef.current !== net) return;
       timingStart("layout");
-      net.setOptions({ layout: { hierarchical: hierarchicalFor(orientation, longest, model.levelsPerGeneration, isLargeLayout(model)) } });
+      net.setOptions({ layout: { hierarchical: hierarchicalFor(orientation, longest, model.levelsPerGeneration, isLargeLayout(model), largest) } });
       timingEnd("layout");
       stale.current = true;
       net.fit({ animation: FIT_ANIMATION });
@@ -615,12 +759,26 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
   }, [orientation, applySelection, model, theme]);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}
+      onMouseMove={haplotype ? onHover : undefined}
+      onMouseLeave={() => setTooltip(null)}
+      // A press on the chart gives it the keyboard focus (vis-network's
+      // pointer handling keeps the browser from doing so), so its keys work
+      // after a click, and only then.
+      onMouseDown={() => containerRef.current?.querySelector<HTMLElement>(".vis-network")
+        ?.focus({ preventScroll: true })}>
       <div
         ref={containerRef}
         data-testid="pedigree-canvas"
         style={{ width: "100%", height: "100%", background: theme.background }}
       />
+      {haplotype && tooltip && (
+        <div role="tooltip" className="pedimap-tooltip"
+          style={{ position: "absolute", left: tooltip.x + 14, top: tooltip.y + 14, maxWidth: 360,
+            pointerEvents: "none", whiteSpace: "pre-line", zIndex: 6 }}>
+          {tooltip.text}
+        </div>
+      )}
       {routingAlert && (
         <div role="alert" style={{ position: "absolute", top: 10, left: 10, right: 10,
           display: "flex", justifyContent: "center", pointerEvents: "none" }}>

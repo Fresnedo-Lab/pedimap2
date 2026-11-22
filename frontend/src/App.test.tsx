@@ -9,9 +9,11 @@ vi.mock("./components/PedigreeCanvas", async () => {
   const { forwardRef } = await import("react");
   return {
     default: forwardRef(function Canvas(props: { model: { individuals: unknown[]; crosses: unknown[] };
-                                             colorMap: Record<string, string> }, _ref) {
+                                             colorMap: Record<string, string>;
+                                             haplotype?: { data: { linkage_group: string } } | null }, _ref) {
       const { individuals, crosses } = props.model;
-      return <div data-testid="pedigree-canvas" data-colors={JSON.stringify(props.colorMap)}>
+      return <div data-testid="pedigree-canvas" data-colors={JSON.stringify(props.colorMap)}
+        data-haplotype={props.haplotype?.data.linkage_group ?? ""}>
         {individuals.length} drawn, {crosses.length} crosses</div>;
     }),
   };
@@ -38,11 +40,17 @@ function serve(graph: GraphData, load: unknown = { loaded: "dat", individuals: 0
     ...more,
   };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-    const body = routes[new URL(url).pathname];
+    const where = new URL(url);
+    let body = routes[where.pathname];
+    // A route may answer by the request: a function of the URL, giving the
+    // body, or a Response (e.g. an error).
+    if (typeof body === "function") body = (body as (u: URL) => unknown)(where);
+    if (body instanceof Response) return body;
     return body === undefined
       ? new Response("not found", { status: 404 })
       : new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
+  return routes;
 }
 
 beforeEach(() => localStorage.clear());
@@ -211,5 +219,104 @@ describe("loading a new dataset", () => {
     await vi.waitFor(() => expect(screen.queryByText(/Gen 1 · cross/)).toBeNull());
     expect(screen.queryByText(/Subpop:/)).toBeNull();
     expect((screen.getByPlaceholderText("Search individuals…") as HTMLInputElement).value).toBe("");
+  });
+});
+
+describe("IBD bars", () => {
+  const summary = (ibd: number) => ({ loci: 1, ibd_positions: ibd, genotype_rows: 0,
+    individuals_with_genotypes: 0, codes: [], nalleles: ibd ? 4 : null, founders_named: !!ibd,
+    flexqtl_codes: false,
+    linkage_groups: [{ name: "1", loci: 1, ibd_positions: ibd }, { name: "2", loci: 1, ibd_positions: 0 }] });
+  const haplotypes = {
+    linkage_group: "1", start_cM: 0, end_cM: 10, positions: [{ position: "0", cM: 0 }], markers: [],
+    nalleles: 4, founders: ["I0", "I2"], founder_alleles: {},
+    rows: { I0: [[[[1, 1]]], [[[2, 1]]]], I1: [[[[1, 1]]], [[[2, 1]]]] },
+  };
+
+  it("offers the linkage groups with IBD positions, and draws the one chosen", async () => {
+    serve(pedigreeOf(4), undefined, "Synthetic", {
+      "/api/pedigree": { population: "Synthetic", ploidy: 2, traits: [], markers: [], marker_summary: summary(1) },
+      "/api/haplotypes": haplotypes,
+    });
+    render(<App />);
+    const canvas = await screen.findByTestId("pedigree-canvas");
+    const select = await screen.findByLabelText("IBD bars") as HTMLSelectElement;
+    expect([...select.options].map(o => o.textContent)).toEqual(["Off", "Linkage group 1"]);  // not 2
+    expect(canvas.getAttribute("data-haplotype")).toBe("");
+
+    fireEvent.change(select, { target: { value: "1" } });
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe("1"));
+    fireEvent.change(select, { target: { value: "" } });
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe(""));
+  });
+
+  it("is not offered for a file without IBD positions", async () => {
+    serve(pedigreeOf(4), undefined, "Synthetic", {
+      "/api/pedigree": { population: "Synthetic", ploidy: 2, traits: [], markers: [], marker_summary: summary(0) },
+    });
+    render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    expect(screen.queryByLabelText("IBD bars")).toBeNull();
+  });
+});
+
+describe("IBD bars across dataset loads", () => {
+  const groups = (names: string[], ibd: number) => ({ loci: names.length, ibd_positions: ibd * names.length,
+    genotype_rows: 0, individuals_with_genotypes: 0, codes: [], nalleles: ibd ? 4 : null,
+    founders_named: !!ibd, flexqtl_codes: false,
+    linkage_groups: names.map(name => ({ name, loci: 1, ibd_positions: ibd })) });
+  const haplotypes = (group: string) => ({
+    linkage_group: group, start_cM: 0, end_cM: 10, positions: [{ position: "0", cM: 0 }], markers: [],
+    nalleles: 4, founders: ["I0", "I2"], founder_alleles: {}, rows: { I0: [[[[1, 1]]], [[[2, 1]]]] },
+  });
+  // Like the backend: 404 for a group the loaded file has no IBD positions on.
+  const haplotypesOf = (available: string[]) => (url: URL) => {
+    const group = url.searchParams.get("linkage_group")!;
+    return available.includes(group) ? haplotypes(group) : new Response(
+      JSON.stringify({ detail: `Linkage group '${group}' has no IBD positions.` }), { status: 404 });
+  };
+  const requested = () => (fetch as unknown as { mock: { calls: [string][] } }).mock.calls
+    .map(([u]) => new URL(u)).filter(u => u.pathname === "/api/haplotypes")
+    .map(u => u.searchParams.get("linkage_group"));
+
+  it("never asks the next file for the old group, and takes the new file's first", async () => {
+    const routes = serve(pedigreeOf(4), { loaded: "dat", individuals: 4 }, "FlexQTL", {
+      "/api/pedigree": { population: "FlexQTL", ploidy: 2, traits: [], markers: [], marker_summary: groups(["1", "2"], 21) },
+      "/api/haplotypes": haplotypesOf(["1", "2"]),
+    });
+    const { container } = render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    fireEvent.change(await screen.findByLabelText("IBD bars"), { target: { value: "1" } });
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe("1"));
+    const before = requested().length;
+
+    // Example.dat: groups A, B and C. Group 1 must not be asked for.
+    routes["/api/pedigree"] = { population: "Apples", ploidy: 2, traits: [], markers: [], marker_summary: groups(["A", "B", "C"], 3) };
+    routes["/api/haplotypes"] = haplotypesOf(["A", "B", "C"]);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x"], "Example.dat")] } });
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe("A"));
+    expect(requested().slice(before)).toEqual(["A"]);
+    expect((screen.getByLabelText("IBD bars") as HTMLSelectElement).value).toBe("A");
+    expect(document.body.textContent).not.toMatch(/API \d|detail|no IBD positions/);
+
+    // A file without IBD positions: the bars are off, and nothing is asked for.
+    routes["/api/pedigree"] = { population: "Plain", ploidy: 2, traits: [], markers: [], marker_summary: groups(["X"], 0) };
+    fireEvent.change(input, { target: { files: [new File(["x"], "plain.dat")] } });
+    await vi.waitFor(() => expect(screen.queryByLabelText("IBD bars")).toBeNull());
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe(""));
+    expect(requested().slice(before)).toEqual(["A"]);
+  });
+
+  it("says plainly when the IBD data cannot be loaded", async () => {
+    serve(pedigreeOf(4), undefined, "FlexQTL", {
+      "/api/pedigree": { population: "FlexQTL", ploidy: 2, traits: [], markers: [], marker_summary: groups(["1"], 21) },
+      "/api/haplotypes": () => new Response(JSON.stringify({ detail: "boom" }), { status: 500 }),
+    });
+    render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    fireEvent.change(await screen.findByLabelText("IBD bars"), { target: { value: "1" } });
+    expect(await screen.findByText(/Could not load the IBD data of linkage group 1\./)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/API \d|boom/);
   });
 });

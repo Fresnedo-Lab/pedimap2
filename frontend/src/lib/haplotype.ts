@@ -250,7 +250,8 @@ export function haplotypeBox(input: {
     }
     items.push({ kind: "rect", role: "bar", x: left[h], y: barsTop, w: barWidth, h: barHeight,
                  stroke: theme.border, homologue: h });
-    // Ticks on the outer side: every IBD position, and (optionally) every marker.
+    // Ticks on the outer side: every IBD position, and (optionally) every marker
+    // that is not one (a marker at an IBD position already has its tick).
     const outer = h === 0 ? left[0] : left[1] + barWidth;
     const out = h === 0 ? -1 : 1;
     for (const p of data.positions) {
@@ -258,11 +259,52 @@ export function haplotypeBox(input: {
                    x2: outer + out * BOX.tick, y2: y(p.cM), stroke: theme.border });
     }
     if (settings.markerTicks) {
-      for (const m of data.markers) {
+      for (const m of data.markers.filter(m => m.position === null)) {
         items.push({ kind: "line", role: "marker-tick", x1: outer + out * (BOX.tick + 1), y1: y(m.cM),
                      x2: outer + out * (BOX.tick + 2), y2: y(m.cM), stroke: theme.border });
       }
     }
   }
   return { width, height, items };
+}
+
+// ── Hover ────────────────────────────────────────────────────────────────────
+
+export type SegmentItem = Extract<BoxItem, { role: "segment" }>;
+
+/** The segment under a point in box coordinates, if any. */
+export function segmentAt(box: HaplotypeBox, x: number, y: number): SegmentItem | null {
+  for (const item of box.items) {
+    if (item.role === "segment" && x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) {
+      return item;
+    }
+  }
+  return null;
+}
+
+const probability = (p: number) => p.toFixed(2);
+
+/** The hover text of a segment (design §9): where it is, which homologue,
+ *  the founder allele, its founder and the probability as read. */
+export function describeSegment(item: SegmentItem, data: HaplotypeData, columns: [string, string]): string {
+  const position = data.positions[item.band];
+  const where = `LG ${data.linkage_group}, ${position.position} cM · homologue from ${
+    (columns[item.homologue] ?? `parent ${item.homologue + 1}`).toLowerCase()}`;
+  const allele = (a: number) => {
+    const founder = data.founders?.[founderOf(a)];
+    return `founder allele ${a}${founder ? ` (${founder})` : ""}`;
+  };
+  const { segment } = item;
+  if (segment.allele !== null) return `${where} · ${allele(segment.allele)} · ${probability(segment.probability)}`;
+  const merged = (segment.merged ?? []).map(([a, p]) => `${allele(a)} ${probability(p)}`).join(", ");
+  return `${where} · other founder alleles, ${probability(segment.probability)} in all: ${merged}`;
+}
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+
+/** The largest box of a chart, for the layout's spacing. */
+export function largestBox(boxes: Iterable<HaplotypeBox>): { width: number; height: number } {
+  let width = 0, height = 0;
+  for (const b of boxes) { width = Math.max(width, b.width); height = Math.max(height, b.height); }
+  return { width, height };
 }

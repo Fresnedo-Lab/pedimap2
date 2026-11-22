@@ -9,6 +9,7 @@
 // they run exactly as on screen.
 
 import type { GraphNode, TraitMeta } from "../hooks/useApi";
+import type { BoxItem, HaplotypeBox } from "../lib/haplotype";
 import { linkColor, type ChartModel } from "./model";
 import { chartBoxes, routeLinks, routingProblems, svgPathData, type Box, type Point } from "./routing";
 import {
@@ -49,6 +50,9 @@ export interface SvgExportInput {
   colorMap:        Record<string, string>;
   /** Individuals drawn hatched (HATCH) instead of with their color. */
   hatched?:        string[];
+  /** Haplotype boxes (lib/haplotype.ts), drawn in place of the node shapes:
+   *  the same items the canvas draws. */
+  haplotypeBoxes?: Record<string, HaplotypeBox> | null;
   style:           DisplayStyle;
   orientation:     "UD" | "LR";
   crossSymbolSize: number;
@@ -77,7 +81,7 @@ export function escapeXml(s: string): string {
 const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
 
 /** Rough text width when no canvas is available to measure it. */
-function textWidth(text: string, fontSize: number): number {
+export function textWidth(text: string, fontSize: number): number {
   return [...text].length * fontSize * 0.6;
 }
 
@@ -133,18 +137,51 @@ function crossSvg(p: Point, size: number, ink: string): string {
  * own boxes and routes, or, without a canvas, boxes estimated from labels.
  */
 export function exportRouting(input: Pick<SvgExportInput,
-  "model" | "positions" | "boxes" | "style" | "orientation" | "crossSymbolSize">) {
+  "model" | "positions" | "boxes" | "style" | "orientation" | "crossSymbolSize" | "haplotypeBoxes">) {
   const { model, positions, orientation, crossSymbolSize } = input;
   const theme = THEMES[input.style];
   const boxes: Record<string, Box> = {};
   for (const n of model.individuals) {
     const p = positions[n.id];
-    if (p) boxes[n.id] = input.boxes?.[n.id] ?? estimateBox(n, p, theme);
+    const hb = input.haplotypeBoxes?.[n.id];
+    if (p) boxes[n.id] = input.boxes?.[n.id] ?? (hb ? haplotypeRect(hb, p) : estimateBox(n, p, theme));
   }
   const routes = routeLinks(model, positions, boxes, {
     orientation, curved: theme.curvedLinks, arrows: theme.arrows, crossSymbolSize,
   });
   return { boxes, routes, problems: routingProblems(model, routes) };
+}
+
+/** A haplotype box's rectangle, centered on its node. */
+export function haplotypeRect(box: HaplotypeBox, p: Point): Box {
+  return { left: p.x - box.width / 2, right: p.x + box.width / 2,
+           top: p.y - box.height / 2, bottom: p.y + box.height / 2 };
+}
+
+/** One haplotype box as SVG, its top left corner at (left, top). */
+function haplotypeSvg(box: HaplotypeBox, left: number, top: number, radius: number, hatched: boolean): string {
+  const item = (i: BoxItem): string => {
+    switch (i.role) {
+      case "box":
+        return `<rect class="haplotype-box" x="0" y="0" width="${fmt(i.w)}" height="${fmt(i.h)}" ` +
+          `rx="${radius}" fill="${hatched ? `url(#${HATCH_ID})` : i.fill}" stroke="${i.stroke}" stroke-width="1"/>`;
+      case "segment":
+        return `<rect class="segment" x="${fmt(i.x)}" y="${fmt(i.y)}" width="${fmt(i.w)}" ` +
+          `height="${fmt(i.h)}" fill="${i.fill}"/>`;
+      case "bar":
+        return `<rect class="bar" x="${fmt(i.x)}" y="${fmt(i.y)}" width="${fmt(i.w)}" height="${fmt(i.h)}" ` +
+          `fill="none" stroke="${i.stroke}" stroke-width="1"/>`;
+      case "position-tick":
+      case "marker-tick":
+        return `<line class="${i.role}" x1="${fmt(i.x1)}" y1="${fmt(i.y1)}" x2="${fmt(i.x2)}" ` +
+          `y2="${fmt(i.y2)}" stroke="${i.stroke}" stroke-width="${i.role === "position-tick" ? 1 : 0.75}"/>`;
+      case "name":
+        return `<text class="individual" x="${fmt(i.x)}" y="${fmt(i.y)}" text-anchor="middle" ` +
+          `font-size="${i.fontSize}" fill="${i.color}">${escapeXml(i.text)}</text>`;
+    }
+  };
+  return `<g class="node haplotype" transform="translate(${fmt(left)},${fmt(top)})">` +
+    box.items.map(item).join("") + `</g>`;
 }
 
 export function buildSvg(input: SvgExportInput): SvgExport {
@@ -195,6 +232,8 @@ export function buildSvg(input: SvgExportInput): SvgExport {
   const nodesSvg = model.individuals.filter(n => positions[n.id]).map(n => {
     const p = at(positions[n.id]);
     const box = shift(boxes[n.id]);
+    const hb = input.haplotypeBoxes?.[n.id];
+    if (hb) return haplotypeSvg(hb, box.left, box.top, input.style === "classic" ? 0 : 4, hatched.has(n.id));
     const shape = shapeOf.get(n.id)!;
     const fill = hatched.has(n.id) ? `url(#${HATCH_ID})` : colorMap[n.id] ?? theme.defaultFill;
     let ty: number;

@@ -888,8 +888,9 @@ Points the sources could not settle. Each needs either Pedimap's own documentati
    founder has a pedigree row, and the `;founders` comment row separates its names, so the founders behind the
    founder alleles follow from the table in both programs' files. Binko still writes no row for a dummy founder in
    the `ALLELES` and `IBDPOSITION` sections, where FlexQTL writes one for a founder without data (5.9: `- 5    - 5`,
-   and probability 1 on the founder's own alleles). Whether Binko should write those rows too is the project lead's
-   decision; a reader that follows 7.1 accepts both.
+   and probability 1 on the founder's own alleles). The project lead decided on 2026-11-20 that Binko will write
+   those rows too, as FlexQTL does, so that the file is uniform: from Binko 1.0.1 on. The files of Binko 1.0.0 are
+   without them. A reader that follows 7.1 accepts both.
    The rule for Binko's older files (a parent without a row placed before its offspring, 5.2) follows from Binko's
    code and is checked by the self-check on `binko_ibd.ped` with its two dummy rows removed, a pedigree in which both
    dummy founders come after every other founder. It is not tested on a pedigree in which a founder's row comes after

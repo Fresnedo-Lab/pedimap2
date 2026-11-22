@@ -1,0 +1,62 @@
+// Typing in a text field never moves the chart: vis-network's keyboard
+// navigation and our own shortcuts act only when the chart has focus.
+import { test, expect, type Page } from "@playwright/test";
+
+const backendPort = Number(process.env.E2E_BACKEND_PORT ?? 8765);
+
+test.beforeEach(async ({ page }) => {
+  // The chart exposes window.__pedimapChart (its zoom) only with this flag.
+  await page.addInitScript(() => { (window as Window & { __PEDIMAP_E2E__?: boolean }).__PEDIMAP_E2E__ = true; });
+  if (backendPort !== 8765) {
+    await page.route("http://127.0.0.1:8765/**", async route =>
+      route.fulfill({ response: await route.fetch({ url: route.request().url().replace(":8765", `:${backendPort}`) }) }));
+  }
+});
+
+/** The chart as drawn: the canvas's pixels. */
+const chartPixels = (page: Page) =>
+  page.evaluate(() => document.querySelector<HTMLCanvasElement>("canvas")!.toDataURL());
+
+test("typing in the search box types, and leaves the chart where it is", async ({ page }) => {
+  await page.goto("/");
+  await page.getByText(/individuals/).first().waitFor();
+  await page.getByRole("button", { name: /Load Example Data/ }).click();
+  await page.waitForTimeout(1200);                          // layout, fit and first frames
+  const before = await chartPixels(page);
+
+  const search = page.getByPlaceholder("Search individuals…");
+  for (const text of ["G1_001", "81015-045"]) {
+    await search.click();
+    await search.fill("");
+    await page.keyboard.type(text, { delay: 30 });          // real key presses: "_" and "-" included
+    await expect(search).toHaveValue(text);
+    await page.waitForTimeout(400);
+    expect(await chartPixels(page), `typing "${text}" moved the chart`).toBe(before);
+  }
+  // "f" in the search box types too; it does not fit the chart.
+  await search.fill("");
+  await page.keyboard.type("Coffee", { delay: 30 });
+  await expect(search).toHaveValue("Coffee");
+
+  // With the chart focused, its keys work: "-" zooms out.
+  await search.fill("");
+  const canvas = page.locator("canvas").first();
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.click(box.x + 8, box.y + 8);             // an empty corner of the chart
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => document.activeElement?.classList.contains("vis-network")),
+         "a click on the chart did not give it the focus").toBe(true);
+  // vis-network zooms a step on each frame while the key is down, so hold it
+  // until the zoom has changed: a press (keydown and keyup at once), or any
+  // fixed hold time, can end before a frame on a slow machine.
+  const scale = () => page.evaluate(() =>
+    (window as Window & { __pedimapChart?: { getScale(): number } }).__pedimapChart!.getScale());
+  const start = await scale();
+  await page.keyboard.down("-");
+  try {
+    await expect.poll(scale, { message: "the focused chart did not zoom out", timeout: 3000 })
+      .toBeLessThan(start);
+  } finally {
+    await page.keyboard.up("-");
+  }
+});

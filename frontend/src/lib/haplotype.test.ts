@@ -148,10 +148,12 @@ describe("haplotypeBox", () => {
     expect(of(b, "segment").find(s => s.homologue === 1 && s.band === 0)!.segment.allele).toBe(38);
   });
 
-  it("ticks every IBD position, and every marker unless turned off", () => {
+  it("ticks every IBD position, and every other marker unless turned off", () => {
     const data = binko("1"), b = box(data, "G1_001");
     expect(of(b, "position-tick")).toHaveLength(2 * data.positions.length);
-    expect(of(b, "marker-tick")).toHaveLength(2 * data.markers.length);
+    // M1_003 is at the IBD position 20 cM, so it has that tick only.
+    expect(of(b, "marker-tick")).toHaveLength(2 * 3);
+    expect(of(box(flexqtl("1"), "G1_001"), "marker-tick")).toHaveLength(0);   // all at positions
     const off = haplotypeBox({ name: "G1_001", fill: "#FFFF96", theme: THEMES.classic, data,
       homologues: data.rows.G1_001, colorOf: () => "#000000", textWidth: width,
       settings: { ...DEFAULT_HAPLOTYPE_SETTINGS, markerTicks: false } });

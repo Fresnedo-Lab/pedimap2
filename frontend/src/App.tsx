@@ -32,7 +32,7 @@ import {
   LEGACY_ENCODING,
 } from "./hooks/useApi";
 import PedigreeCanvas, {
-  type Orientation, type PedigreeCanvasHandle,
+  haplotypeBoxes, type HaplotypeView, type Orientation, type PedigreeCanvasHandle,
 } from "./components/PedigreeCanvas";
 import IndividualPanel from "./components/IndividualPanel";
 import ExportImageDialog from "./components/ExportImageDialog";
@@ -43,9 +43,12 @@ import type { DisplayStyle } from "./chart/style";
 import { buildLegend, traitColorsFor, type TraitColors } from "./chart/svgExport";
 import { saveTextFile } from "./lib/saveFile";
 import { markerColoring, type MarkerColoringChoice, type MarkerColoringMode } from "./lib/genotypeCodes";
+import { DEFAULT_HAPLOTYPE_SETTINGS, palette, type HaplotypeData } from "./lib/haplotype";
+import { THEMES } from "./chart/style";
 import ChartLegend from "./components/ChartLegend";
 import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
 import { exportBaseName } from "./lib/fileNames";
+import { isEditableTarget } from "./lib/keyboard";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
 import { useUpdater } from "./hooks/useUpdater";
@@ -259,7 +262,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // ── Server data (deferred until the backend is ready) ─────────────────────
-  const { data: pedigree, reload: reloadPedigree } =
+  const { data: pedigree, loading: pedigreeLoading, error: pedigreeError, reload: reloadPedigree } =
     useFetch<PedigreeData>(() => api.getPedigree(), [], ready);
 
   const { data: indList, reload: reloadIndividuals } =
@@ -277,6 +280,10 @@ export default function App() {
   // trait, and every individual's genotype at that marker.
   const [markerChoice, setMarkerChoice] = useState<MarkerColoringChoice | null>(null);
   const [markerValues, setMarkerValues] = useState<MarkerValues | null>(null);
+  // IBD data of the linkage group the haplotype display shows, cached by group
+  // for the file loaded (cleared with it).
+  const haplotypeCache = useRef(new Map<string, HaplotypeData>());
+  const [haplotypeData, setHaplotypeData] = useState<HaplotypeData | null>(null);
   // The selection behind the displayed subpopulation; null for the whole population.
   const [subpop,      setSubpop]      = useState<SubpopSelection | null>(null);
 
@@ -322,8 +329,7 @@ export default function App() {
       if (e.key !== "f" && e.key !== "F") return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Don't steal the key while the user is typing (e.g. in the search box).
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      if (isEditableTarget(e.target)) return;
       e.preventDefault();
       fitToWindow();
     };
@@ -371,6 +377,8 @@ export default function App() {
     setDetail(null);
     setSearch("");
     setMarkerChoice(null);           // the new file may not have the marker
+    haplotypeCache.current.clear();
+    setHaplotypeData(null);
     reloadPedigree();
     reloadIndividuals();
     await loadGraph();
@@ -568,6 +576,41 @@ export default function App() {
   ), [markerChoice, loadedValues, chosenAllele, graphData, flexqtlCodes]);
   const chartColors = coloring?.colorMap ?? colorMap;
 
+  // ── Haplotype display: IBD bars of one linkage group in every box ────────
+  // The groups with IBD positions of the file loaded. While a new file's
+  // pedigree is still loading (or failed to), `pedigree` may be the previous
+  // file's: decide nothing from it, so no request goes out for a group the new
+  // file does not have.
+  const pedigreeSettled = !pedigreeLoading && !pedigreeError;
+  const ibdGroups = useMemo(() => (pedigreeSettled ? pedigree?.marker_summary?.linkage_groups ?? [] : [])
+    .filter(g => g.ibd_positions > 0).map(g => g.name), [pedigree, pedigreeSettled]);
+  const ibdGroup = ibdGroups.length === 0 || view.cellContents !== "name+ibd" ? null
+    : ibdGroups.includes(view.ibdLinkageGroup ?? "") ? view.ibdLinkageGroup! : ibdGroups[0];
+  useEffect(() => {
+    if (!ibdGroup) { setHaplotypeData(null); return; }
+    const cached = haplotypeCache.current.get(ibdGroup);
+    if (cached) { setHaplotypeData(cached); return; }
+    let current = true;
+    api.getHaplotypes(ibdGroup).then(data => {
+      haplotypeCache.current.set(ibdGroup, data);
+      if (current) setHaplotypeData(data);
+    }, () => {
+      if (current) setLoadError(`Could not load the IBD data of linkage group ${ibdGroup}.`);
+    });
+    return () => { current = false; };
+  }, [api, ibdGroup]);
+  // Colors over the founders that contribute to the individuals displayed.
+  const haplotypeView = useMemo((): HaplotypeView | null => {
+    if (!haplotypeData || !graphData || haplotypeData.linkage_group !== ibdGroup) return null;
+    const pal = palette(haplotypeData, graphData.nodes.map(n => n.id), "founder");
+    return { data: haplotypeData, colorOf: pal.colorOf, settings: DEFAULT_HAPLOTYPE_SETTINGS,
+             columns: (pedigree?.parent_labels?.columns ?? ["Parent 1", "Parent 2"]) as [string, string] };
+  }, [haplotypeData, graphData, ibdGroup, pedigree]);
+  // While the bars' data loads, the chart waits: drawing it with names only
+  // first would lay it out twice.
+  const haplotypePending = view.cellContents === "name+ibd" &&
+    (pedigreeLoading || (ibdGroup !== null && haplotypeView === null));
+
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const closeImageDialog = useCallback(() => setImageDialogOpen(false), []);
 
@@ -578,10 +621,14 @@ export default function App() {
     const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
     return {
       model: chartModel, ...geometry, colorMap: chartColors, hatched: coloring?.hatched,
+      haplotypeBoxes: haplotypeView
+        ? haplotypeBoxes(chartModel, haplotypeView, THEMES[displayStyle], chartColors,
+                         new Set(coloring?.hatched ?? []))
+        : null,
       style: displayStyle, orientation, crossSymbolSize,
       legend: coloring?.legend ?? buildLegend(meta, chartModel.individuals, colorMap, colors),
     };
-  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, displayStyle, orientation, crossSymbolSize]);
+  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, haplotypeView, displayStyle, orientation, crossSymbolSize]);
 
   const handleLoadExample = useCallback(async () => {
     try {
@@ -748,6 +795,20 @@ export default function App() {
             </button>
           ))}
         </div>
+
+        {ibdGroups.length > 0 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, color: "#64748b", fontSize: 11,
+            whiteSpace: "nowrap" }}>
+            IBD bars:
+            <select aria-label="IBD bars" value={ibdGroup ?? ""} style={{ width: 130 }}
+              onChange={e => updateView(e.target.value
+                ? { cellContents: "name+ibd", ibdLinkageGroup: e.target.value }
+                : { cellContents: "name" })}>
+              <option value="">Off</option>
+              {ibdGroups.map(g => <option key={g} value={g}>Linkage group {g}</option>)}
+            </select>
+          </label>
+        )}
 
         <button onClick={fitToWindow} title="Fit to window (F)"
           style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
@@ -962,7 +1023,7 @@ export default function App() {
         {/* narrows graphData to `GraphData` (not null) in the else branch,     */}
         {/* satisfying PedigreeCanvas's non-nullable `graph: GraphData` prop.   */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-          {graphLoading || !graphData || !chartModel
+          {graphLoading || !graphData || !chartModel || haplotypePending
             ? <Spinner />
             : tooLargeToDraw
             ? (
@@ -986,6 +1047,7 @@ export default function App() {
                 crossSymbolSize={crossSymbolSize}
                 parentLabels={pedigree?.parent_labels}
                 hatched={coloring?.hatched}
+                haplotype={haplotypeView}
               />
             )}
           {coloring && !tooLargeToDraw && <ChartLegend legend={coloring.legend} />}
