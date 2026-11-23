@@ -344,14 +344,20 @@ of data, scheme, group, selection or size.
 - SVG, PDF and PNG write each box from `haplotypeBox`, so the export is exactly
   the screen: bands, segments, merged remainders, ticks, marker columns.
   PDF goes through svg2pdf as today; PNG through the SVG.
-- **Founder-allele legend** beside the chart, titled "Founder alleles,
-  linkage group 1". It lists only the founder alleles shown (§2.2):
+- **Founder-allele legend** below a top-to-bottom chart and at the right of a
+  left-to-right one, after the legend of the active coloring; the page grows
+  so it never covers the chart. Titled "Founder alleles, linkage group 1
+  (below 0.10 merged)", the value being the merge threshold of §1.1, so it
+  follows the bar width. Below its rows, "Below 0.10, merged" (the remainder
+  gray) and "No IBD data" (hatched) when the image has them. It lists only the
+  founder alleles shown (§2.2):
   - by founder: one row per founder, its name and two swatches labeled with
     the allele numbers;
   - by founder allele: one row per founder allele;
   - highlight: the highlighted alleles, then "Other founder alleles".
 
-  More than 20 rows flow into columns. For a subset without founder names, rows
+  At the right, more than 20 rows flow into columns; below, rows flow into as
+  many columns as the chart's width holds. For a subset without founder names, rows
   are labeled by number.
 - Tests: the SVG has one `rect` per drawn segment, the same as the canvas
   recorded; a PDF keeps the colors (`/DeviceRGB` fills of each legend color);
