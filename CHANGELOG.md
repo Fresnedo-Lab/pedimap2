@@ -23,10 +23,6 @@ release notes, so every release needs its own section here before it is tagged.
   their legend of founder alleles comes in a later release.
 
 ### Fixed
-- Typing in the search box (or any other field) no longer zooms or moves the
-  chart, and "-" and "_" are typed instead of swallowed: the chart's keys
-  (arrows to move, + and - to zoom) now act only after you click the chart.
-  Every version since 2.0.0 had this.
 - Error messages above the chart are plain sentences, not the raw replies of
   Pedimap's background service.
 
@@ -34,6 +30,14 @@ release notes, so every release needs its own section here before it is tagged.
 - Files with IBD data open with much less data passed around inside the app:
   the pedigree data no longer carries the IBD probabilities, which no screen
   reads from it (for the FlexQTL test file, 0.21 MB instead of 2.07 MB).
+
+## [2.3.1] — 2026-11-22
+
+### Fixed
+- Typing in the search box no longer zooms or pans the chart; names with _
+  or - can be searched. The chart's own keys (arrows to pan, + and - to
+  zoom) now work after a click on the chart. The bug was in every release
+  since 2.0.0.
 
 ## [2.3.0] — 2026-11-20
 
@@ -284,7 +288,8 @@ _2.1.1 was built but never released (macOS backend failed to start)._
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.2...v2.3.0
 [2.2.2]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.0...v2.2.1

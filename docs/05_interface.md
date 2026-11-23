@@ -30,4 +30,8 @@ _Placeholder: describe typing an individual ID or name to highlight and center t
 
 ## Keyboard Shortcuts
 
+The chart's keys (the arrow keys to pan, + and - to zoom) work after you
+click the chart, and stop while you type in the search box or any other
+field. **F** fits the chart to the window unless a text field has the focus.
+
 _Placeholder: table of keyboard shortcuts — Ctrl+O (open), Ctrl+S (save), +/- (zoom), Escape (deselect), F (fit view)._
