@@ -43,7 +43,7 @@ import type { DisplayStyle } from "./chart/style";
 import { buildLegend, traitColorsFor, type TraitColors } from "./chart/svgExport";
 import { saveTextFile } from "./lib/saveFile";
 import { markerColoring, type MarkerColoringChoice, type MarkerColoringMode } from "./lib/genotypeCodes";
-import { DEFAULT_HAPLOTYPE_SETTINGS, palette, type HaplotypeData } from "./lib/haplotype";
+import { DEFAULT_HAPLOTYPE_SETTINGS, founderAlleleLegend, palette, type HaplotypeData } from "./lib/haplotype";
 import { THEMES } from "./chart/style";
 import ChartLegend from "./components/ChartLegend";
 import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
@@ -619,11 +619,17 @@ export default function App() {
     if (!chartModel || !geometry) return null;
     const meta = pedigree?.traits.find(t => t.name === activeTrait);
     const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
+    // The bars as on screen, and the legend of exactly the founder alleles
+    // they draw, in the screen's colors.
+    const boxes = haplotypeView
+      ? haplotypeBoxes(chartModel, haplotypeView, THEMES[displayStyle], chartColors,
+                       new Set(coloring?.hatched ?? []))
+      : null;
     return {
       model: chartModel, ...geometry, colorMap: chartColors, hatched: coloring?.hatched,
-      haplotypeBoxes: haplotypeView
-        ? haplotypeBoxes(chartModel, haplotypeView, THEMES[displayStyle], chartColors,
-                         new Set(coloring?.hatched ?? []))
+      haplotypeBoxes: boxes,
+      founderLegend: boxes && haplotypeView
+        ? founderAlleleLegend(haplotypeView.data, Object.values(boxes), haplotypeView.settings)
         : null,
       style: displayStyle, orientation, crossSymbolSize,
       legend: coloring?.legend ?? buildLegend(meta, chartModel.individuals, colorMap, colors),

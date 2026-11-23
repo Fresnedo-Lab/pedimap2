@@ -190,11 +190,16 @@ export function palette(data: HaplotypeData, ids: Iterable<string>, scheme: Colo
 export interface HaplotypeSettings { barWidth: number; barHeight: number; markerTicks: boolean }
 export const DEFAULT_HAPLOTYPE_SETTINGS: HaplotypeSettings = { barWidth: 10, barHeight: 90, markerTicks: true };
 
+/** Probabilities below this share of a homologue are drawn as one gray
+ *  remainder: a segment narrower than BOX.minSegment px of the bar (§1.1). */
+export const mergeThreshold = (settings: HaplotypeSettings) => BOX.minSegment / settings.barWidth;
+
 export type BoxItem =
   | { kind: "rect"; role: "box"; x: number; y: number; w: number; h: number; fill: string; stroke: string }
   | { kind: "rect"; role: "bar"; x: number; y: number; w: number; h: number; stroke: string; homologue: number }
   | { kind: "rect"; role: "segment"; x: number; y: number; w: number; h: number; fill: string;
       homologue: number; band: number; segment: Segment }
+  | { kind: "rect"; role: "no-data"; x: number; y: number; w: number; h: number; homologue: number }
   | { kind: "line"; role: "position-tick" | "marker-tick"; x1: number; y1: number; x2: number; y2: number;
       stroke: string }
   | { kind: "text"; role: "name"; x: number; y: number; text: string; color: string; fontSize: number };
@@ -206,7 +211,7 @@ export const BOX = { padding: 6, gap: 6, tick: 4, minWidth: 60, nameGap: 4, minS
 /**
  * Everything inside one individual's box, in box coordinates (origin at the
  * box's top left). `homologues` are its rows on the group (null: none, the
- * bars stay empty). Text widths come from `textWidth`, the same estimate the
+ * bars are hatched as unknown, like any unknown value). Text widths come from `textWidth`, the same estimate the
  * canvas and the export use, so both draw the same box.
  */
 export function haplotypeBox(input: {
@@ -237,7 +242,10 @@ export function haplotypeBox(input: {
   ];
   const all = bands(data);
   for (let h = 0; h < 2; h++) {
-    for (const band of all) {
+    if (!homologues) {
+      items.push({ kind: "rect", role: "no-data", x: left[h], y: barsTop, w: barWidth, h: barHeight, homologue: h });
+    }
+    for (const band of homologues ? all : []) {
       const top = span > 0 ? y(band.from) : barsTop, bottom = span > 0 ? y(band.to) : barsTop + barHeight;
       let x = left[h];
       for (const segment of segments(homologues?.[h]?.[band.index] ?? [], barWidth, BOX.minSegment)) {
@@ -266,6 +274,58 @@ export function haplotypeBox(input: {
     }
   }
   return { width, height, items };
+}
+
+// ── Legend of founder alleles (export) ───────────────────────────────────────
+
+export interface FounderLegendRow {
+  founder: number;                                   // index in founder order
+  label:   string;
+  alleles: { allele: number; color: string }[];      // the founder's alleles drawn, ascending
+}
+export interface FounderLegend {
+  title:     string;
+  rows:      FounderLegendRow[];
+  /** Label of the gray remainder row, when a remainder is drawn. */
+  remainder: string | null;
+  /** Some individual has no IBD rows (its bars are hatched). */
+  noData:    boolean;
+}
+
+const formatShare = (x: number) => x.toFixed(2);
+
+/**
+ * The legend of an export with IBD bars (design §7): one row per founder whose
+ * alleles are drawn in color in `boxes`, each allele with its swatch; the gray
+ * remainder and "No IBD data" only when drawn. Colors are the boxes' own, so
+ * they are the screen's palette.
+ */
+export function founderAlleleLegend(data: HaplotypeData, boxes: Iterable<HaplotypeBox>,
+                                    settings: HaplotypeSettings): FounderLegend {
+  const colors = new Map<number, string>();
+  let remainder = false, noData = false;
+  for (const box of boxes) {
+    for (const item of box.items) {
+      if (item.role === "no-data") noData = true;
+      else if (item.role === "segment") {
+        if (item.segment.allele === null) remainder = true;
+        else colors.set(item.segment.allele, item.fill);
+      }
+    }
+  }
+  const rows = new Map<number, FounderLegendRow>();
+  for (const allele of [...colors.keys()].sort((a, b) => a - b)) {
+    const k = founderOf(allele);
+    if (!rows.has(k)) rows.set(k, { founder: k, label: founderLabel(data, k), alleles: [] });
+    rows.get(k)!.alleles.push({ allele, color: colors.get(allele)! });
+  }
+  const t = formatShare(mergeThreshold(settings));
+  return {
+    title: `Founder alleles, linkage group ${data.linkage_group} (below ${t} merged)`,
+    rows: [...rows.values()],
+    remainder: remainder ? `Below ${t}, merged` : null,
+    noData,
+  };
 }
 
 // ── Hover ────────────────────────────────────────────────────────────────────

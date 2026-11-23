@@ -3,13 +3,15 @@
 // Build a standalone SVG of the whole chart from node positions and the chart
 // model (not a screenshot), reproducing the display style: node shape and
 // fill, labels as real <text>, role-colored links, cross symbols, and the
-// legend of the active trait. PDF and PNG export both start from this SVG.
+// legends: the active coloring's, then the founder alleles' of the IBD bars,
+// below a top-to-bottom chart and at the right of a left-to-right one. PDF and
+// PNG export both start from this SVG.
 //
 // Links are written from chart/routing.ts, the routes the canvas draws, so
 // they run exactly as on screen.
 
 import type { GraphNode, TraitMeta } from "../hooks/useApi";
-import type { BoxItem, HaplotypeBox } from "../lib/haplotype";
+import { REMAINDER_COLOR, type BoxItem, type FounderLegend, type HaplotypeBox } from "../lib/haplotype";
 import { linkColor, type ChartModel } from "./model";
 import { chartBoxes, routeLinks, routingProblems, svgPathData, type Box, type Point } from "./routing";
 import {
@@ -57,6 +59,8 @@ export interface SvgExportInput {
   orientation:     "UD" | "LR";
   crossSymbolSize: number;
   legend?:         Legend | null;
+  /** The founder alleles of the IBD bars (lib/haplotype.ts, founderAlleleLegend). */
+  founderLegend?:  FounderLegend | null;
   /** Default "white". */
   background?:     ExportBackground;
   /** Base64 TrueType data to embed with @font-face (SVG and PNG; not PDF). */
@@ -69,6 +73,16 @@ const MARGIN = 24;
 const LEGEND_GAP = 32;
 const LEGEND_ROW = 18;
 const SWATCH = 12;
+/** Between the coloring's legend and the founder alleles' legend. */
+const BLOCK_GAP = 16;
+/** Founder rows per column of a legend at the right of the chart (design §7). */
+const LEGEND_COLUMN_ROWS = 20;
+const COLUMN_GAP = 24;
+const ALLELE_GAP = 10;
+/** Width per character of legend text that other items follow: wider than
+ *  textWidth's average, since founder names are often capitals and
+ *  underscores (DUMMY_G1_007_M), which run wider in the chart font. */
+const LEGEND_CHAR = 0.72;
 
 /** Default classic box size; vis-network grows it to fit the label. */
 export const CLASSIC_BOX = { minWidth: 80, minHeight: 30, padding: 5 };
@@ -168,6 +182,9 @@ function haplotypeSvg(box: HaplotypeBox, left: number, top: number, radius: numb
       case "segment":
         return `<rect class="segment" x="${fmt(i.x)}" y="${fmt(i.y)}" width="${fmt(i.w)}" ` +
           `height="${fmt(i.h)}" fill="${i.fill}"/>`;
+      case "no-data":
+        return `<rect class="no-data" x="${fmt(i.x)}" y="${fmt(i.y)}" width="${fmt(i.w)}" ` +
+          `height="${fmt(i.h)}" fill="url(#${HATCH_ID})"/>`;
       case "bar":
         return `<rect class="bar" x="${fmt(i.x)}" y="${fmt(i.y)}" width="${fmt(i.w)}" height="${fmt(i.h)}" ` +
           `fill="none" stroke="${i.stroke}" stroke-width="1"/>`;
@@ -185,11 +202,13 @@ function haplotypeSvg(box: HaplotypeBox, left: number, top: number, radius: numb
 }
 
 export function buildSvg(input: SvgExportInput): SvgExport {
-  const { model, positions, colorMap, crossSymbolSize, legend } = input;
+  const { model, positions, colorMap, crossSymbolSize, legend, founderLegend } = input;
   const theme = THEMES[input.style];
   const hatched = new Set(input.hatched ?? []);
   const usesHatch = hatched.size > 0 ||
-    (legend?.kind === "discrete" && legend.entries.some(e => e.hatch));
+    (legend?.kind === "discrete" && legend.entries.some(e => e.hatch)) ||
+    !!founderLegend?.noData ||
+    Object.values(input.haplotypeBoxes ?? {}).some(b => b.items.some(i => i.role === "no-data"));
   const shapeOf = new Map(model.individuals.map(n => [n.id, theme.shape(n.cross_type)]));
 
   // ── Geometry ──────────────────────────────────────────────────────────────
@@ -209,10 +228,27 @@ export function buildSvg(input: SvgExportInput): SvgExport {
   const background = paper ? "#FFFFFF" : theme.background;
   const pageText = paper ? theme.paperText : theme.text;
 
-  // ── Legend ────────────────────────────────────────────────────────────────
-  const legendSvg = legend ? renderLegend(legend, theme, pageText, MARGIN + chartW + LEGEND_GAP, MARGIN) : null;
-  const width  = MARGIN * 2 + chartW + (legendSvg ? LEGEND_GAP + legendSvg.width : 0);
-  const height = MARGIN * 2 + Math.max(chartH, legendSvg?.height ?? 0);
+  // ── Legends ───────────────────────────────────────────────────────────────
+  // One block, the coloring's legend first: below a top-to-bottom chart (its
+  // columns as wide as the chart), at the right of a left-to-right one. The
+  // page grows to hold it, so it never overlaps the chart.
+  const below = input.orientation === "UD";
+  const blocks = [
+    legend ? renderLegend(legend, theme, pageText) : null,
+    founderLegend ? renderFounderLegend(founderLegend, theme, pageText, below ? chartW : null) : null,
+  ].filter((b): b is Block => b !== null);
+  const legendW = Math.max(0, ...blocks.map(b => b.width));
+  const legendH = blocks.reduce((h, b) => h + b.height, 0) + BLOCK_GAP * Math.max(0, blocks.length - 1);
+  const legendX = below ? MARGIN : MARGIN + chartW + LEGEND_GAP;
+  const legendY = below ? MARGIN + chartH + LEGEND_GAP : MARGIN;
+  let blockY = legendY;
+  const legendSvg = blocks.map(b => {
+    const g = `<g class="${b.cls}" transform="translate(${fmt(legendX)},${fmt(blockY)})">${b.svg}</g>`;
+    blockY += b.height + BLOCK_GAP;
+    return g;
+  }).join("\n");
+  const width  = MARGIN * 2 + (!blocks.length ? chartW : below ? Math.max(chartW, legendW) : chartW + LEGEND_GAP + legendW);
+  const height = MARGIN * 2 + (!blocks.length ? chartH : below ? chartH + LEGEND_GAP + legendH : Math.max(chartH, legendH));
 
   // ── Links: the canvas's routes, in chart coordinates ──────────────────────
   const links = routes.map(r => {
@@ -263,7 +299,7 @@ export function buildSvg(input: SvgExportInput): SvgExport {
     `<g class="links" transform="translate(${fmt(ox)},${fmt(oy)})">${links}</g>`,
     `<g class="crosses">${crossesSvg}</g>`,
     `<g class="nodes">${nodesSvg}</g>`,
-    legendSvg ? legendSvg.svg : "",
+    legendSvg,
     `</svg>`,
   ].join("\n");
   return { svg, width, height };
@@ -271,12 +307,19 @@ export function buildSvg(input: SvgExportInput): SvgExport {
 
 // ── Legend ───────────────────────────────────────────────────────────────────
 
-function renderLegend(legend: Legend, theme: StyleTheme, textColor: string, x: number, y: number) {
-  const text = (cls: string, tx: number, ty: number, s: string, extra = "") =>
-    `<text class="${cls}" x="${fmt(tx)}" y="${fmt(ty)}" fill="${textColor}"${extra}>${escapeXml(s)}</text>`;
-  const swatch = (sx: number, sy: number, color: string, hatch = false) =>
-    `<rect x="${fmt(sx)}" y="${fmt(sy)}" width="${SWATCH}" height="${SWATCH}" ` +
-    `fill="${hatch ? `url(#${HATCH_ID})` : color}" stroke="${theme.border}" stroke-width="0.5"/>`;
+/** A legend drawn at (0, 0), and its size. */
+interface Block { cls: string; svg: string; width: number; height: number }
+
+const legendText = (textColor: string) => (cls: string, tx: number, ty: number, s: string, extra = "") =>
+  `<text class="${cls}" x="${fmt(tx)}" y="${fmt(ty)}" fill="${textColor}"${extra}>${escapeXml(s)}</text>`;
+const legendSwatch = (theme: StyleTheme) => (sx: number, sy: number, color: string, hatch = false, extra = "") =>
+  `<rect class="legend-swatch" x="${fmt(sx)}" y="${fmt(sy)}" width="${SWATCH}" height="${SWATCH}" ` +
+  `fill="${hatch ? `url(#${HATCH_ID})` : color}" stroke="${theme.border}" stroke-width="0.5"${extra}/>`;
+
+function renderLegend(legend: Legend, theme: StyleTheme, textColor: string): Block {
+  const x = 0, y = 0;
+  const text = legendText(textColor);
+  const swatch = legendSwatch(theme);
 
   // Regular weight only (see svgToPdf); the title is set apart by size.
   const parts = [text("legend-title", x, y + theme.fontSize, legend.trait, ` font-size="${theme.fontSize + 2}"`)];
@@ -310,7 +353,72 @@ function renderLegend(legend: Legend, theme: StyleTheme, textColor: string, x: n
       rowY += LEGEND_ROW;
     }
   }
-  return { svg: `<g class="legend">${parts.join("")}</g>`, width, height: rowY - y };
+  return { cls: "legend", svg: parts.join(""), width, height: rowY - y };
+}
+
+/**
+ * The founder alleles of the IBD bars (design §7): a row per founder, its name
+ * and a numbered swatch for each of its alleles drawn; then the gray remainder
+ * and "No IBD data" when drawn. Rows flow into columns: at most
+ * LEGEND_COLUMN_ROWS per column at the right of the chart, or as many columns
+ * as fit `maxWidth` below it.
+ */
+function renderFounderLegend(legend: FounderLegend, theme: StyleTheme, textColor: string,
+                             maxWidth: number | null): Block {
+  const fs = theme.fontSize;
+  const text = legendText(textColor);
+  const swatch = legendSwatch(theme);
+  const width_ = (s: string, size = fs) => [...s].length * size * LEGEND_CHAR;
+  const labelW = (r: FounderLegend["rows"][number]) => width_(r.label);
+  const swatchesW = (r: FounderLegend["rows"][number]) =>
+    r.alleles.reduce((w, a) => w + SWATCH + 4 + width_(String(a.allele)), 0) +
+    ALLELE_GAP * Math.max(0, r.alleles.length - 1);
+  const n = legend.rows.length;
+  const layout = (columns: number) => {
+    const perColumn = Math.max(1, Math.ceil(n / columns));
+    const cols = Array.from({ length: Math.ceil(n / perColumn) }, (_, c) => legend.rows.slice(c * perColumn, (c + 1) * perColumn));
+    const label = cols.map(col => Math.max(0, ...col.map(labelW)));
+    const widths = cols.map((col, c) => label[c] + 8 + Math.max(0, ...col.map(swatchesW)));
+    return { perColumn, cols, label, widths, total: widths.reduce((a, b) => a + b, 0) + COLUMN_GAP * Math.max(0, cols.length - 1) };
+  };
+  let grid = layout(Math.max(1, Math.ceil(n / LEGEND_COLUMN_ROWS)));
+  if (maxWidth !== null) {
+    grid = layout(1);
+    for (let c = n; c > 1; c--) {
+      const g = layout(c);
+      if (g.total <= maxWidth) { grid = g; break; }
+    }
+  }
+
+  const titleSize = fs + 2;
+  const parts = [text("legend-title", 0, titleSize, legend.title, ` font-size="${titleSize}"`)];
+  const top = titleSize + 10;
+  let colX = 0;
+  grid.cols.forEach((col, c) => {
+    col.forEach((row, i) => {
+      const y = top + i * LEGEND_ROW;
+      let x = colX + grid.label[c] + 8;
+      const cells = [text("legend founder", colX, y + SWATCH - 2, row.label)];
+      for (const a of row.alleles) {
+        cells.push(swatch(x, y, a.color, false, ` data-allele="${a.allele}"`));
+        cells.push(text("legend allele", x + SWATCH + 4, y + SWATCH - 2, String(a.allele)));
+        x += SWATCH + 4 + width_(String(a.allele)) + ALLELE_GAP;
+      }
+      parts.push(`<g class="legend-row" data-founder="${escapeXml(row.label)}">${cells.join("")}</g>`);
+    });
+    colX += grid.widths[c] + COLUMN_GAP;
+  });
+  let rowY = top + Math.min(n, grid.perColumn) * LEGEND_ROW;
+  let width = Math.max(width_(legend.title, titleSize), grid.total);
+  const extra = (label: string, color: string, hatch: boolean, cls: string) => {
+    parts.push(`<g class="${cls}">${swatch(0, rowY, color, hatch)}` +
+               `${text("legend", SWATCH + 6, rowY + SWATCH - 2, label)}</g>`);
+    width = Math.max(width, SWATCH + 6 + width_(label));
+    rowY += LEGEND_ROW;
+  };
+  if (legend.remainder) extra(legend.remainder, REMAINDER_COLOR, false, "legend-remainder");
+  if (legend.noData) extra("No IBD data", HATCH.fill, true, "legend-no-data");
+  return { cls: "legend founder-alleles", svg: parts.join(""), width, height: rowY };
 }
 
 function formatNumber(n: number): string {

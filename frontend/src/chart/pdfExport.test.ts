@@ -3,6 +3,11 @@ import { buildChartModel, gridLayout } from "./model";
 import { buildSvg } from "./svgExport";
 import { loadPdfLibraries, svgToPdf } from "./imageExport";
 import { appleGraph, notoSansBase64 } from "../test/fixtures";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { DEFAULT_HAPLOTYPE_SETTINGS, founderAlleleLegend, haplotypeBox, palette, type HaplotypeData } from "../lib/haplotype";
+import { THEMES } from "./style";
+import { textWidth } from "./svgExport";
 
 async function pdfText(bytes: Uint8Array): Promise<{ text: string; pages: number; size: number[] }> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -63,5 +68,41 @@ describe("PDF export", () => {
     const { text, size } = await pdfText(bytes);
     expect(size.map(Math.round)).toEqual([842, 595]);
     expect(text).toContain("Šampion");
+  }, 30_000);
+
+  it("keeps the founder-allele legend's colors as RGB fills", async () => {
+    const fixtures = (f: string) => JSON.parse(readFileSync(resolve("src/test/fixtures", f), "utf-8"));
+    const graph = fixtures("example.json").graph;
+    const data: HaplotypeData = fixtures("haplotypes.json").example.groups.A;
+    const ibdModel = buildChartModel(graph, true);
+    const { colorOf } = palette(data, graph.nodes.map((n: { id: string }) => n.id), "founder");
+    const boxes = Object.fromEntries(ibdModel.individuals.map(n => [n.id, haplotypeBox({
+      name: n.label, fill: THEMES.classic.defaultFill, theme: THEMES.classic, data,
+      homologues: data.rows[n.id] ?? null, colorOf, settings: DEFAULT_HAPLOTYPE_SETTINGS, textWidth,
+    })]));
+    const legend = founderAlleleLegend(data, Object.values(boxes), DEFAULT_HAPLOTYPE_SETTINGS);
+    const out = buildSvg({ model: ibdModel, positions: gridLayout(ibdModel), colorMap: {}, style: "classic",
+                           orientation: "LR", crossSymbolSize: 12, haplotypeBoxes: boxes, founderLegend: legend });
+    const bytes = await svgToPdf(out.svg, out.width, out.height, "fit", notoSansBase64(), await loadPdfLibraries());
+
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const page = await (await pdfjs.getDocument({ data: bytes.slice() }).promise).getPage(1);
+    const ops = await page.getOperatorList();
+    const fills = new Set<string>();
+    ops.fnArray.forEach((fn, i) => {
+      if (fn !== pdfjs.OPS.setFillRGBColor) return;
+      const [arg] = ops.argsArray[i] as unknown[];
+      fills.add(typeof arg === "string" ? arg.toLowerCase()
+        : "#" + (ops.argsArray[i] as number[]).map(v => v.toString(16).padStart(2, "0")).join(""));
+    });
+    const colors = legend.rows.flatMap(r => r.alleles.map(a => a.color.toLowerCase()));
+    expect(colors.length).toBe(8);
+    // PDF stores each channel as a number from 0 to 1, so it comes back within
+    // two levels of 255.
+    const rgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const close = (a: string, b: string) => rgb(a).every((v, i) => Math.abs(v - rgb(b)[i]) <= 2);
+    for (const c of colors) expect([...fills].some(f => close(f, c)), `${c} in ${[...fills]}`).toBe(true);
+    const { text } = await pdfText(bytes);
+    expect(text).toContain("Founder alleles, linkage group A (below 0.10 merged)");
   }, 30_000);
 });

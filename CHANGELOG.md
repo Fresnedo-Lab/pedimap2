@@ -19,14 +19,23 @@ release notes, so every release needs its own section here before it is tagged.
   shade for its two founder alleles. Ticks mark the IBD positions. Hovering a
   bar names the founder allele, its founder and the probability. Colors are
   shared out over the founders that contribute to the individuals shown, so
-  a subpopulation gets more distinct colors. Image exports include the bars;
-  their legend of founder alleles comes in a later release.
+  a subpopulation gets more distinct colors. Bars of an individual without
+  IBD data are hatched, as unknown values are.
+- **Image exports with IBD bars** (PNG, SVG and PDF) show the bars as on
+  screen and a legend of the founder alleles: a row per founder with a
+  numbered swatch for each of its founder alleles drawn, in the screen's
+  colors, plus the gray of merged small probabilities and "No IBD data" when
+  the image has them. Its title names the linkage group and the probability
+  below which segments are merged.
 
 ### Fixed
 - Error messages above the chart are plain sentences, not the raw replies of
   Pedimap's background service.
 
 ### Changed
+- In image exports, the legend goes below a top-to-bottom chart (it was at
+  the right) and stays at the right of a left-to-right chart; the page grows
+  so it never covers the chart.
 - Files with IBD data open with much less data passed around inside the app:
   the pedigree data no longer carries the IBD probabilities, which no screen
   reads from it (for the FlexQTL test file, 0.21 MB instead of 2.07 MB).

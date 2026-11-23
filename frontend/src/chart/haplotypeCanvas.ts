@@ -28,6 +28,16 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
   ctx.closePath();
 }
 
+/** The hatch's light stripes over the rectangle (clip to it first). */
+function hatchLines(ctx: CanvasRenderingContext2D, x0: number, y0: number, w: number, h: number) {
+  ctx.strokeStyle = HATCH.ink;
+  ctx.lineWidth = HATCH.width;
+  ctx.beginPath();
+  const step = HATCH.spacing * Math.SQRT2;
+  for (let x = -h; x < w; x += step) { ctx.moveTo(x0 + x, y0 + h); ctx.lineTo(x0 + x + h, y0); }
+  ctx.stroke();
+}
+
 /** Draw `box` with its top left corner at (left, top). */
 export function drawHaplotypeBox(ctx: CanvasRenderingContext2D, box: HaplotypeBox,
                                  left: number, top: number, opts: DrawOptions): void {
@@ -43,12 +53,7 @@ export function drawHaplotypeBox(ctx: CanvasRenderingContext2D, box: HaplotypeBo
         if (opts.hatched) {
           ctx.save();
           ctx.clip();
-          ctx.strokeStyle = HATCH.ink;
-          ctx.lineWidth = HATCH.width;
-          ctx.beginPath();
-          const step = HATCH.spacing * Math.SQRT2;
-          for (let x = -item.h; x < item.w; x += step) { ctx.moveTo(x, item.h); ctx.lineTo(x + item.h, 0); }
-          ctx.stroke();
+          hatchLines(ctx, item.x, item.y, item.w, item.h);
           ctx.restore();
         }
         roundedRect(ctx, item.x, item.y, item.w, item.h, opts.radius);
@@ -61,6 +66,17 @@ export function drawHaplotypeBox(ctx: CanvasRenderingContext2D, box: HaplotypeBo
         ctx.fillStyle = item.fill;
         // A hair wider and taller, so neighboring segments leave no seam.
         ctx.fillRect(item.x, item.y, item.w + 0.25, item.h + 0.25);
+        break;
+      case "no-data":
+        // No IBD rows: hatched, as every unknown value is drawn.
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(item.x, item.y, item.w, item.h);
+        ctx.fillStyle = HATCH.fill;
+        ctx.fill();
+        ctx.clip();
+        hatchLines(ctx, item.x, item.y, item.w, item.h);
+        ctx.restore();
         break;
       case "bar":
         ctx.strokeStyle = item.stroke;
