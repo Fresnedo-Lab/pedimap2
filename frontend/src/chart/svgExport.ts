@@ -361,7 +361,10 @@ function renderLegend(legend: Legend, theme: StyleTheme, textColor: string): Blo
  * and a numbered swatch for each of its alleles drawn; then the gray remainder
  * and "No IBD data" when drawn. Rows flow into columns: at most
  * LEGEND_COLUMN_ROWS per column at the right of the chart, or as many columns
- * as fit `maxWidth` below it.
+ * as fit `maxWidth` below it. Within a column, swatches sit in fixed slots, a
+ * founder's first allele in the first and its second in the second, each slot
+ * as wide as the column's widest allele number, so swatches line up across
+ * rows.
  */
 function renderFounderLegend(legend: FounderLegend, theme: StyleTheme, textColor: string,
                              maxWidth: number | null): Block {
@@ -370,16 +373,21 @@ function renderFounderLegend(legend: FounderLegend, theme: StyleTheme, textColor
   const swatch = legendSwatch(theme);
   const width_ = (s: string, size = fs) => [...s].length * size * LEGEND_CHAR;
   const labelW = (r: FounderLegend["rows"][number]) => width_(r.label);
-  const swatchesW = (r: FounderLegend["rows"][number]) =>
-    r.alleles.reduce((w, a) => w + SWATCH + 4 + width_(String(a.allele)), 0) +
-    ALLELE_GAP * Math.max(0, r.alleles.length - 1);
+  /** A founder's first allele (odd number) in slot 0, its second in slot 1. */
+  const slotOf = (allele: number) => (allele - 1) % 2;
+  const slotsOf = (col: FounderLegend["rows"]) =>
+    1 + Math.max(0, ...col.flatMap(r => r.alleles.map(a => slotOf(a.allele))));
+  /** One slot: swatch, gap, the column's widest allele number, gap to the next. */
+  const slotW = (col: FounderLegend["rows"]) =>
+    SWATCH + 4 + Math.max(0, ...col.flatMap(r => r.alleles.map(a => width_(String(a.allele))))) + ALLELE_GAP;
   const n = legend.rows.length;
   const layout = (columns: number) => {
     const perColumn = Math.max(1, Math.ceil(n / columns));
     const cols = Array.from({ length: Math.ceil(n / perColumn) }, (_, c) => legend.rows.slice(c * perColumn, (c + 1) * perColumn));
     const label = cols.map(col => Math.max(0, ...col.map(labelW)));
-    const widths = cols.map((col, c) => label[c] + 8 + Math.max(0, ...col.map(swatchesW)));
-    return { perColumn, cols, label, widths, total: widths.reduce((a, b) => a + b, 0) + COLUMN_GAP * Math.max(0, cols.length - 1) };
+    const slot = cols.map(slotW);
+    const widths = cols.map((col, c) => label[c] + 8 + slotsOf(col) * slot[c] - ALLELE_GAP);
+    return { perColumn, cols, label, slot, widths, total: widths.reduce((a, b) => a + b, 0) + COLUMN_GAP * Math.max(0, cols.length - 1) };
   };
   let grid = layout(Math.max(1, Math.ceil(n / LEGEND_COLUMN_ROWS)));
   if (maxWidth !== null) {
@@ -397,12 +405,11 @@ function renderFounderLegend(legend: FounderLegend, theme: StyleTheme, textColor
   grid.cols.forEach((col, c) => {
     col.forEach((row, i) => {
       const y = top + i * LEGEND_ROW;
-      let x = colX + grid.label[c] + 8;
       const cells = [text("legend founder", colX, y + SWATCH - 2, row.label)];
       for (const a of row.alleles) {
-        cells.push(swatch(x, y, a.color, false, ` data-allele="${a.allele}"`));
+        const x = colX + grid.label[c] + 8 + slotOf(a.allele) * grid.slot[c];
+        cells.push(swatch(x, y, a.color, false, ` data-allele="${a.allele}" data-slot="${slotOf(a.allele)}"`));
         cells.push(text("legend allele", x + SWATCH + 4, y + SWATCH - 2, String(a.allele)));
-        x += SWATCH + 4 + width_(String(a.allele)) + ALLELE_GAP;
       }
       parts.push(`<g class="legend-row" data-founder="${escapeXml(row.label)}">${cells.join("")}</g>`);
     });

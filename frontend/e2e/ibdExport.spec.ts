@@ -68,8 +68,22 @@ for (const orientation of ["↓ Top to bottom", "→ Left to right"] as const) {
           if (items[i - 1].r.right > items[i].r.left + 0.5) overlaps.push(`${row.getAttribute("data-founder")}: ${items[i - 1].el.textContent || "swatch"}`);
         }
       }
+      // Swatches and numbers in fixed columns: within a legend column (rows
+      // whose names start at the same x), each slot's swatches share one x,
+      // and so do their numbers.
+      const slots = new Map<string, { swatch: Set<number>; number: Set<number> }>();
+      for (const row of block.querySelectorAll("g.legend-row")) {
+        const column = Math.round(box(row.querySelector("text.founder")!).left);
+        for (const s of row.querySelectorAll("rect.legend-swatch")) {
+          const key = `${column}/${s.getAttribute("data-slot")}`;
+          if (!slots.has(key)) slots.set(key, { swatch: new Set(), number: new Set() });
+          slots.get(key)!.swatch.add(Math.round(box(s).left * 10) / 10);
+          slots.get(key)!.number.add(Math.round(box(s.nextElementSibling!).left * 10) / 10);
+        }
+      }
       const b = box(block);
       const result = {
+        slots: [...slots.entries()].map(([key, v]) => ({ key, swatch: [...v.swatch], number: [...v.number] })),
         title: block.querySelector("text.legend-title")?.textContent,
         overlaps,
         rowRights: [...block.querySelectorAll("g.legend-row")].map(r => ({ left: box(r.querySelector("text")!).left, right: box(r).right })),
@@ -94,6 +108,11 @@ for (const orientation of ["↓ Top to bottom", "→ Left to right"] as const) {
       if (next !== undefined) expect(r.right).toBeLessThan(next);
     }
     expect(legend.swatches).toHaveLength(58);
+    expect(legend.slots.length).toBeGreaterThanOrEqual(2);
+    for (const slot of legend.slots) {
+      expect(slot.swatch, `swatch x in slot ${slot.key}`).toHaveLength(1);
+      expect(slot.number, `number x in slot ${slot.key}`).toHaveLength(1);
+    }
     if (orientation === "↓ Top to bottom") expect(legend.legend.top).toBeGreaterThan(legend.chart.bottom);
     else expect(legend.legend.left).toBeGreaterThan(legend.chart.right);
 
