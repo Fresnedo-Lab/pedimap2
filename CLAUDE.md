@@ -105,9 +105,18 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   "_resetHierarchicalLayout" of its internal emitter, so the canvas repacks
   after each; anything else that adjusts vis's positions must do the same.
 - Release tags are created only by scripts/tag-release.sh VERSION (on main,
-  clean, in sync with origin, all four version files and a CHANGELOG section
-  at VERSION). Never `git tag` a release by hand: a hand-made v2.2.2 once
-  landed on the commit before the version bump.
+  or for a patch of an older minor version on its maintenance branch
+  maint/X.Y; clean, in sync with origin, all four version files and a
+  CHANGELOG section at VERSION). Never `git tag` a release by hand: a
+  hand-made v2.2.2 once landed on the commit before the version bump.
+- Patch releases of an older minor version (e.g. 2.3.1 while main heads for
+  2.4.0): a release/X.Y.Z branch from the vX.Y.0 tag (or maint/X.Y), PR into
+  maint/X.Y, tag there, then merge maint/X.Y back into main with a merge
+  commit (never squash) so the tag is in main's history. In that merge keep
+  main's code, take the patch's version files and CHANGELOG section, and
+  drop from [Unreleased] whatever the patch already shipped. When publishing
+  a patch older than the newest release, untick "Set as latest release": the
+  updater follows /releases/latest.
 - Test a macOS build only after checking which branch it was built from:
   the app embeds frontend/dist as built at that moment. A build made right
   after switching branches tests that branch, not the open PR.

@@ -49,6 +49,7 @@ import { exportBaseName } from "./lib/fileNames";
 import UpdateBanner from "./components/UpdateBanner";
 import AboutMenu from "./components/AboutMenu";
 import { useUpdater } from "./hooks/useUpdater";
+import { isEditableTarget } from "./lib/keyboard";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -322,8 +323,7 @@ export default function App() {
       if (e.key !== "f" && e.key !== "F") return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Don't steal the key while the user is typing (e.g. in the search box).
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      if (isEditableTarget(e.target)) return;
       e.preventDefault();
       fitToWindow();
     };

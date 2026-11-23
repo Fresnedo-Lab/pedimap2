@@ -6,9 +6,12 @@
 # vVERSION, which starts the release workflow, but only when the commit is
 # the one that should be released:
 #
-#   - the current branch is main;
+#   - the current branch is main, or maint/X.Y for a version X.Y.Z (a patch
+#     of an older minor version, e.g. 2.3.1 on maint/2.3 while main heads
+#     for 2.4.0);
 #   - the working tree is clean (no changed, staged or untracked files);
-#   - main is in sync with origin/main (nothing to pull, nothing unpushed);
+#   - the branch is in sync with its origin (nothing to pull, nothing
+#     unpushed);
 #   - package.json, frontend/package.json, src-tauri/Cargo.toml and
 #     src-tauri/tauri.conf.json all have version VERSION;
 #   - CHANGELOG.md has a non-empty "## [VERSION]" section (the release notes);
@@ -48,9 +51,12 @@ cd "$root"
 echo "Checking $tag in $root"
 
 # ── Branch ────────────────────────────────────────────────────────────────────
+# main, or the maintenance branch of this version's minor version.
 branch=$(git symbolic-ref --quiet --short HEAD || echo "(detached HEAD)")
-[ "$branch" = main ] || refuse "the current branch is $branch, not main (git switch main && git pull)"
-ok "on main"
+maint="maint/${version%.*}"
+[ "$branch" = main ] || [ "$branch" = "$maint" ] ||
+  refuse "the current branch is $branch, not main or $maint (git switch main && git pull)"
+ok "on $branch"
 
 # ── Clean working tree ────────────────────────────────────────────────────────
 if [ -n "$(git status --porcelain)" ]; then
@@ -60,11 +66,11 @@ fi
 ok "working tree clean"
 
 # ── In sync with origin ───────────────────────────────────────────────────────
-git fetch --quiet origin main || refuse "could not fetch origin/main"
-read -r ahead behind < <(git rev-list --left-right --count HEAD...origin/main)
-[ "$behind" -eq 0 ] || refuse "main is $behind commit(s) behind origin/main (git pull)"
-[ "$ahead" -eq 0 ] || refuse "main has $ahead commit(s) not on origin/main; merge through a pull request instead"
-ok "main is in sync with origin/main ($(git rev-parse --short HEAD))"
+git fetch --quiet origin "$branch" || refuse "could not fetch origin/$branch"
+read -r ahead behind < <(git rev-list --left-right --count "HEAD...origin/$branch")
+[ "$behind" -eq 0 ] || refuse "$branch is $behind commit(s) behind origin/$branch (git pull)"
+[ "$ahead" -eq 0 ] || refuse "$branch has $ahead commit(s) not on origin/$branch; merge through a pull request instead"
+ok "$branch is in sync with origin/$branch ($(git rev-parse --short HEAD))"
 
 # ── Version files ─────────────────────────────────────────────────────────────
 # Read the same way as the release workflow's "Check tag against version files".
