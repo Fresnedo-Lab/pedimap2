@@ -85,8 +85,11 @@ const translate = (el: Element) => {
 function legendAndSummary(svg: string, width: number, height: number) {
   const doc = parse(svg);
   const block = doc.querySelector("g.founder-alleles")!;
+  // Sized to the page's room from the legend's origin, so it opens whole.
+  const at = translate(block);
   const legend = [
-    `<svg xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans, sans-serif" font-size="11">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width - at.x}" height="${height - at.y}" ` +
+      `font-family="Noto Sans, sans-serif" font-size="11">`,
     doc.querySelector("defs")!.outerHTML,
     block.outerHTML.replace(/ transform="translate\([^)]*\)"/, ""),
     `</svg>`, "",
