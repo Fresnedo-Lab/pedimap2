@@ -119,10 +119,10 @@ describe("palettes", () => {
 
 describe("haplotypeBox", () => {
   const width = (t: string, size: number) => t.length * size * 0.6;
-  const box = (data: HaplotypeData, id: string, fill = "#FFFF96") => haplotypeBox({
+  const box = (data: HaplotypeData, id: string, fill = "#FFFF96", settings = DEFAULT_HAPLOTYPE_SETTINGS) => haplotypeBox({
     name: id, fill, theme: THEMES.classic, data, homologues: data.rows[id] ?? null,
     colorOf: palette(data, Object.keys(data.rows), "founder").colorOf,
-    settings: DEFAULT_HAPLOTYPE_SETTINGS, textWidth: width,
+    settings, textWidth: width,
   });
   const of = <R extends BoxItem["role"]>(b: { items: BoxItem[] }, role: R) =>
     b.items.filter((i): i is Extract<BoxItem, { role: R }> => i.role === role);
@@ -140,11 +140,15 @@ describe("haplotypeBox", () => {
       }
       expect(segs.reduce((t, s) => t + s.h * s.w, 0)).toBeCloseTo(barWidth * barHeight, 6);
     }
-    // G1_001 at 0 cM: first homologue on founder allele 23 at 0.95 (spec 5.5); the
-    // 0.05 of allele 24 is half a pixel wide, so it is merged into the remainder.
+    // G1_001 at 0 cM: first homologue on founder allele 23 at 0.95 (spec 5.5).
+    // The 0.05 of allele 24 is one pixel of the default 20 px bar, so it is
+    // drawn; on a 10 px bar it is half a pixel and merged into the remainder.
     const first = of(b, "segment").filter(s => s.homologue === 0 && s.band === 0);
-    expect(first.map(s => [s.segment.allele, s.segment.probability])).toEqual([[23, 0.95], [null, 0.05]]);
-    expect(first[1].fill).toBe(REMAINDER_COLOR);
+    expect(first.map(s => [s.segment.allele, s.segment.probability])).toEqual([[23, 0.95], [24, 0.05]]);
+    const narrow = of(box(data, "G1_001", "#FFFF96", { ...DEFAULT_HAPLOTYPE_SETTINGS, barWidth: 10 }), "segment")
+      .filter(s => s.homologue === 0 && s.band === 0);
+    expect(narrow.map(s => [s.segment.allele, s.segment.probability])).toEqual([[23, 0.95], [null, 0.05]]);
+    expect(narrow[1].fill).toBe(REMAINDER_COLOR);
     expect(of(b, "segment").find(s => s.homologue === 1 && s.band === 0)!.segment.allele).toBe(38);
   });
 
@@ -162,7 +166,9 @@ describe("haplotypeBox", () => {
 
   it("grows with the name and keeps every item inside", () => {
     const data = example("A"), short = box(data, "Cox"), long = box(data, "A-very-long-cultivar-name");
-    expect(short.width).toBe(BOX.minWidth);
+    // The bars and their ticks, or the minimum, whichever is wider.
+    const bars = 2 * DEFAULT_HAPLOTYPE_SETTINGS.barWidth + BOX.gap + 2 * (BOX.tick + 2) + 2 * BOX.padding;
+    expect(short.width).toBe(Math.max(BOX.minWidth, bars));
     expect(long.width).toBeGreaterThan(short.width);
     for (const b of [short, long]) for (const i of b.items) {
       if (i.kind === "rect") expect(i.x >= 0 && i.y >= 0 && i.x + i.w <= b.width + 1e-9 && i.y + i.h <= b.height + 1e-9).toBe(true);

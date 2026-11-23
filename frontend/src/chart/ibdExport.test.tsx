@@ -15,7 +15,7 @@ import { drawHaplotypeBox } from "./haplotypeCanvas";
 import { THEMES, contrastRatio, type DisplayStyle } from "./style";
 import { installFakeCanvas } from "../test/fakeCanvas";
 import {
-  DEFAULT_HAPLOTYPE_SETTINGS, REMAINDER_COLOR, founderAlleleLegend, founderOf, palette,
+  DEFAULT_HAPLOTYPE_SETTINGS, REMAINDER_COLOR, formatThreshold, mergeThreshold, founderAlleleLegend, founderOf, palette,
   type HaplotypeData, type HaplotypeSettings,
 } from "../lib/haplotype";
 
@@ -131,7 +131,7 @@ describe("export snapshots (Modern, white page)", () => {
  *  founder allele with a probability drawn as its own segment (at least the
  *  merge threshold of its homologue's sum). */
 function expectedRows(data: HaplotypeData, ids: string[], settings = DEFAULT_HAPLOTYPE_SETTINGS) {
-  const threshold = 1 / settings.barWidth;
+  const threshold = mergeThreshold(settings);
   const alleles = new Set<number>();
   for (const id of ids) {
     for (const homologue of data.rows[id] ?? []) {
@@ -206,7 +206,7 @@ describe("the legend lists exactly the founder alleles drawn", () => {
       const boxes = Object.values(haplotypeBoxes(model, viewOf(c.data, c.graph), THEMES.modern, {}, new Set()));
       const drawn = boxes.some(b => b.items.some(i => i.role === "segment" && i.segment.allele === null));
       const legend = founderAlleleLegend(c.data, boxes, DEFAULT_HAPLOTYPE_SETTINGS);
-      expect(legend.remainder, c.name).toBe(drawn ? "Below 0.10, merged" : null);
+      expect(legend.remainder, c.name).toBe(drawn ? `Below ${formatThreshold(DEFAULT_HAPLOTYPE_SETTINGS)}, merged` : null);
       const { svg } = buildSvg({ model, positions: Object.fromEntries(c.graph.nodes.map((n, i) => [n.id, { x: i * 200, y: 0 }])),
                                  colorMap: {}, haplotypeBoxes: Object.fromEntries(c.graph.nodes.map((n, i) => [n.id, boxes[i]])),
                                  founderLegend: legend, style: "modern", orientation: "LR", crossSymbolSize: 12 });
@@ -214,6 +214,45 @@ describe("the legend lists exactly the founder alleles drawn", () => {
       expect(!!row, c.name).toBe(drawn);
       if (drawn) expect(row!.querySelector("rect")!.getAttribute("fill")).toBe(REMAINDER_COLOR);
     }
+  });
+});
+
+// ── The view's settings, in the export as on screen ──────────────────────────
+
+describe("an export with the view's bar width and palette", () => {
+  it("FlexQTL at 14 px, by founder allele: segments, title and swatches follow", async () => {
+    const { graph, data } = CASES[1];
+    const settings = { ...DEFAULT_HAPLOTYPE_SETTINGS, barWidth: 14 };
+    const pal = palette(data, graph.nodes.map(n => n.id), "allele");
+    const view: HaplotypeView = { data, colorOf: pal.colorOf, settings, columns: ["Parent 1", "Parent 2"] };
+    const model = buildChartModel(graph, true);
+    const boxes = haplotypeBoxes(model, view, THEMES.modern, {}, new Set());
+    const legend = founderAlleleLegend(data, Object.values(boxes), settings);
+    expect(legend.title).toBe("Founder alleles, linkage group 1 (below 0.07 merged)");
+    const doc = parse(buildSvg({
+      model, positions: Object.fromEntries(graph.nodes.map((n, i) => [n.id, { x: i * 200, y: 0 }])),
+      colorMap: {}, haplotypeBoxes: boxes, founderLegend: legend, style: "modern", orientation: "UD", crossSymbolSize: 12,
+    }).svg);
+
+    // Every bar is 14 px, and each band's segments fill it across.
+    for (const g of doc.querySelectorAll("g.node.haplotype")) {
+      for (const bar of g.querySelectorAll("rect.bar")) expect(Number(bar.getAttribute("width"))).toBe(14);
+      const rows = new Map<string, number>();
+      for (const seg of g.querySelectorAll("rect.segment")) {
+        const key = `${seg.getAttribute("y")}|${Number(seg.getAttribute("x")) < Number(g.querySelectorAll("rect.bar")[1].getAttribute("x")) ? 0 : 1}`;
+        rows.set(key, (rows.get(key) ?? 0) + Number(seg.getAttribute("width")));
+      }
+      for (const w of rows.values()) expect(w).toBeCloseTo(14, 1);
+    }
+    // The legend's swatches are the by-allele palette, which the chart drew.
+    const drawn = new Set([...doc.querySelectorAll("g.node rect.segment")].map(r => r.getAttribute("fill")));
+    for (const sw of doc.querySelectorAll("g.founder-alleles rect.legend-swatch[data-allele]")) {
+      const color = pal.colorOf(Number(sw.getAttribute("data-allele")));
+      expect(sw.getAttribute("fill")).toBe(color);
+      expect(drawn.has(color)).toBe(true);
+    }
+    const remainder = doc.querySelector("g.legend-remainder text")?.textContent;
+    if (remainder) expect(remainder).toBe("Below 0.07, merged");
   });
 });
 

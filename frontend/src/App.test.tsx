@@ -10,10 +10,14 @@ vi.mock("./components/PedigreeCanvas", async () => {
   return {
     default: forwardRef(function Canvas(props: { model: { individuals: unknown[]; crosses: unknown[] };
                                              colorMap: Record<string, string>;
-                                             haplotype?: { data: { linkage_group: string } } | null }, _ref) {
+                                             haplotype?: { data: { linkage_group: string };
+                                                           settings: { barWidth: number };
+                                                           colorOf: (allele: number) => string } | null }, _ref) {
       const { individuals, crosses } = props.model;
       return <div data-testid="pedigree-canvas" data-colors={JSON.stringify(props.colorMap)}
-        data-haplotype={props.haplotype?.data.linkage_group ?? ""}>
+        data-haplotype={props.haplotype?.data.linkage_group ?? ""}
+        data-bar-width={props.haplotype?.settings.barWidth ?? ""}
+        data-allele-colors={props.haplotype ? [1, 2, 3, 4].map(a => props.haplotype!.colorOf(a)).join(",") : ""}>
         {individuals.length} drawn, {crosses.length} crosses</div>;
     }),
   };
@@ -250,6 +254,76 @@ describe("IBD bars", () => {
     await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe(""));
   });
 
+  const showBars = async () => {
+    serve(pedigreeOf(4), undefined, "Synthetic", {
+      "/api/pedigree": { population: "Synthetic", ploidy: 2, traits: [], markers: [], marker_summary: summary(1) },
+      "/api/haplotypes": haplotypes,
+    });
+    const view = render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    fireEvent.change(await screen.findByLabelText("IBD bars"), { target: { value: "1" } });
+    await vi.waitFor(() => expect(screen.getByTestId("pedigree-canvas").getAttribute("data-haplotype")).toBe("1"));
+    fireEvent.click(screen.getByTitle("Settings"));
+    return view;
+  };
+  const canvas = () => screen.getByTestId("pedigree-canvas");
+  const stored = () => JSON.parse(localStorage.getItem("pedimap.viewSettings")!)["view-1"].haplotype;
+
+  it("⚙ sets the bar width and the palette; the chart draws with them and they are kept", async () => {
+    const view = await showBars();
+    const width = screen.getByLabelText("Bar width (px)") as HTMLInputElement;
+    expect(width.value).toBe("20");                                          // the default
+    expect(canvas().getAttribute("data-bar-width")).toBe("20");
+    expect(screen.getByTestId("merge-threshold").textContent).toMatch(/below 0\.05 of\s+a homologue/);
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).value).toBe("founder");
+    expect(screen.getByText("With many founders, 'By founder allele' separates colors better.")).toBeTruthy();
+
+    // Typed: "3" is out of range and waits for the next digit; "38" applies.
+    fireEvent.change(width, { target: { value: "3" } });
+    expect(canvas().getAttribute("data-bar-width")).toBe("20");
+    fireEvent.change(width, { target: { value: "38" } });
+    expect(canvas().getAttribute("data-bar-width")).toBe("38");
+    expect(screen.getByTestId("merge-threshold").textContent).toMatch(/below 0\.03 of/);
+    fireEvent.click(screen.getByLabelText("Wider bars"));
+    fireEvent.click(screen.getByLabelText("Wider bars"));
+    fireEvent.click(screen.getByLabelText("Wider bars"));                  // stops at 40
+    expect(canvas().getAttribute("data-bar-width")).toBe("40");
+    expect((screen.getByLabelText("Wider bars") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("Narrower bars"));
+    expect(canvas().getAttribute("data-bar-width")).toBe("39");
+
+    const byFounder = canvas().getAttribute("data-allele-colors");
+    fireEvent.change(screen.getByLabelText("Palette"), { target: { value: "allele" } });
+    const byAllele = canvas().getAttribute("data-allele-colors");
+    expect(byAllele).not.toBe(byFounder);
+    expect(stored()).toEqual({ barWidth: 39, colorScheme: "allele" });
+
+    // A new session (the app started again) keeps both.
+    view.unmount();
+    await showBars();
+    expect(canvas().getAttribute("data-bar-width")).toBe("39");
+    expect(canvas().getAttribute("data-allele-colors")).toBe(byAllele);
+    expect((screen.getByLabelText("Bar width (px)") as HTMLInputElement).value).toBe("39");
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).value).toBe("allele");
+  });
+
+  it("takes the defaults for stored IBD settings that are missing or not valid", async () => {
+    for (const [haplotype, expected] of [
+      [undefined, { barWidth: 20, colorScheme: "founder" }],                // saved before PR 4
+      [{ barWidth: 200, colorScheme: "highlight" }, { barWidth: 40, colorScheme: "founder" }],
+      [{ barWidth: 2.4 }, { barWidth: 6, colorScheme: "founder" }],
+      [{ barWidth: "wide", colorScheme: "allele" }, { barWidth: 20, colorScheme: "allele" }],
+      [{ barWidth: 13.6, colorScheme: null }, { barWidth: 14, colorScheme: "founder" }],
+    ] as const) {
+      localStorage.setItem("pedimap.viewSettings", JSON.stringify({ "view-1": { orientation: "UD", style: "modern", haplotype } }));
+      const view = await showBars();
+      expect(canvas().getAttribute("data-bar-width"), JSON.stringify(haplotype)).toBe(String(expected.barWidth));
+      expect(stored(), JSON.stringify(haplotype)).toEqual(expected);
+      view.unmount();
+      localStorage.clear();
+    }
+  });
+
   it("is not offered for a file without IBD positions", async () => {
     serve(pedigreeOf(4), undefined, "Synthetic", {
       "/api/pedigree": { population: "Synthetic", ploidy: 2, traits: [], markers: [], marker_summary: summary(0) },
@@ -257,6 +331,8 @@ describe("IBD bars", () => {
     render(<App />);
     await screen.findByTestId("pedigree-canvas");
     expect(screen.queryByLabelText("IBD bars")).toBeNull();
+    fireEvent.click(screen.getByTitle("Settings"));                        // nor its ⚙ section
+    expect(screen.queryByLabelText("Bar width (px)")).toBeNull();
   });
 });
 

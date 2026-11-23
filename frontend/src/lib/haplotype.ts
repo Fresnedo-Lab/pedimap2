@@ -188,11 +188,16 @@ export function palette(data: HaplotypeData, ids: Iterable<string>, scheme: Colo
 // ── Box geometry ─────────────────────────────────────────────────────────────
 
 export interface HaplotypeSettings { barWidth: number; barHeight: number; markerTicks: boolean }
-export const DEFAULT_HAPLOTYPE_SETTINGS: HaplotypeSettings = { barWidth: 10, barHeight: 90, markerTicks: true };
+export const DEFAULT_HAPLOTYPE_SETTINGS: HaplotypeSettings = { barWidth: 20, barHeight: 90, markerTicks: true };
+/** The bar width a view may set, in px (⚙ "IBD bars"). 38 px is Pedimap 1.x's
+ *  default of 10 mm at 96 dpi. */
+export const BAR_WIDTH = { min: 6, max: 40 };
 
 /** Probabilities below this share of a homologue are drawn as one gray
  *  remainder: a segment narrower than BOX.minSegment px of the bar (§1.1). */
 export const mergeThreshold = (settings: HaplotypeSettings) => BOX.minSegment / settings.barWidth;
+/** The merge threshold as the ⚙ menu and the export legend show it ("0.05"). */
+export const formatThreshold = (settings: HaplotypeSettings) => mergeThreshold(settings).toFixed(2);
 
 export type BoxItem =
   | { kind: "rect"; role: "box"; x: number; y: number; w: number; h: number; fill: string; stroke: string }
@@ -292,8 +297,6 @@ export interface FounderLegend {
   noData:    boolean;
 }
 
-const formatShare = (x: number) => x.toFixed(2);
-
 /**
  * The legend of an export with IBD bars (design §7): one row per founder whose
  * alleles are drawn in color in `boxes`, each allele with its swatch; the gray
@@ -319,7 +322,7 @@ export function founderAlleleLegend(data: HaplotypeData, boxes: Iterable<Haploty
     if (!rows.has(k)) rows.set(k, { founder: k, label: founderLabel(data, k), alleles: [] });
     rows.get(k)!.alleles.push({ allele, color: colors.get(allele)! });
   }
-  const t = formatShare(mergeThreshold(settings));
+  const t = formatThreshold(settings);
   return {
     title: `Founder alleles, linkage group ${data.linkage_group} (below ${t} merged)`,
     rows: [...rows.values()],

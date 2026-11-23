@@ -43,7 +43,7 @@ import type { DisplayStyle } from "./chart/style";
 import { buildLegend, traitColorsFor, type TraitColors } from "./chart/svgExport";
 import { saveTextFile } from "./lib/saveFile";
 import { markerColoring, type MarkerColoringChoice, type MarkerColoringMode } from "./lib/genotypeCodes";
-import { DEFAULT_HAPLOTYPE_SETTINGS, founderAlleleLegend, palette, type HaplotypeData } from "./lib/haplotype";
+import { BAR_WIDTH, DEFAULT_HAPLOTYPE_SETTINGS, founderAlleleLegend, palette, type HaplotypeData } from "./lib/haplotype";
 import { THEMES } from "./chart/style";
 import ChartLegend from "./components/ChartLegend";
 import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
@@ -66,8 +66,8 @@ const MARKER_OPTION: Record<MarkerColoringMode, string> = {
 // ── Per-view settings ─────────────────────────────────────────────────────────
 // Pedimap 1.x stores display options per view. This mirrors that surface so
 // later options are field additions rather than a refactor. Wired up today:
-// orientation, style, showCrossSymbols, crossSymbolSize and traitColors; the
-// rest carry sensible defaults and are not yet read.
+// orientation, style, showCrossSymbols, crossSymbolSize, traitColors and
+// haplotype; the rest carry sensible defaults and are not yet read.
 export interface ViewSettings {
   orientation:      Orientation;                        // 'UD' | 'LR'
   style:            DisplayStyle;                       // 'modern' | 'classic'
@@ -85,7 +85,15 @@ export interface ViewSettings {
   // Per continuous trait: user-chosen low/high/missing colors (else the
   // trait's own). Used for the chart and the export legend alike.
   traitColors:      Record<string, Partial<TraitColors>>;
+  // IBD bars (⚙ "IBD bars"), on screen and in exports alike: the bar width,
+  // which sets the merge threshold (1/width), and the palette.
+  haplotype:        HaplotypeViewSettings;
 }
+
+export interface HaplotypeViewSettings { barWidth: number; colorScheme: IbdColorScheme }
+/** The palettes offered (design §2.1); the highlight scheme comes later. */
+export type IbdColorScheme = "founder" | "allele";
+const IBD_COLOR_SCHEMES: IbdColorScheme[] = ["founder", "allele"];
 
 // One view exists today. When the tabbed View system lands, settings become a
 // map keyed by tab id and `activeViewId` becomes stateful — this store already
@@ -106,6 +114,21 @@ function defaultViewSettings(): ViewSettings {
     ibdLinkageGroup:   null,
     selectedMarkers:   [],
     traitColors:       {},
+    haplotype:         { barWidth: DEFAULT_HAPLOTYPE_SETTINGS.barWidth, colorScheme: "founder" },
+  };
+}
+
+/** Stored IBD settings, made valid: a whole width within BAR_WIDTH, a known
+ *  palette; anything else takes the default. */
+function validHaplotype(stored: unknown): HaplotypeViewSettings {
+  const d = defaultViewSettings().haplotype;
+  if (!stored || typeof stored !== "object") return d;
+  const { barWidth, colorScheme } = stored as Partial<HaplotypeViewSettings>;
+  const width = Number(barWidth);
+  return {
+    barWidth: Number.isFinite(width) && barWidth !== null
+      ? Math.min(BAR_WIDTH.max, Math.max(BAR_WIDTH.min, Math.round(width))) : d.barWidth,
+    colorScheme: IBD_COLOR_SCHEMES.includes(colorScheme as IbdColorScheme) ? colorScheme as IbdColorScheme : d.colorScheme,
   };
 }
 
@@ -119,6 +142,7 @@ function withDefaults(stored: Partial<ViewSettings>): ViewSettings {
   if (typeof stored.showCrossSymbols !== "object" || stored.showCrossSymbols === null) {
     merged.showCrossSymbols = defaultViewSettings().showCrossSymbols;
   }
+  merged.haplotype = validHaplotype(stored.haplotype);
   return merged;
 }
 function loadViewSettings(): Record<string, ViewSettings> {
@@ -602,10 +626,11 @@ export default function App() {
   // Colors over the founders that contribute to the individuals displayed.
   const haplotypeView = useMemo((): HaplotypeView | null => {
     if (!haplotypeData || !graphData || haplotypeData.linkage_group !== ibdGroup) return null;
-    const pal = palette(haplotypeData, graphData.nodes.map(n => n.id), "founder");
-    return { data: haplotypeData, colorOf: pal.colorOf, settings: DEFAULT_HAPLOTYPE_SETTINGS,
+    const pal = palette(haplotypeData, graphData.nodes.map(n => n.id), view.haplotype.colorScheme);
+    return { data: haplotypeData, colorOf: pal.colorOf,
+             settings: { ...DEFAULT_HAPLOTYPE_SETTINGS, barWidth: view.haplotype.barWidth },
              columns: (pedigree?.parent_labels?.columns ?? ["Parent 1", "Parent 2"]) as [string, string] };
-  }, [haplotypeData, graphData, ibdGroup, pedigree]);
+  }, [haplotypeData, graphData, ibdGroup, pedigree, view.haplotype.barWidth, view.haplotype.colorScheme]);
   // While the bars' data loads, the chart waits: drawing it with names only
   // first would lay it out twice.
   const haplotypePending = view.cellContents === "name+ibd" &&
@@ -923,6 +948,10 @@ export default function App() {
             showCrossSymbols: { ...view.showCrossSymbols, [displayStyle]: show } })}
           onCrossSymbolSize={size => updateView({ crossSymbolSize: size })}
           onDrawingLimit={limit => setAppSettings(prev => ({ ...prev, drawingLimit: limit }))}
+          ibd={ibdGroups.length > 0 ? {
+            ...view.haplotype,
+            onChange: change => updateView({ haplotype: { ...view.haplotype, ...change } }),
+          } : null}
         />
         <AboutMenu updater={updater} />
       </div>

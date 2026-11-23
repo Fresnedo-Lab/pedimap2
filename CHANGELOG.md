@@ -21,6 +21,12 @@ release notes, so every release needs its own section here before it is tagged.
   shared out over the founders that contribute to the individuals shown, so
   a subpopulation gets more distinct colors. Bars of an individual without
   IBD data are hatched, as unknown values are.
+- **IBD bar settings** in ⚙: the bar width (6 to 40 px, 20 px by default)
+  and the palette, "By founder" (the default) or "By founder allele", which
+  separates colors better when there are many founders. The width sets which
+  probabilities are drawn as one gray remainder (below 1/width; 0.05 at 20
+  px), and ⚙ says so. Both apply to the chart and to image exports, are kept
+  per view and last across sessions.
 - **Image exports with IBD bars** (PNG, SVG and PDF) show the bars as on
   screen and a legend of the founder alleles: a row per founder with a
   numbered swatch for each of its founder alleles drawn, in the screen's
@@ -31,6 +37,8 @@ release notes, so every release needs its own section here before it is tagged.
 ### Fixed
 - Error messages above the chart are plain sentences, not the raw replies of
   Pedimap's background service.
+- The hint text in ⚙ is easier to read: 6.7:1 against its background, up
+  from 3.6:1 (WCAG AA asks 4.5:1 for small text).
 
 ### Changed
 - In image exports, the legend goes below a top-to-bottom chart (it was at
