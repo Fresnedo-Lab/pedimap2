@@ -116,4 +116,26 @@ expect fail "tag v1.3.0 already exists here" 1.3.0
 git_ tag -d v1.3.0 >/dev/null
 expect fail "tag v1.3.0 already exists on origin" 1.3.0
 
+# A patch of an older minor version, on its maintenance branch maint/X.Y
+git_ switch -q -c maint/1.2 "$(git rev-list --max-parents=0 HEAD)"   # the 1.2.3 release
+git_ push -q -u origin maint/1.2 2>/dev/null
+expect fail "not main or maint/1.3"        1.3.0                  # another minor version
+set_version 1.2.4
+sed -i.tmp 's/^## \[Unreleased\]/## [Unreleased]\n\n## [1.2.4] — 2026-03-01\n\n- Patch./' CHANGELOG.md && rm -f CHANGELOG.md.tmp
+git_ commit -q -am "release 1.2.4" && git_ push -q origin maint/1.2
+(cd "$work/other" && git_ fetch -q origin && git_ switch -q -c maint/1.2 origin/maint/1.2 &&
+ echo "fix" > fix.txt && git_ add -A && git_ commit -q -m "fix" && git_ push -q origin maint/1.2)
+expect fail "1 commit(s) behind origin/maint/1.2" 1.2.4
+git_ pull -q --ff-only
+echo "local" > local.txt && git_ add -A && git_ commit -q -m "local only"
+expect fail "1 commit(s) not on origin/maint/1.2" 1.2.4
+git_ reset -q --hard origin/maint/1.2
+git_ switch -q main
+expect fail "the version files do not all say 1.2.4" 1.2.4      # main is at 1.3.0
+git_ switch -q maint/1.2
+expect pass "Tagged"                       1.2.4
+[ "$(git -C "$work/origin.git" rev-parse 'v1.2.4^{commit}')" = "$(git -C "$work/origin.git" rev-parse maint/1.2)" ] ||
+  { echo "FAIL: origin's v1.2.4 is not the head of maint/1.2" >&2; exit 1; }
+printf 'ok   %-58s %s\n' "(origin)" "v1.2.4 is on the head of maint/1.2"
+
 echo "All tag-release.sh checks passed."
