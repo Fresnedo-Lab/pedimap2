@@ -55,7 +55,8 @@ jobs:
       # Chapters are concatenated in order; README.md is used as the title page.
       # Images are referenced from the chapters as images/…, relative to docs/;
       # pdf-links.lua turns links between chapter files into links within the
-      # one document.
+      # one document; pdf-symbols.lua writes the few symbols the fonts lack
+      # (⚙, 🖼, ⓘ) as words.
       - name: Build pedimap2-manual.pdf
         run: |
           pandoc \
@@ -72,6 +73,7 @@ jobs:
             CHANGELOG.md \
             --resource-path=.:docs \
             --lua-filter=docs/pdf-links.lua \
+            --lua-filter=docs/pdf-symbols.lua \
             --pdf-engine=xelatex \
             --toc \
             --toc-depth=2 \
