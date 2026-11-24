@@ -10,6 +10,14 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.4.0] — 2026-11-24
+
+Pedimap 2 now draws IBD haplotypes on the chart. For a file with IBD
+probabilities, such as a FlexQTL or Binko file, every individual's box shows
+its two homologues along a linkage group, colored by the founder alleles they
+descend from, and image exports carry the bars with a legend of the founder
+alleles.
+
 ### Added
 - **IBD bars on the chart.** For a file with IBD data, **IBD bars** in the
   toolbar draws, in every individual's box, two bars along a chosen linkage
@@ -19,34 +27,29 @@ release notes, so every release needs its own section here before it is tagged.
   shade for its two founder alleles. Ticks mark the IBD positions. Hovering a
   bar names the founder allele, its founder and the probability. Colors are
   shared out over the founders that contribute to the individuals shown, so
-  a subpopulation gets more distinct colors. Bars of an individual without
-  IBD data are hatched, as unknown values are.
+  a subpopulation gets more distinct colors.
 - **IBD bar settings** in ⚙: the bar width (6 to 40 px, 20 px by default)
   and the palette, "By founder" (the default) or "By founder allele", which
   separates colors better when there are many founders. The width sets which
-  probabilities are drawn as one gray remainder (below 1/width; 0.05 at 20
-  px), and ⚙ says so. Both apply to the chart and to image exports, are kept
-  per view and last across sessions.
+  probabilities are drawn as one gray remainder (below 0.05 at 20 px), and ⚙
+  says so. Both apply to the chart and to image exports, and Pedimap
+  remembers them the next time you open it.
 - **Image exports with IBD bars** (PNG, SVG and PDF) show the bars as on
   screen and a legend of the founder alleles: a row per founder with a
   numbered swatch for each of its founder alleles drawn, in the screen's
-  colors, plus the gray of merged small probabilities and "No IBD data" when
-  the image has them. Its title names the linkage group and the probability
-  below which segments are merged.
+  colors, plus the gray of merged small probabilities when the image has
+  it. Its title names the linkage group and the probability below which
+  segments are merged.
 
 ### Fixed
 - Error messages above the chart are plain sentences, not the raw replies of
   Pedimap's background service.
-- The hint text in ⚙ is easier to read: 6.7:1 against its background, up
-  from 3.6:1 (WCAG AA asks 4.5:1 for small text).
+- The hint text in ⚙ has more contrast, so it is easier to read.
 
 ### Changed
 - In image exports, the legend goes below a top-to-bottom chart (it was at
   the right) and stays at the right of a left-to-right chart; the page grows
   so it never covers the chart.
-- Files with IBD data open with much less data passed around inside the app:
-  the pedigree data no longer carries the IBD probabilities, which no screen
-  reads from it (for the FlexQTL test file, 0.21 MB instead of 2.07 MB).
 
 ## [2.3.1] — 2026-11-22
 
@@ -305,7 +308,8 @@ _2.1.1 was built but never released (macOS backend failed to start)._
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.2...v2.3.0
 [2.2.2]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.1...v2.2.2
