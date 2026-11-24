@@ -36,7 +36,7 @@ You do not need to program to use it.
 ## What you can do with it
 
 | To… | See |
-|---|---|
+|------------------------------|----------------|
 | install Pedimap 2 or update it | [Chapter 2](02_installation.md) |
 | try it out on the example pedigree in a few minutes | [Chapter 3](03_quickstart.md) |
 | prepare a data file, or understand an error message about one | [Chapter 4](04_file_formats.md) |

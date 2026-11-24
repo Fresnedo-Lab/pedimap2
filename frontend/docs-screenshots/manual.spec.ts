@@ -255,3 +255,28 @@ test("flexqtl-by-founder.png, flexqtl-by-allele.png: the same part of the chart 
   await restMouse(page);
   await page.screenshot({ path: out("flexqtl-by-allele.png"), clip: area });
 });
+
+// ── Chapters 7 and 8: subpopulations, export, large pedigrees ────────────────
+
+const APPLE = "apple_public.dat";
+
+test("subpopulation.png: Gala's ancestors and descendants, and the export panel (apple_public.dat)", async ({ page }) => {
+  await loadFixture(page, APPLE);
+  await clickIndividual(page, "Gala");
+  await page.getByRole("button", { name: /Subpop: Gala/ }).click();
+  await settle(page);
+  await page.getByRole("button", { name: /Export subpopulation/ }).click();
+  await page.getByRole("dialog", { name: "Export subpopulation" }).waitFor();
+  await page.screenshot({ path: out("subpopulation.png") });
+});
+
+test("drawing-limit.png: apple_public.dat listed, with the drawing limit set to 10", async ({ page }) => {
+  await loadFixture(page, APPLE);
+  await page.getByTitle("Settings").click();
+  const limit = page.getByLabel("Drawing limit");
+  await limit.fill("10");
+  await limit.press("Enter");
+  await page.getByTitle("Settings").click();
+  await expect(page.getByText(/more than the drawing limit of 10/)).toBeVisible();
+  await page.screenshot({ path: out("drawing-limit.png") });
+});

@@ -11,7 +11,7 @@ Go to the latest release:
 Download **one** file for your computer (`X.Y.Z` is the version number):
 
 | Your computer | File |
-|---|---|
+|------------------------|--------------------|
 | Windows 10 or 11 (recommended for most users) | `Pedimap2-X.Y.Z-Windows-Installer.exe` |
 | Windows, installed for you by an IT department | `Pedimap2-X.Y.Z-Windows.msi` |
 | Mac with Apple silicon (M1, M2, M3, M4 or later) | `Pedimap2-X.Y.Z-macOS-AppleSilicon.dmg` |

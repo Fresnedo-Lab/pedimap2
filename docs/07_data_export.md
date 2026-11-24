@@ -1,51 +1,96 @@
-# Chapter 7 — Data Export
+# Chapter 7 — Exporting
 
-## Overview
+Pedimap 2 saves two kinds of files: **images** of the chart, for reports,
+slides and papers, and **data files** (`.dat`) of the pedigree or of a part
+of it.
 
-_Placeholder: Pedimap 2 supports exporting the graph image, the individual table, and the full pedigree as JSON._
+## Saving an image of the chart
 
-## Exporting the Graph as an Image
+Click **Export image…** in the toolbar.
 
-Click **🖼 Export image…** in the toolbar. The export always contains the whole
-displayed chart (the full population, or the subpopulation you are showing),
-no matter how far you have zoomed or panned. It uses the current display
-style (Modern or Classic Pedimap) and orientation, with the same fills,
-role-colored parent links and cross symbols as on screen, plus a legend for
-the trait you are coloring by.
+![The Export image dialog](images/export-dialog.png)
+
+The image always holds the **whole chart as displayed**: the whole
+population, or the subpopulation you are showing, however far you have
+zoomed or moved. It uses the current display style and orientation, with
+the same colors, lines, cross symbols and IBD bars as on screen.
+
+**Format**
 
 | Format | Use it for |
-|--------|------------|
-| **PNG** | Slides and documents. Saved at 2× screen resolution. A very large chart is saved at a lower scale so neither side exceeds 16,000 pixels; the dialog tells you when this happened. |
-| **SVG** | Editing in Inkscape or Illustrator. A vector drawing in which names are text. |
-| **PDF** | Printing and publication. Vector, with names as text. Choose a page fitted to the chart, or US Letter or A4 in landscape (the chart is scaled down to fit inside the margins). |
+|----|------------------------------------------------------------|
+| **PNG** | Slides and documents. Saved at twice the screen resolution. A very large chart is saved at a lower resolution, so that neither side exceeds 16,000 pixels; Pedimap then says so, and suggests SVG or PDF for full detail. |
+| **SVG** | Editing in Inkscape or Illustrator: a drawing in which every name is text. |
+| **PDF** | Printing and publication: a drawing with names as text. Under **Page**, choose **Fitted to the chart**, **US Letter, landscape** or **A4, landscape** (the chart is scaled to fit inside the margins). |
 
-Under **Background**, **White** (the default) puts the chart on a white page,
-which suits printed figures; **As on screen** keeps the display style's own
-background, such as Modern's dark one. Links are routed exactly as on screen.
+**Background:** **White** (the default) puts the chart on a white page, for
+print; **As on screen** keeps the display style's own background, such as
+Modern's dark one.
 
-Names are set in Noto Sans, which is bundled with Pedimap 2 and embedded in
-every exported file, so accented and non-Latin names appear correctly on any
-computer.
+Click **Save…** and choose where to save the file. Pedimap suggests a name
+from the pedigree's name, for example `Apples.png` for the example pedigree,
+or `Apple-Public_Gala_subpop.png` for a subpopulation around Gala in a
+pedigree named Apple-Public.
 
-The chart cannot be exported while the population is too large to draw (see
-the drawing limit under ⚙); build a subpopulation first.
+**Legends.** The image carries a legend for the coloring (the trait or the
+marker) and, with IBD bars shown, a legend of the founder alleles: one row
+per founder, with a numbered swatch for each of its alleles in the image,
+and the gray of merged small probabilities when there is any. Its title
+names the linkage group and the probability below which segments are
+merged, for example "Founder alleles, linkage group A (below 0.05 merged)".
+The legends go below a top-to-bottom chart and to the right of a
+left-to-right chart, and the page grows so that they never cover the chart.
 
-## Exporting the Individual Table as CSV
+**Names** are set in Noto Sans, which comes with Pedimap 2 and is embedded
+in every image, so accented and non-Latin names look right on any computer.
 
-_Placeholder: File → Export → CSV; columns exported — ID, name, parents, cross type, ploidy, generation, all traits._
+While a pedigree is too large to draw (above the drawing limit,
+[Chapter 8](08_advanced.md)), it cannot be exported as an image; build a
+subpopulation first.
 
-## Saving the Pedigree as JSON
+## Saving the pedigree as a data file (.dat)
 
-_Placeholder: File → Save As → JSON; explain the round-trip guarantee — saved files can be re-opened with no data loss._
+Click **Export .dat** in the toolbar, then choose where to save the file.
 
-## Copying Node Data to Clipboard
+The file is a Pedimap `.dat` file with everything Pedimap read: the header
+keywords, the pedigree with every trait column, single-parent descent
+(`*SELF`, `*DH`, `*MUT`, `*VP`), the linkage groups, the marker data and the
+IBD probabilities. Opened again, it gives the same data. A parent that had no
+line of its own in the original file gets one.
 
-_Placeholder: right-click a node → Copy Details to copy the individual's data as tab-separated text._
+Pedimap also writes a few comment lines that start with `; PEDIMAP2`. They
+record, for example, whether each trait is discrete or continuous, so that a
+part of a population keeps its traits' types. Pedimap 1.x and other programs
+ignore them, as they ignore every comment.
 
-## Printing
+The file is saved in UTF-8.
 
-_Placeholder: File → Print opens the system print dialog; tips for landscape orientation and scaling._
+### Saving a subpopulation
 
-## Batch Export
+While a subpopulation is shown ([Chapter 8](08_advanced.md)), the button
+reads **Export subpopulation (.dat)** and opens a small panel:
 
-_Placeholder: placeholder for a planned batch-export feature (multiple subpopulations as separate files); marked as roadmap._
+![Exporting a subpopulation](images/subpopulation.png)
+
+- It says how many individuals will be written ("6 individuals around
+  Gala").
+- **Replace outside parents with unknown**, off by default:
+  - **off**: a parent outside the subpopulation is written as a founder
+    row of its own, so no link in the pedigree is lost;
+  - **on**: only the individuals shown are written, and their links to
+    parents outside them are dropped (those parents become unknown).
+
+Click **Save…** to choose where to save the file.
+
+**IBD probabilities in a subpopulation.** The exported file keeps the IBD
+probabilities exactly as in the whole population, numbered by the whole
+population's founder alleles, and says so in a comment line. Its founders'
+alleles may therefore belong to founders that are not in the file. Pedimap 2
+reads such files; whether Pedimap 1.x does has not been tested.
+
+## What Pedimap does not save yet
+
+- **JSON files.** Pedimap opens `.json` files but cannot yet save one.
+- **Changes to the data.** Pedimap shows your data; it does not edit it. To
+  correct a name or a value, edit the data file and open it again.
+- **Printing.** Save a PDF and print it from your PDF viewer.

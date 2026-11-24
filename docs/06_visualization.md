@@ -22,7 +22,7 @@ offspring sit in the founders' row.
 ![The example in Classic Pedimap style, left to right](images/classic-style.png)
 
 | | Modern | Classic Pedimap |
-|---|---|---|
+|--------|----------------------------|----------------------------------|
 | Background | dark | white |
 | Individuals | shapes by cross type (below), name inside or underneath | rectangles with the name at the top, pale yellow, as in Pedimap 1.x |
 | Lines | curved, with an arrow to the offspring | straight, without arrows |
@@ -31,7 +31,7 @@ offspring sit in the founders' row.
 In Modern style, the shape tells how an individual was produced:
 
 | Shape | Individual |
-|---|---|
+|----------|--------------------------|
 | ellipse (name inside) | a cross between two parents, a founder, or a mutant |
 | diamond | from selfing (`*SELF`) |
 | star | a doubled haploid (`*DH`) |

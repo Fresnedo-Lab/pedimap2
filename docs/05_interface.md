@@ -13,7 +13,7 @@ the **details panel** on the right.
 **First row**
 
 | Control | What it does |
-|---|---|
+|----------------|------------------------------------------------------------|
 | **Open File** | Opens a `.dat`, `.ped`, `.pmp` (with its `.dat`) or `.json` file ([Chapter 4](04_file_formats.md)) |
 | **Demo Data** | Shows the small made-up demo pedigree that Pedimap starts with |
 | **Load Example Data** | Opens the example apple pedigree of [Chapter 3](03_quickstart.md) |
@@ -25,7 +25,7 @@ the **details panel** on the right.
 **Second row**
 
 | Control | What it does |
-|---|---|
+|---------|------------------------------------------------------------|
 | **IBD bars** | Off, or the linkage group whose IBD bars every box shows. Only for files with IBD probabilities, and only the linkage groups that have them |
 | **Fit to window** | Shows the whole chart again (or press **F**) |
 | **Color by** | None, a trait, **Genotype code at marker…** or **Allele at marker…** (the last two for files with marker data). For a marker, a **Marker** menu appears next to it, and for an allele, an **Allele** menu. For a continuous trait, the **Low**, **High** and **Missing** colors appear; click one to change it, and **Reset** to go back to the trait's own colors |
@@ -110,7 +110,7 @@ and the genotype codes in use with how often each occurs.
 The gear button at the top right opens the settings.
 
 | Setting | What it does |
-|---|---|
+|----------------|------------------------------------------------------------|
 | **Show cross symbols (×)** | Draws a × where the lines from two parents meet, one per parent pair, shared by full sibs. On by default in Classic Pedimap, off in Modern; each style keeps its own choice |
 | **Cross symbol size (px)** | The size of the ×, from 4 to 40 |
 | **IBD bars: Bar width (px)** | The width of each IBD bar, from 6 to 40 (20 by default). The line below says which probabilities this merges into a gray remainder ([Chapter 6](06_visualization.md)). Shown for files with IBD probabilities |

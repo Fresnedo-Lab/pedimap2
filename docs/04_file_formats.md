@@ -11,7 +11,7 @@ are in the [`.dat` format reference](reference/dat-format.md) and the
 Click **Open File** in the toolbar and choose one of these:
 
 | File | What it is |
-|---|---|
+|-----------|----------------------------------------------------------|
 | `.dat` | A Pedimap data file: the pedigree, traits, and optionally markers and IBD probabilities. The format of Pedimap 1.x. |
 | `.ped` | The `pedimap.ped` file that FlexQTL and Binko.jl write: a `.dat` file with a few additions (see below). |
 | `.dat` with its `.pmp` | A Pedimap 1.x project. Select both files together in the Open dialog. |
@@ -46,7 +46,7 @@ Line2     Line1     *SELF     101      pink
 Header lines come first, each as `KEYWORD = value`. All are optional.
 
 | Keyword | Default | Meaning |
-|---|---|---|
+|------|------|----------------------------------------------------|
 | `POPULATION` | the file name | The pedigree's name, shown in the window and in exported file names |
 | `UNKNOWN` | `-` | The symbol for an unknown parent or a missing value. Several symbols may be listed; any of them counts. |
 | `PLOIDY` | `2` | The ploidy of the population |
@@ -177,7 +177,7 @@ warnings, in an amber bar above the chart, and the file opens. Click
 **Dismiss** to close the bar. Read them: they often point to a mistake.
 
 | Message begins with | What it usually means |
-|---|---|
+|--------------------------------------------|------------------------------------------------------|
 | "1 parent(s) have no row of their own: 'Elstr' (closest existing individual: 'Elstar')" | A misspelled parent name. Correct the spelling in the parent column. |
 | "FACTOR0 does not match the pedigree…" | The FACTOR0 column of a FlexQTL or Binko file disagrees with the parents listed. The column is kept as read. |
 | "… IBD homologue(s) do not sum to 1 within the rounding of their values…" | Some IBD probabilities add up to more or less than 1. They are drawn scaled to 1 and shown as read. |
@@ -185,7 +185,7 @@ warnings, in an amber bar above the chart, and the file opens. Click
 Common errors and their causes:
 
 | Error | Likely cause |
-|---|---|
+|------------------------------------|------------------------------------------|
 | "…has 6 fields, but the caption has 5" | A missing or extra value on that line, or a name with a space that is not in quotes |
 | "Duplicate individual name: …" | The same individual on two lines |
 | "Circular pedigree — the following individuals form an ancestry cycle: …" | An individual listed as its own ancestor, usually from a swapped name |
