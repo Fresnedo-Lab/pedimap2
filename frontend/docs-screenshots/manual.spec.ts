@@ -155,3 +155,103 @@ test("export-dialog.png: Export image", async ({ page }) => {
   await page.getByRole("button", { name: /Export image/ }).click();
   await page.getByRole("dialog", { name: "Export image" }).screenshot({ path: out("export-dialog.png") });
 });
+
+// ── Chapter 5: the window ─────────────────────────────────────────────────────
+
+const FLEXQTL = "flexqtl_binko/flexqtl_routeB_sim_small.ped.gz";
+const chartArea = async (page: Page) => (await page.getByTestId("pedigree-canvas").boundingBox())!;
+
+/** The part of the chart around the boxes of `ids`, with a margin, within the
+ *  chart's area. */
+async function around(page: Page, ids: string[], pad = 40) {
+  const boxes = (await Promise.all(ids.map(id => boxOf(page, id)))).filter((b): b is Box => !!b);
+  const area = await chartArea(page);
+  const left = Math.max(area.x, Math.min(...boxes.map(b => b.left)) - pad);
+  const top = Math.max(area.y, Math.min(...boxes.map(b => b.top)) - pad);
+  const right = Math.min(area.x + area.width, Math.max(...boxes.map(b => b.left + b.width)) + pad);
+  const bottom = Math.min(area.y + area.height, Math.max(...boxes.map(b => b.top + b.height)) + pad);
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+/** Every individual of the loaded pedigree. */
+const allIds = async () =>
+  ((await (await fetch(`${backend}/api/individuals`)).json()) as { id: string }[]).map(i => i.id);
+
+/** Zoom in with the mouse wheel around an individual, then rest the mouse on
+ *  an empty corner of the chart, which closes any tooltip. */
+async function zoomAt(page: Page, id: string, steps: number) {
+  const b = (await boxOf(page, id))!;
+  await page.mouse.move(b.left + b.width / 2, b.top + b.height / 2);
+  for (let i = 0; i < steps; i++) { await page.mouse.wheel(0, -120); await page.waitForTimeout(120); }
+  await restMouse(page);
+}
+async function restMouse(page: Page) {
+  const area = await chartArea(page);
+  await page.mouse.move(area.x + area.width - 4, area.y + 4);
+  await page.waitForTimeout(600);
+}
+
+test("toolbar.png: the toolbar, with the example open", async ({ page }) => {
+  await loadExample(page);
+  await page.getByRole("toolbar", { name: "Main toolbar" }).screenshot({ path: out("toolbar.png") });
+});
+
+test("settings.png: Settings with the IBD bars section (FlexQTL fixture)", async ({ page }) => {
+  await loadFixture(page, FLEXQTL);
+  await page.getByLabel("IBD bars").selectOption({ index: 1 });
+  await settle(page);
+  await page.getByTitle("Settings").click();
+  await page.getByRole("dialog", { name: "Settings" }).screenshot({ path: out("settings.png") });
+});
+
+test("marker-data.png: the Marker data summary (FlexQTL fixture)", async ({ page }) => {
+  await loadFixture(page, FLEXQTL);
+  await page.getByTitle("Marker data of this file").click();
+  await page.getByRole("dialog", { name: "Marker data" }).screenshot({ path: out("marker-data.png") });
+});
+
+// ── Chapter 6: visualization ──────────────────────────────────────────────────
+
+test("classic-style.png: the example in Classic Pedimap, left to right", async ({ page }) => {
+  await loadExample(page);
+  await page.getByRole("button", { name: "Classic Pedimap", exact: true }).click();
+  await page.getByRole("button", { name: "→ Left to right", exact: true }).click();
+  await settle(page);
+  await page.screenshot({ path: out("classic-style.png"), clip: await around(page, await allIds()) });
+});
+
+test("trait-discrete.png: the example colored by Color, with its legend", async ({ page }) => {
+  await loadExample(page);
+  await page.getByLabel("Color by").selectOption("Color");
+  await settle(page);
+  await page.screenshot({ path: out("trait-discrete.png"), clip: await chartArea(page) });
+});
+
+test("marker-coloring.png: FlexQTL fixture, genotype code at M2_007", async ({ page }) => {
+  await loadFixture(page, FLEXQTL);
+  await page.getByLabel("Color by").selectOption({ label: "Genotype code at marker…" });
+  await page.getByLabel("Marker").selectOption("M2_007");
+  await settle(page);
+  await expect(page.getByRole("group", { name: /^Legend:/ })).toBeVisible();
+  // Founders (codes 5 and 0) and the first generation (one 11), large enough
+  // to see, with the legend in the chart's corner.
+  await zoomAt(page, "G1_003", 14);
+  await page.screenshot({ path: out("marker-coloring.png"), clip: await chartArea(page) });
+});
+
+test("flexqtl-by-founder.png, flexqtl-by-allele.png: the same part of the chart in both palettes", async ({ page }) => {
+  await loadFixture(page, FLEXQTL);
+  await page.getByLabel("IBD bars").selectOption({ index: 1 });            // linkage group 1
+  await settle(page);
+  // Zoom in on generations 2 and 3, around G3_010, and keep ten boxes of each.
+  await zoomAt(page, "G3_010", 9);
+  const ids = ["G2", "G3"].flatMap(g => Array.from({ length: 10 }, (_, i) => `${g}_${String(i + 6).padStart(3, "0")}`));
+  const area = await around(page, ids, 24);
+  await page.screenshot({ path: out("flexqtl-by-founder.png"), clip: area });
+
+  await page.getByTitle("Settings").click();
+  await page.getByLabel("Palette").selectOption("allele");
+  await page.getByTitle("Settings").click();                 // close it again
+  await restMouse(page);
+  await page.screenshot({ path: out("flexqtl-by-allele.png"), clip: area });
+});

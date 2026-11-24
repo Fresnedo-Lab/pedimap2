@@ -32,7 +32,8 @@ The window now shows:
   the **second parent** is blue. In this file the parent columns are named
   FEMALE and MALE, so the first parent is the female (the seed parent) and
   the second the male. Files from FlexQTL and Binko.jl name their columns
-  PARENT1 and PARENT2 and do not state which parent is which sex. A plant
+  PARENT1 and PARENT2 and do not state which parent is which sex
+  ([Chapter 6](06_visualization.md) gives the rule for every file). A plant
   with a single parent (from selfing, for example) has one purple line.
 - **Lines never pass through a plant they do not connect.** A line that
   spans more than one generation runs in a lane of its own.

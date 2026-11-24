@@ -69,7 +69,7 @@ and precalculated IBD probabilities.
 | Generation-aware hierarchical layout | ✅ |
 | Orientation toggle — top-to-bottom / left-to-right | ✅ |
 | Display styles — Modern, or Classic Pedimap (rectangles with the name on top, pale yellow fill) | ✅ |
-| Parent links colored by role — first parent red, second parent blue, single parent (`*SELF`, `*DH`, `*MUT`, `*VP`) purple. With FEMALE/MALE columns the first parent is the female; FlexQTL and Binko files (PARENT1/PARENT2) do not state sex | ✅ |
+| Parent links colored by role — first parent red, second parent blue, single parent (`*SELF`, `*DH`, `*MUT`, `*VP`) purple. With FEMALE/MALE columns the first parent is the female (a file listing MALE first still draws the female red); FlexQTL and Binko files (PARENT1/PARENT2) do not state sex | ✅ |
 | Cross symbols — one × per parent pair, shared by full sibs; on in Classic, off in Modern (⚙ to change or resize) | ✅ |
 | Link routing — a link never runs through an individual or × it does not connect; links spanning generations get their own lane | ✅ |
 | Trait coloring — continuous gradient and qualitative palette | ✅ |
