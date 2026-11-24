@@ -83,10 +83,11 @@ and precalculated IBD probabilities.
 | Details panel — parents, traits, expandable lists of relatives, marker genotypes with their codes, and the most probable founder alleles at each IBD position | ✅ |
 | Color by a marker — genotype code, or copies of an allele, with a legend | ✅ |
 | Marker data summary — loci, linkage groups, IBD positions, codes in use | ✅ |
+| IBD haplotype bars — each individual's two homologues along a linkage group, colored by founder or by founder allele, with hover details; bar width and palette in ⚙ | ✅ |
 | Fit to window — toolbar button or **F** | ✅ |
 | JSON export / import round-trip | ✅ |
 | Legacy `.dat` export — whole population or displayed subpopulation; reads back unchanged | ✅ |
-| Image export — PNG, SVG or PDF of the whole displayed chart, with trait legend, on white or as on screen | ✅ |
+| Image export — PNG, SVG or PDF of the whole displayed chart, with the trait legend and the founder-allele legend of the IBD bars, on white or as on screen | ✅ |
 | Drawing limit — populations above 1,000 individuals (⚙) are listed, not drawn | ✅ |
 | Cross-platform native installers | ✅ |
 | Offline-first — all computation is local | ✅ |
@@ -94,8 +95,8 @@ and precalculated IBD probabilities.
 
 ### Shown in the details panel, not yet on the chart
 
-- IBD probabilities per linkage group and position: the panel shows each
-  homologue's most probable founder alleles
+- The most probable founder alleles at each IBD position, as text (the chart
+  shows the probabilities as IBD bars)
 - Observed marker alleles with their genotype codes
 
 The parser also reads the linkage group maps and the founder allele
@@ -113,8 +114,8 @@ These are core to Pedimap 1.x and are the focus of ongoing work:
   still missing
 - Information panel — a persistent panel that follows the mouse (a details
   panel already opens on click)
-- IBD haplotype rectangles and most-probable alleles on the chart (the details
-  panel already shows them)
+- Most-probable alleles and marker scores inside the chart's boxes (the
+  details panel already shows them)
 - `.pmp` subpopulations and saved views (currently only the population name is read)
 
 ---
@@ -311,7 +312,6 @@ users never install Python.
 - [ ] On-screen legend for trait colorings
 
 **Then**
-- [ ] IBD haplotype rectangles per linkage group
 - [ ] Most-probable-allele display with probability thresholds
       (details panel done; chart display pending)
 - [ ] Marker score display with color codes (details panel done; chart
@@ -340,6 +340,7 @@ users never install Python.
 - [x] Marker genotypes and IBD founder-allele probabilities in the details panel (2.3.0)
 - [x] Color by genotype code or allele copies at a marker, with a legend (2.3.0)
 - [x] Names readable on every fill (WCAG AA contrast), on screen and in exports (2.3.0)
+- [x] IBD haplotype bars on the chart per linkage group, with a founder-allele legend in image exports and settings for bar width and palette (2.4.0)
 
 ---
 
