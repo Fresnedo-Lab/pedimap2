@@ -125,10 +125,16 @@ test.beforeEach(async ({ page }) => {
   }
 });
 
-async function expectNoCrossings(page: Page, dataset: string, ibdBars = false) {
+async function expectNoCrossings(page: Page, dataset: string, ibdBars = false, barWidth?: number) {
   await load(page, dataset);
-  // The haplotype display: boxes with the IBD bars of the first linkage group.
+  // The haplotype display: boxes with the IBD bars of the first linkage group,
+  // at the default bar width or the one given (⚙ "IBD bars").
   if (ibdBars) await page.getByLabel("IBD bars").selectOption({ index: 1 });
+  if (barWidth !== undefined) {
+    await page.getByTitle("Settings").click();
+    await page.getByLabel("Bar width (px)").fill(String(barWidth));
+    await page.getByTitle("Settings").click();
+  }
   const failures: string[] = [];
   for (const s of SETTINGS) {
     await page.getByRole("button", { name: s.style, exact: true }).click();
@@ -143,6 +149,9 @@ async function expectNoCrossings(page: Page, dataset: string, ibdBars = false) {
     const label = `${s.style}, ${s.orientation.slice(2)}, cross symbols ${s.crosses ? "on" : "off"}`;
     const svg = await exportSvg(page);
     if (ibdBars) expect(svg, `${label}: haplotype boxes in the export`).toContain('class="node haplotype"');
+    if (barWidth !== undefined) expect(svg, `${label}: ${barWidth} px bars`).toContain(`class="bar" x="`);
+    if (barWidth !== undefined) expect([...svg.matchAll(/class="bar" [^>]*?[^-]width="([\d.]+)"/g)].every(m => Number(m[1]) === barWidth),
+                                       `${label}: every bar ${barWidth} px wide`).toBe(true);
     const result = await page.evaluate(findCrossings, svg);
     // The export shows the whole loaded population (not, say, a stale one).
     const loaded = (await (await fetch(`${backend}/api/individuals`)).json()).length;
@@ -159,9 +168,12 @@ for (const dataset of ["Example", "apple_public.dat", "Demo Data", "flexqtl_bink
        ({ page }) => expectNoCrossings(page, dataset));
 }
 
-for (const dataset of ["flexqtl_binko/binko_ibd.ped", "flexqtl_binko/flexqtl_routeB_sim_small.ped.gz"]) {
+for (const dataset of ["Example", "flexqtl_binko/binko_ibd.ped", "flexqtl_binko/flexqtl_routeB_sim_small.ped.gz"]) {
   test(`${dataset} with IBD bars: exported links cross no box, in all 8 settings`,
        ({ page }) => expectNoCrossings(page, dataset, true));
+  // The widest bars a view may set (BAR_WIDTH.max in lib/haplotype.ts).
+  test(`${dataset} with 40 px IBD bars: exported links cross no box, in all 8 settings`,
+       ({ page }) => expectNoCrossings(page, dataset, true, 40));
 }
 
 // The private pedigree is never committed; runs only where the file exists

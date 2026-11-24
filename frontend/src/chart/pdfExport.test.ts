@@ -103,6 +103,7 @@ describe("PDF export", () => {
     const close = (a: string, b: string) => rgb(a).every((v, i) => Math.abs(v - rgb(b)[i]) <= 2);
     for (const c of colors) expect([...fills].some(f => close(f, c)), `${c} in ${[...fills]}`).toBe(true);
     const { text } = await pdfText(bytes);
-    expect(text).toContain("Founder alleles, linkage group A (below 0.10 merged)");
+    expect(text).toContain(legend.title);
+    expect(legend.title).toBe("Founder alleles, linkage group A (below 0.05 merged)");
   }, 30_000);
 });

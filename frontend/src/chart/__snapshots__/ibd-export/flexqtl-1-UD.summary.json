@@ -1,6 +1,6 @@
 {
  "page": {
-  "width": 4162.2,
+  "width": 4167.2,
   "height": 835
  },
  "legendAt": {
@@ -82,523 +82,523 @@
   },
   {
    "name": "F001",
-   "x": 2638.2,
+   "x": 2633.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F002",
-   "x": 1342.2,
+   "x": 1337.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F003",
-   "x": 1486.2,
+   "x": 1481.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F004",
-   "x": 2782.2,
+   "x": 2777.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F005",
-   "x": 2926.2,
+   "x": 2921.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F006",
-   "x": 1630.2,
+   "x": 1625.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F007",
-   "x": 3070.2,
+   "x": 3065.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F008",
-   "x": 3214.2,
+   "x": 3209.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F009",
-   "x": 3358.2,
+   "x": 3353.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F010",
-   "x": 1774.2,
+   "x": 1769.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F011",
-   "x": 3502.2,
+   "x": 3497.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F012",
-   "x": 1918.2,
+   "x": 1913.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F013",
-   "x": 3646.2,
+   "x": 3641.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F014",
-   "x": 2062.2,
+   "x": 2057.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F015",
-   "x": 3790.2,
+   "x": 3785.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F016",
-   "x": 2206.2,
+   "x": 2201.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F017",
-   "x": 3934.2,
+   "x": 3929.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F018",
-   "x": 2350.2,
+   "x": 2345.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F019",
-   "x": 2494.2,
+   "x": 2489.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "F020",
-   "x": 4078.2,
+   "x": 4073.2,
    "y": 24,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 42
   },
   {
    "name": "G1_001",
-   "x": 46.2,
+   "x": 41.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 59
   },
   {
    "name": "G1_002",
-   "x": 190.2,
+   "x": 185.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 63
   },
   {
    "name": "G1_003",
-   "x": 334.2,
+   "x": 329.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 64
   },
   {
    "name": "G1_004",
-   "x": 478.2,
+   "x": 473.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 64
   },
   {
    "name": "G1_005",
-   "x": 622.2,
+   "x": 617.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 63
   },
   {
    "name": "G1_006",
-   "x": 766.2,
+   "x": 761.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 62
   },
   {
    "name": "G1_007",
-   "x": 910.2,
+   "x": 905.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 73
   },
   {
    "name": "G1_008",
-   "x": 1054.2,
+   "x": 1049.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 64
   },
   {
    "name": "G1_009",
-   "x": 1198.2,
+   "x": 1193.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 63
   },
   {
    "name": "G1_010",
-   "x": 1342.2,
+   "x": 1337.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 66
   },
   {
    "name": "G1_011",
-   "x": 1486.2,
+   "x": 1481.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 76
   },
   {
    "name": "G1_012",
-   "x": 1630.2,
+   "x": 1625.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 69
   },
   {
    "name": "G1_013",
-   "x": 1774.2,
+   "x": 1769.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 75
   },
   {
    "name": "G1_014",
-   "x": 1918.2,
+   "x": 1913.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 70
   },
   {
    "name": "G1_015",
-   "x": 2062.2,
+   "x": 2057.2,
    "y": 211,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 60
   },
   {
    "name": "G2_001",
-   "x": 46.2,
+   "x": 41.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 80
+   "segments": 84
   },
   {
    "name": "G2_002",
-   "x": 190.2,
+   "x": 185.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 78
+   "segments": 81
   },
   {
    "name": "G2_003",
-   "x": 334.2,
+   "x": 329.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 74
   },
   {
    "name": "G2_004",
-   "x": 478.2,
+   "x": 473.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 79
+   "segments": 89
   },
   {
    "name": "G2_005",
-   "x": 622.2,
+   "x": 617.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 97
+   "segments": 98
   },
   {
    "name": "G2_006",
-   "x": 766.2,
+   "x": 761.2,
    "y": 398,
-   "width": 60,
-   "height": 117,
-   "segments": 94
-  },
-  {
-   "name": "G2_007",
-   "x": 910.2,
-   "y": 398,
-   "width": 60,
-   "height": 117,
-   "segments": 99
-  },
-  {
-   "name": "G2_008",
-   "x": 1054.2,
-   "y": 398,
-   "width": 60,
-   "height": 117,
-   "segments": 83
-  },
-  {
-   "name": "G2_009",
-   "x": 1198.2,
-   "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 97
   },
   {
-   "name": "G2_010",
-   "x": 1342.2,
+   "name": "G2_007",
+   "x": 905.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 87
+   "segments": 102
+  },
+  {
+   "name": "G2_008",
+   "x": 1049.2,
+   "y": 398,
+   "width": 70,
+   "height": 117,
+   "segments": 89
+  },
+  {
+   "name": "G2_009",
+   "x": 1193.2,
+   "y": 398,
+   "width": 70,
+   "height": 117,
+   "segments": 98
+  },
+  {
+   "name": "G2_010",
+   "x": 1337.2,
+   "y": 398,
+   "width": 70,
+   "height": 117,
+   "segments": 88
   },
   {
    "name": "G2_011",
-   "x": 1486.2,
+   "x": 1481.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 90
+   "segments": 91
   },
   {
    "name": "G2_012",
-   "x": 1630.2,
+   "x": 1625.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
    "segments": 78
   },
   {
    "name": "G2_013",
-   "x": 1774.2,
+   "x": 1769.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 73
+   "segments": 78
   },
   {
    "name": "G2_014",
-   "x": 1918.2,
+   "x": 1913.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 80
+   "segments": 83
   },
   {
    "name": "G2_015",
-   "x": 2062.2,
+   "x": 2057.2,
    "y": 398,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 80
+   "segments": 84
   },
   {
    "name": "G3_001",
-   "x": 46.2,
+   "x": 41.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 81
+   "segments": 86
   },
   {
    "name": "G3_002",
-   "x": 190.2,
+   "x": 185.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 86
+   "segments": 90
   },
   {
    "name": "G3_003",
-   "x": 334.2,
+   "x": 329.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 87
+   "segments": 90
   },
   {
    "name": "G3_004",
-   "x": 478.2,
+   "x": 473.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 86
+   "segments": 92
   },
   {
    "name": "G3_005",
-   "x": 622.2,
+   "x": 617.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 89
+   "segments": 96
   },
   {
    "name": "G3_006",
-   "x": 766.2,
+   "x": 761.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 90
+   "segments": 95
   },
   {
    "name": "G3_007",
-   "x": 910.2,
+   "x": 905.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 90
+   "segments": 96
   },
   {
    "name": "G3_008",
-   "x": 1054.2,
+   "x": 1049.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 80
+   "segments": 85
   },
   {
    "name": "G3_009",
-   "x": 1198.2,
+   "x": 1193.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 81
+   "segments": 84
   },
   {
    "name": "G3_010",
-   "x": 1342.2,
+   "x": 1337.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 84
+   "segments": 94
   },
   {
    "name": "G3_011",
-   "x": 1486.2,
+   "x": 1481.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 88
+   "segments": 97
   },
   {
    "name": "G3_012",
-   "x": 1630.2,
+   "x": 1625.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 84
+   "segments": 91
   },
   {
    "name": "G3_013",
-   "x": 1774.2,
+   "x": 1769.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 84
+   "segments": 92
   },
   {
    "name": "G3_014",
-   "x": 1918.2,
+   "x": 1913.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 89
+   "segments": 91
   },
   {
    "name": "G3_015",
-   "x": 2062.2,
+   "x": 2057.2,
    "y": 585,
-   "width": 60,
+   "width": 70,
    "height": 117,
-   "segments": 99
+   "segments": 107
   }
  ]
 }

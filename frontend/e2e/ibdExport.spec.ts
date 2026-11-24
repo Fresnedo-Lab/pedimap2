@@ -97,7 +97,7 @@ for (const orientation of ["↓ Top to bottom", "→ Left to right"] as const) {
       return result;
     }, svg);
 
-    expect(legend.title).toBe("Founder alleles, linkage group 1 (below 0.10 merged)");
+    expect(legend.title).toBe("Founder alleles, linkage group 1 (below 0.05 merged)");      // the default 20 px bar
     expect(legend.rows).toBe(29);
     expect(legend.overlaps).toEqual([]);
     // Columns do not run into each other: every row ends left of the next

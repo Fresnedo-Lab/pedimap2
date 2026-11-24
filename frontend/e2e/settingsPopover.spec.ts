@@ -3,8 +3,12 @@
 // toolbar's button labels, meanwhile, still never wrap.
 
 import { test, expect, type Page } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
+import zlib from "node:zlib";
 
 const backendPort = Number(process.env.E2E_BACKEND_PORT ?? 8765);
+const backend = `http://127.0.0.1:${backendPort}`;
 
 test.beforeEach(async ({ page }) => {
   // The app calls the backend at 127.0.0.1:8765; follow it to another port.
@@ -46,23 +50,36 @@ function wrappedToolbarLabels() {
     .map(b => b.textContent!.trim());
 }
 
-async function openSettings(page: Page, width: number) {
+async function openSettings(page: Page, width: number, ibd = false) {
   await page.setViewportSize({ width, height: 900 });
   await page.goto("/");
   await page.getByText(/individuals/).first().waitFor();
+  if (ibd) {
+    // A file with IBD data, so the popover has its "IBD bars" section.
+    const file = path.resolve("../backend/tests/fixtures/flexqtl_binko/flexqtl_routeB_sim_small.ped.gz");
+    const form = new FormData();
+    form.append("dat_file", new Blob([zlib.gunzipSync(fs.readFileSync(file))]), "flexqtl_routeB_sim_small.ped");
+    expect((await fetch(`${backend}/api/load`, { method: "POST", body: form })).ok).toBe(true);
+    await page.reload();
+    await page.getByText(/individuals/).first().waitFor();
+  }
   await page.getByTitle("Settings").click();
   return page.getByRole("dialog", { name: "Settings" });
 }
 
-for (const width of [820, 1440]) {
-  test(`settings popover lays out within its box at ${width} px`, async ({ page }) => {
-    const popover = await openSettings(page, width);
+for (const [width, ibd] of [[820, false], [1440, false], [820, true], [1440, true]] as const) {
+  test(`settings popover lays out within its box at ${width} px${ibd ? ", with its IBD bars section" : ""}`, async ({ page }) => {
+    const popover = await openSettings(page, width, ibd);
     await expect(popover).toBeVisible();
     expect(await popover.evaluate(outside)).toEqual([]);
 
-    // Both number inputs are shown, whole, inside the popover.
+    // The number inputs and the palette choice are shown, whole, inside the popover.
     const box = (await popover.boundingBox())!;
-    for (const input of [page.getByLabel("Cross symbol size (px)"), page.getByLabel("Drawing limit")]) {
+    const inputs = [page.getByLabel("Cross symbol size (px)"), page.getByLabel("Drawing limit")];
+    // (Whether the section shows depends on the file the shared backend holds;
+    // the App tests check that a file without IBD data has none.)
+    if (ibd) inputs.push(page.getByLabel("Bar width (px)"), page.getByLabel("Palette"));
+    for (const input of inputs) {
       await expect(input).toBeVisible();
       const r = (await input.boundingBox())!;
       expect(r.width).toBeGreaterThan(30);

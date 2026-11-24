@@ -68,11 +68,14 @@ length is the group's map; its top is the group's start.
   hover lists them. The threshold is in chart units, not screen pixels, so the
   screen and the export (drawn at 100 %) merge the same segments. **The
   threshold therefore follows the bar width:** a bar *w* pixels wide merges
-  probabilities below 1/*w* of a homologue (below 0.1 with the default
-  10-pixel bar, below 0.05 at 20 pixels). Since the bar width decides which
-  probabilities are drawn separately, its setting (PR 4) must be prominent:
-  in the "Haplotypes" section of ⚙, next to the color scheme, with its effect
-  stated ("probabilities below 0.10 are drawn as one gray remainder").
+  probabilities below 1/*w* of a homologue (below 0.05 with the default
+  20-pixel bar, below 0.1 at 10 pixels). Since the bar width decides which
+  probabilities are drawn separately, its setting is prominent: in the "IBD
+  bars" section of ⚙, next to the palette, with its effect stated
+  ("Probabilities below 0.05 of a homologue are drawn as one gray
+  remainder"). The width ranges from 6 to 40 px; the default of 20 px was
+  chosen from renders at 10, 12, 14, 20 and 38 px (38 px being Pedimap 1.x's
+  10 mm at 96 dpi; its 25 mm height matches the 90 px bar height).
 - **Founders without data** have rows supplied by the parser (probability 1 on
   their own alleles), so their bars show their own two founder alleles, one per
   homologue, like every founder. Nothing extra is needed.
@@ -253,7 +256,11 @@ position"); sorting by name is a later option.
 
 ## 4. View settings
 
-The reserved fields are used, and a few are added:
+The reserved fields are used, and a few are added. In use so far (PR 4):
+`haplotype.barWidth` (default 20, 6 to 40) and `haplotype.colorScheme`
+("founder", the default, or "allele"; "highlight" comes later), stored per
+view with the other view settings, so they last across sessions; a stored
+value out of range or unknown takes the default. The rest are reserved.
 
 ```ts
 cellContents:     "name" | "name+markers" | "name+ibd" | "name+ibd+markers";
@@ -264,7 +271,7 @@ haplotype: {
   highlighted:   number[];            // founder alleles, at most 8
   markerColumns: { mostProbable: boolean; observed: boolean };
   thresholds:    { certain: number; likely: number };     // 0.95, 0.75
-  barWidth:      number;              // px per bar, default 10; sets the merge threshold (§1.1)
+  barWidth:      number;              // px per bar, 6 to 40, default 20; sets the merge threshold (§1.1)
   barHeight:     number;              // px, default 90
   markerTicks:   boolean;             // ticks at markers; default true
 }                                     // (ticks at IBD positions always shown)
@@ -272,8 +279,13 @@ haplotype: {
 
 Settings are per view (they move with the view when tabs land). A stored group
 or marker that the loaded file does not have falls back to the default. The
-settings appear in a new "Haplotypes" section of the ⚙ menu; the linkage group
-selector also appears in the toolbar while IBD is shown.
+settings appear in an "IBD bars" section of the ⚙ menu, shown when the file
+has IBD data: the bar width with the merge threshold it gives, and the palette,
+with the hint "With many founders, 'By founder allele' separates colors
+better" (measured on the FlexQTL fixture's 58 founder alleles: closest pair
+ΔE 5.34 by founder allele against 4.58 by founder; 13.23 against 13.53 for
+the 4 founders of G3_010). The linkage group selector also appears in the
+toolbar while IBD is shown.
 
 ## 5. Rendering
 
@@ -347,13 +359,13 @@ of data, scheme, group, selection or size.
 - **Founder-allele legend** below a top-to-bottom chart and at the right of a
   left-to-right one, after the legend of the active coloring; the page grows
   so it never covers the chart. Titled "Founder alleles, linkage group 1
-  (below 0.10 merged)", the value being the merge threshold of §1.1, so it
-  follows the bar width. Below its rows, "Below 0.10, merged" (the remainder
+  (below 0.05 merged)", the value being the merge threshold of §1.1, so it
+  follows the bar width. Below its rows, "Below 0.05, merged" (the remainder
   gray) and "No IBD data" (hatched) when the image has them. It lists only the
   founder alleles shown (§2.2):
-  - by founder: one row per founder, its name and two swatches labeled with
-    the allele numbers;
-  - by founder allele: one row per founder allele;
+  - by founder and by founder allele alike: one row per founder, its name and
+    a swatch for each of its founder alleles drawn, labeled with the allele
+    number, the swatches in fixed columns;
   - highlight: the highlighted alleles, then "Other founder alleles".
 
   At the right, more than 20 rows flow into columns; below, rows flow into as
@@ -432,8 +444,9 @@ fully tested, so the visible PRs build on settled numbers.
    waits instead of laying out a name-only chart first.
 3. **Export** of IBD mode: the founder-allele legend, and the PDF and PNG
    checks, with their WebKit test.
-4. **Color schemes and settings**: by founder allele, highlight (with legend
-   clicks), the "Haplotypes" ⚙ section and per-view persistence.
+4. **Settings**: the "IBD bars" ⚙ section with the bar width (default 20 px)
+   and the palette (by founder, by founder allele), per view and kept across
+   sessions. The highlight scheme (with legend clicks) follows in a later PR.
 5. **Markers in the box**: most probable allele with thresholds, observed
    genotypes with code swatches, label placement.
 
