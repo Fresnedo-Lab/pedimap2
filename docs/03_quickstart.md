@@ -1,29 +1,158 @@
-# Chapter 3 — Quickstart
+# Chapter 3 — Quick start
 
-## Overview
+This tutorial takes about ten minutes. It uses the example pedigree that
+comes with Pedimap 2, so you need no data of your own. You will open the
+example, read the chart, look at one plant in detail, color the chart by a
+trait, show the IBD bars, and save a figure.
 
-_Placeholder: brief statement that this chapter walks through loading a sample pedigree and exploring the main features in under five minutes._
+## Step 1: Open the example
 
-## Step 1 — Launch Pedimap 2
+Click **Load Example Data** in the toolbar.
 
-_Placeholder: describe launching the app and waiting for the Python backend to start (status indicator in the toolbar)._
+This is the apple pedigree that came with the original Pedimap: 8 plants in
+4 generations, two traits (`Color`, with values such as Red and Green, and
+`Length`, a number), 5 markers on 3 linkage groups, and IBD probabilities.
 
-## Step 2 — Load a Pedigree File
+![The example pedigree, just opened](images/window-overview.png)
 
-_Placeholder: click File → Open, select a .dat or .json pedigree file, and describe the loading confirmation message._
+The window now shows:
 
-## Step 3 — Explore the Graph
+- the **toolbar** at the top;
+- the **list of individuals** on the left, with each plant's cross type and
+  generation, and a search box above it;
+- the **chart** in the middle.
 
-_Placeholder: pan, zoom, and click nodes to inspect individual details in the sidebar._
+## Step 2: Read the chart
 
-## Step 4 — Apply a Trait Color Map
+- **Generations run from top to bottom.** The four founders (Cox, GoldenD,
+  IngridM and Jonathan, generation 0) are in the top row; their offspring are
+  in the rows below; 81015-045, in generation 3, is at the bottom.
+- **Each line joins a plant to one of its parents**, with the arrow pointing
+  to the offspring. The line from the **first parent** is red, the line from
+  the **second parent** is blue. In this file the parent columns are named
+  FEMALE and MALE, so the first parent is the female (the seed parent) and
+  the second the male. Files from FlexQTL and Binko.jl name their columns
+  PARENT1 and PARENT2 and do not state which parent is which sex. A plant
+  with a single parent (from selfing, for example) has one purple line.
+- **Lines never pass through a plant they do not connect.** A line that
+  spans more than one generation runs in a lane of its own.
 
-_Placeholder: open the Color panel, select a trait, and observe nodes colored by trait value._
+To move around:
 
-## Step 5 — Export the View
+- drag the background to move the chart, and scroll (or pinch) to zoom;
+- press **F**, or click **Fit to window**, to see the whole chart again;
+- drag a plant sideways to move it within its row.
 
-_Placeholder: use File → Export to save the current graph as a PNG or SVG._
+Hold the mouse over a plant to see its parents, generation and trait
+values.
 
-## Next Steps
+## Step 3: Look at one plant
 
-_Placeholder: pointers to Chapter 5 (Interface) and Chapter 6 (Visualization) for deeper exploration._
+Click **81015-045**, at the bottom of the chart (or click its name in the
+list on the left). The **details panel** opens on the right.
+
+![The details panel of 81015-045](images/details-panel.png)
+
+From top to bottom it shows:
+
+- **Parentage:** its parents, Elstar and Elise, labeled as the file names
+  them ("Female parent" and "Male parent" here). Click a parent's name to
+  move to that plant.
+- **Traits:** Color is Green; Length is 12.3, with a bar showing where 12.3
+  lies in the range of Length.
+- **Relatives:** 7 ancestors, no descendants, no siblings. Click a line to
+  list them.
+- **Markers:** the plant's two alleles at each marker, by linkage group,
+  with the genotype code of each as a small colored badge.
+- **IBD:** which founder each of its two chromosome copies comes from (see
+  Step 5).
+
+Click **×** at the top right of the panel to close it.
+
+## Step 4: Color the chart by a trait
+
+In the toolbar, choose **Color by: Length**.
+
+![The example colored by Length](images/color-by-trait.png)
+
+Each plant now takes a color between blue (the lowest Length) and red (the
+highest). Next to the menu, the toolbar shows the colors for **Low**,
+**High** and **Missing**; click one to choose another color.
+
+Choose **Color by: Color** to see the other trait: each value gets its own
+color, and values that are color names (Red, Green) are drawn in that color.
+
+Choose **Color by: None** to go back.
+
+## Step 5: Show the IBD bars
+
+The example file includes IBD probabilities: for each plant, the
+probability that each of its two chromosome copies descends from each of
+the founders' alleles, at a few positions along each linkage group.
+
+In the toolbar, choose **IBD bars: Linkage group A**.
+
+Every plant's box now holds two bars. Each bar is one chromosome copy
+(homologue), along linkage group A from 0 cM at the top to 29 cM at the
+bottom:
+
+- the **left bar** is the copy from the first parent, the **right bar** the
+  copy from the second parent;
+- each founder has its own color, in a light and a dark shade for its two
+  alleles: GoldenD orange, IngridM purple, Jonathan green, Cox pink;
+- where the founder is uncertain, the bar is split across its width in
+  proportion to the probabilities.
+
+The founders' own bars are a single color each: a founder carries its own
+two alleles.
+
+Now hold the mouse over the top of 81015-045's **left** bar, on its thin
+orange stripe:
+
+![81015-045's first homologue at 0 cM](images/ibd-bars-example.png)
+
+The tooltip reads "LG A, 0 cM · homologue from female parent · founder
+allele 1 (GoldenD) · 0.22". Move the mouse right, onto the purple part, and
+it reads founder allele 3 (IngridM), 0.78. So at 0 cM, the chromosome copy
+that 81015-045 received from Elstar descends from IngridM with probability
+0.78 and from GoldenD with probability 0.22. That fits the pedigree: Elstar
+is a cross of GoldenD and IngridM, and the data cannot tell for certain
+which of the two passed this segment on.
+
+The same numbers are in the details panel. Click 81015-045, scroll to
+**IBD**, and choose linkage group **A** and position **0 cM**:
+
+![The IBD section of the details panel](images/details-ibd.png)
+
+The copy from the second parent, Elise, is Jonathan's allele 6 with
+probability 1.00 at this position.
+
+To make the bars wider or to change the colors, click the **Settings**
+button (the gear at the top right) and use its **IBD bars** section
+([Chapter 6](06_visualization.md) explains how to read the bars in
+detail). Choose **IBD bars: Off** to go back to the plain chart.
+
+## Step 6: Save a figure
+
+Click **Export image…** in the toolbar.
+
+![The Export image dialog](images/export-dialog.png)
+
+1. Choose a format: **PNG** (a picture, at twice the screen resolution),
+   **SVG** (a drawing you can edit in Inkscape or Illustrator) or **PDF**
+   (for printing and publication; you can also choose the page size).
+2. Choose the background: **White**, for print, or **As on screen**.
+3. Click **Save…** and choose where to save the file.
+
+The image always shows the whole chart as displayed (all plants, colors and
+IBD bars), however far you have zoomed in, with a legend for the coloring
+and for the IBD bars.
+
+## Where next
+
+- To open your own data, click **Open File** and choose a `.dat`, `.ped`,
+  `.pmp` or `.json` file. [Chapter 4](04_file_formats.md) describes the
+  files Pedimap reads.
+- To learn every part of the window, see [Chapter 5](05_interface.md).
+- To read the colors and the IBD bars in depth, see
+  [Chapter 6](06_visualization.md).
