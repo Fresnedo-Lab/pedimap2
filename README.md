@@ -83,9 +83,9 @@ and precalculated IBD probabilities.
 | Details panel — parents, traits, expandable lists of relatives, marker genotypes with their codes, and the most probable founder alleles at each IBD position | ✅ |
 | Color by a marker — genotype code, or copies of an allele, with a legend | ✅ |
 | Marker data summary — loci, linkage groups, IBD positions, codes in use | ✅ |
-| IBD haplotype bars — each individual's two homologues along a linkage group, colored by founder or by founder allele, with hover details; bar width and palette in ⚙ | ✅ |
+| IBD haplotype bars — each individual's two homologues along a linkage group, colored by founder or by founder allele, with hover details and an on-screen legend of the founder alleles; bar width and palette in ⚙ | ✅ |
 | Fit to window — toolbar button or **F** | ✅ |
-| Opening `.json` pedigree files (Pedimap 2's own format); saving one from the app is planned | ✅ |
+| Save as JSON — the whole population with all of its data, in Pedimap 2's own format ([described here](docs/reference/json-format.md)); opened again, it gives the same data | ✅ |
 | Legacy `.dat` export — whole population or displayed subpopulation; reads back unchanged | ✅ |
 | Image export — PNG, SVG or PDF of the whole displayed chart, with the trait legend and the founder-allele legend of the IBD bars, on white or as on screen | ✅ |
 | Drawing limit — populations above 1,000 individuals (⚙) are listed, not drawn | ✅ |
@@ -341,6 +341,7 @@ users never install Python.
 - [x] Color by genotype code or allele copies at a marker, with a legend (2.3.0)
 - [x] Names readable on every fill (WCAG AA contrast), on screen and in exports (2.3.0)
 - [x] IBD haplotype bars on the chart per linkage group, with a founder-allele legend in image exports and settings for bar width and palette (2.4.0)
+- [x] On-screen legend of the founder alleles; Save as JSON (2.5.0)
 
 ---
 

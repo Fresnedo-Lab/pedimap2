@@ -88,9 +88,24 @@ population's founder alleles, and says so in a comment line. Its founders'
 alleles may therefore belong to founders that are not in the file. Pedimap 2
 reads such files; whether Pedimap 1.x does has not been tested.
 
+## Saving the pedigree as JSON
+
+Click **Save as JSON** in the toolbar, then choose where to save the file.
+Pedimap suggests a name from the pedigree's name, for example `Apples.json`.
+
+The file holds the **whole population** with all of its data: the pedigree,
+every trait value, the marker genotypes with their codes, the IBD
+probabilities, and what Pedimap read from the original file's header.
+Opening it again gives the same data. It is saved in UTF-8.
+
+Save as JSON always saves the whole population, also while a subpopulation
+is shown. To save a subpopulation, use **Export subpopulation (.dat)**.
+
+The [JSON format reference](reference/json-format.md) describes every field,
+for anyone who wants to read or write such files with other software.
+
 ## What Pedimap does not save yet
 
-- **JSON files.** Pedimap opens `.json` files but cannot yet save one.
 - **Changes to the data.** Pedimap shows your data; it does not edit it. To
   correct a name or a value, edit the data file and open it again.
 - **Printing.** Save a PDF and print it from your PDF viewer.

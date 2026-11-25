@@ -146,9 +146,15 @@ specification](reference/flexqtl-binko-pedimap/README.md) describes:
 
 ## JSON files (.json)
 
-A `.json` file holds a pedigree in Pedimap 2's own format, with all of its
-data. Pedimap opens such files, but cannot yet save one: to keep a pedigree,
-export it as a `.dat` file ([Chapter 7](07_data_export.md)).
+A `.json` file holds a whole population in Pedimap 2's own format, with all
+of its data: the pedigree, traits, marker genotypes with their codes, and IBD
+probabilities. Pedimap opens such files and saves them (**Save as JSON**,
+[Chapter 7](07_data_export.md)); opening a saved file gives the same data.
+The format is described in the [JSON format reference](reference/json-format.md),
+for anyone who wants to read or write it with other software.
+
+A file saved by a newer Pedimap 2, in a later version of the format, opens
+with a warning that some of its data may not be shown.
 
 ## Project files (.pmp)
 

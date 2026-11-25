@@ -119,6 +119,8 @@ test("ibd-bars-example.png: linkage group A, the mouse on 81015-045 at 0 cM", as
   await loadExample(page);
   await page.getByLabel("IBD bars").selectOption("A");
   await settle(page);
+  // This one is about the tooltip; the legend has its own screenshot.
+  await page.getByRole("group", { name: "Founder alleles" }).getByRole("button").click();
   const b = (await boxOf(page, "81015-045"))!;
   // In the box (lib/haplotype.ts, haplotypeBox, default settings): the first
   // homologue's bar starts BOX.gap/2 + barWidth left of the middle, below the
@@ -133,9 +135,11 @@ test("ibd-bars-example.png: linkage group A, the mouse on 81015-045 at 0 cM", as
   await page.mouse.move(x, y);
   await page.waitForTimeout(400);
   await expect(page.getByText(/0\.22/)).toBeVisible();
+  // The box, the lines into it and the tooltip; starting just left of the
+  // box keeps the legend in the chart's corner out of the picture.
   const pad = 140;
   await page.screenshot({ path: out("ibd-bars-example.png"),
-    clip: { x: Math.max(0, b.left - pad), y: Math.max(0, b.top - pad), width: b.width + 2 * pad + 220, height: b.height + 2 * pad } });
+    clip: { x: b.left - 30, y: Math.max(0, b.top - pad), width: b.width + 30 + pad + 220, height: b.height + pad + 30 } });
 });
 
 test("details-ibd.png: the IBD section of 81015-045, group A at 0 cM", async ({ page }) => {
@@ -243,6 +247,8 @@ test("flexqtl-by-founder.png, flexqtl-by-allele.png: the same part of the chart 
   await loadFixture(page, FLEXQTL);
   await page.getByLabel("IBD bars").selectOption({ index: 1 });            // linkage group 1
   await settle(page);
+  // The legend has its own screenshot; collapsed, it covers none of the boxes.
+  await page.getByRole("group", { name: "Founder alleles" }).getByRole("button").click();
   // Zoom in on generations 2 and 3, around G3_010, and keep ten boxes of each.
   await zoomAt(page, "G3_010", 9);
   const ids = ["G2", "G3"].flatMap(g => Array.from({ length: 10 }, (_, i) => `${g}_${String(i + 6).padStart(3, "0")}`));
@@ -254,6 +260,14 @@ test("flexqtl-by-founder.png, flexqtl-by-allele.png: the same part of the chart 
   await page.getByTitle("Settings").click();                 // close it again
   await restMouse(page);
   await page.screenshot({ path: out("flexqtl-by-allele.png"), clip: area });
+});
+
+test("ibd-legend.png: the example with IBD bars and the founder-allele legend", async ({ page }) => {
+  await loadExample(page);
+  await page.getByLabel("IBD bars").selectOption("A");
+  await settle(page);
+  await expect(page.getByRole("group", { name: "Founder alleles" })).toBeVisible();
+  await page.screenshot({ path: out("ibd-legend.png"), clip: await chartArea(page) });
 });
 
 // ── Chapters 7 and 8: subpopulations, export, large pedigrees ────────────────

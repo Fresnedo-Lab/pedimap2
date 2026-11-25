@@ -54,7 +54,8 @@ first parent and blue the line from the second. Files from FlexQTL and
 Binko.jl name the columns `PARENT1` and `PARENT2` and do not state the
 parents' sex; files with `FEMALE` and `MALE` columns do, and there the first
 parent is the female. A file may also list `MALE` before `FEMALE`: the
-female's line is then still red.
+female's line is then still red. Data that does not name its parent columns,
+such as the demo data, calls its parents "Parent 1" and "Parent 2".
 
 **Cross symbols.** When cross symbols are on (**Settings → Show cross
 symbols**), the lines from the two parents meet at a ×, and one line runs
@@ -191,8 +192,14 @@ apart for the three main kinds of color blindness as well. With dozens of
 founders, some colors are still alike; hold the mouse over a segment, or
 look at the details panel, to be sure.
 
-In an exported image, a legend lists each founder with the numbers and
-colors of its founder alleles ([Chapter 7](07_data_export.md)).
+A **legend** at the lower left of the chart lists each founder with the
+numbers and colors of its founder alleles, the gray of merged small
+probabilities when there is any, and in its title the linkage group and the
+probability below which segments are merged. It shows the same rows as the
+legend of an exported image ([Chapter 7](07_data_export.md)). Click its title
+to collapse it; Pedimap remembers your choice.
+
+![The founder-allele legend of the example, linkage group A](images/ibd-legend.png)
 
 ### The gray remainder and the bar width
 

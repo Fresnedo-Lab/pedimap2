@@ -3,7 +3,7 @@
 Pedimap 2 draws the pedigrees of plant breeding populations, with their
 trait values, marker genotypes and IBD probabilities. This manual is for
 breeders and geneticists who use it; you need no programming. It describes
-Pedimap 2.4.
+Pedimap 2.5.
 
 ## Contents
 

@@ -10,6 +10,27 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-11-25
+
+### Added
+- **A legend of the founder alleles on screen.** While IBD bars are shown, a
+  legend at the lower left of the chart lists each founder with the numbers
+  and colors of its founder alleles, as the legend of an exported image does,
+  above the legend of a discrete coloring. Click its title to collapse it;
+  Pedimap remembers your choice.
+- **Save as JSON** saves the whole population with all of its data (pedigree,
+  traits, marker genotypes and codes, IBD probabilities) as a Pedimap 2 JSON
+  file; opening it again gives the same data. The format is described in
+  `docs/reference/json-format.md`, and files carry a format version: a file
+  from a newer Pedimap 2 opens with a warning that some data may not be shown.
+  To save a subpopulation, use Export subpopulation (.dat).
+
+### Changed
+- Data that does not name its parent columns, such as the demo data, labels
+  its parents "Parent 1" and "Parent 2" instead of "Female parent" and "Male
+  parent", since it does not state their sex. Its `.dat` export writes the
+  columns as `PARENT1` and `PARENT2`.
+
 ## [2.4.0] — 2026-11-24
 
 Pedimap 2 now draws IBD haplotypes on the chart. For a file with IBD
@@ -308,7 +329,8 @@ _2.1.1 was built but never released (macOS backend failed to start)._
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.2.2...v2.3.0

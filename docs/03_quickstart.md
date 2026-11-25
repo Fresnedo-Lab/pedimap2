@@ -102,7 +102,8 @@ bottom:
 - the **left bar** is the copy from the first parent, the **right bar** the
   copy from the second parent;
 - each founder has its own color, in a light and a dark shade for its two
-  alleles: GoldenD orange, IngridM purple, Jonathan green, Cox pink;
+  alleles: GoldenD orange, IngridM purple, Jonathan green, Cox pink. A legend
+  at the lower left of the chart lists them; click its title to collapse it;
 - where the data cannot tell which founder allele a segment comes from, the
   bar is split across its width in proportion to the probabilities. A split
   shows **uncertainty, not a mixture**: each segment of a homologue descends

@@ -18,6 +18,7 @@ the **details panel** on the right.
 | **Demo Data** | Shows the small made-up demo pedigree that Pedimap starts with |
 | **Load Example Data** | Opens the example apple pedigree of [Chapter 3](03_quickstart.md) |
 | **Export .dat** | Saves the pedigree as a `.dat` file. While a subpopulation is shown, it reads **Export subpopulation (.dat)** ([Chapter 7](07_data_export.md)) |
+| **Save as JSON** | Saves the whole population, with all of its data, as a Pedimap 2 JSON file ([Chapter 7](07_data_export.md)) |
 | **Export image…** | Saves the chart as a PNG, SVG or PDF image ([Chapter 7](07_data_export.md)) |
 | **Orientation** | **Top to bottom** (generations as rows) or **Left to right** (generations as columns) |
 | **Modern** / **Classic Pedimap** | The display style ([Chapter 6](06_visualization.md)) |
@@ -56,6 +57,11 @@ the **details panel** on the right.
 - Drag an individual sideways to move it within its row. It cannot pass its
   neighbors in the row, so lines keep clear of every box.
 
+**Legends** sit at the lower left of the chart: the legend of a discrete
+coloring, and above it, while IBD bars are shown, the legend of the founder
+alleles. Click the founder-allele legend's title to collapse it to that
+title; Pedimap remembers your choice.
+
 A large pedigree takes a moment to arrange; Pedimap then shows "Laying
 out…" first. Above the drawing limit, the individuals are listed instead of
 drawn ([Chapter 8](08_advanced.md)).
@@ -75,8 +81,9 @@ The panel shows everything known about the selected individual. Under its
 name: its generation, its cross type and its ploidy.
 
 - **Parentage:** its two parents, labeled as the file names them ("Female
-  parent" and "Male parent", or "Parent 1" and "Parent 2"). Click a parent to
-  select it.
+  parent" and "Male parent", or "Parent 1" and "Parent 2"). Data that does not
+  name its parent columns, such as the demo data, has "Parent 1" and "Parent
+  2". Click a parent to select it.
 - **Traits:** each trait value; a continuous value with a bar showing where it
   lies in the trait's range.
 - **Relatives:** the numbers of ancestors, descendants and siblings. Click a
