@@ -69,7 +69,7 @@ and precalculated IBD probabilities.
 | Generation-aware hierarchical layout | ✅ |
 | Orientation toggle — top-to-bottom / left-to-right | ✅ |
 | Display styles — Modern, or Classic Pedimap (rectangles with the name on top, pale yellow fill) | ✅ |
-| Parent links colored by role — female red, male blue, single-parent (`*SELF`, `*DH`, `*MUT`, `*VP`) purple | ✅ |
+| Parent links colored by role — first parent red, second parent blue, single parent (`*SELF`, `*DH`, `*MUT`, `*VP`) purple. With FEMALE/MALE columns the first parent is the female (a file listing MALE first still draws the female red); FlexQTL and Binko files (PARENT1/PARENT2) do not state sex | ✅ |
 | Cross symbols — one × per parent pair, shared by full sibs; on in Classic, off in Modern (⚙ to change or resize) | ✅ |
 | Link routing — a link never runs through an individual or × it does not connect; links spanning generations get their own lane | ✅ |
 | Trait coloring — continuous gradient and qualitative palette | ✅ |
@@ -85,7 +85,7 @@ and precalculated IBD probabilities.
 | Marker data summary — loci, linkage groups, IBD positions, codes in use | ✅ |
 | IBD haplotype bars — each individual's two homologues along a linkage group, colored by founder or by founder allele, with hover details; bar width and palette in ⚙ | ✅ |
 | Fit to window — toolbar button or **F** | ✅ |
-| JSON export / import round-trip | ✅ |
+| Opening `.json` pedigree files (Pedimap 2's own format); saving one from the app is planned | ✅ |
 | Legacy `.dat` export — whole population or displayed subpopulation; reads back unchanged | ✅ |
 | Image export — PNG, SVG or PDF of the whole displayed chart, with the trait legend and the founder-allele legend of the IBD bars, on white or as on screen | ✅ |
 | Drawing limit — populations above 1,000 individuals (⚙) are listed, not drawn | ✅ |
@@ -100,8 +100,8 @@ and precalculated IBD probabilities.
 - Observed marker alleles with their genotype codes
 
 The parser also reads the linkage group maps and the founder allele
-definitions (`FOUNDERALLELES`); they survive a JSON round-trip, but no
-interface shows them yet.
+definitions (`FOUNDERALLELES`); they are kept with the data and in `.dat`
+exports, but no interface shows them yet.
 
 ### Not yet implemented
 
@@ -330,7 +330,7 @@ users never install Python.
 - [x] In-app update check and install (ⓘ About → Check for updates; from 2.1.2 on)
 - [x] Subpopulation `.dat` export, with parents outside it kept as founders (2.2.0)
 - [x] Classic Pedimap display style (2.2.0)
-- [x] Sex-colored parent links — female red, male blue, single-parent purple (2.2.0)
+- [x] Parent links colored by role — first parent red, second parent blue, single parent purple (2.2.0)
 - [x] Cross symbols — one × per parent pair, shared by full sibs (2.2.0)
 - [x] Image export — SVG, PDF and PNG (2.2.0)
 - [x] Editable low / high / missing colors for continuous traits (2.2.0)

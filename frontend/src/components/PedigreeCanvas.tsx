@@ -187,8 +187,13 @@ interface VisInternals {
   body: { emitter: { on(event: string, handler: () => void): void } };
 }
 
-/** What the WebKit tests may read of the chart: its zoom, nothing else. */
-interface ChartProbe { getScale(): number }
+/** What the WebKit tests and the manual's screenshot script may read of the
+ *  chart: its zoom, and where an individual's box is on the page. Read only. */
+interface ChartProbe {
+  getScale(): number;
+  /** The box of individual `id` in page pixels, or null if it is not drawn. */
+  boxOf(id: string): { left: number; top: number; width: number; height: number } | null;
+}
 const chartWindow = window as Window & { __pedimapChart?: ChartProbe; __PEDIMAP_E2E__?: boolean };
 
 // Displayed in place of an absent parent. The .dat UNKNOWN symbol is not
@@ -614,7 +619,21 @@ const PedigreeCanvas = forwardRef<PedigreeCanvasHandle, Props>(function Pedigree
       networkRef.current = network;
       // Exists only for the end-to-end tests, which set __PEDIMAP_E2E__ (e2e/keyboard.spec.ts).
       if (chartWindow.__PEDIMAP_E2E__ === true) {
-        const probe: ChartProbe = { getScale: () => net.getScale() };
+        const probe: ChartProbe = {
+          getScale: () => net.getScale(),
+          boxOf: id => {
+            if (!nodesDS.current.get(id)) return null;
+            // A haplotype box as drawn (vis-network's own bounding box of a
+            // custom shape lags behind); other nodes as vis-network has them.
+            const hb = boxesRef.current?.[id];
+            const c = net.getPosition(id);
+            const b = hb ? { left: c.x - hb.width / 2, right: c.x + hb.width / 2, top: c.y - hb.height / 2, bottom: c.y + hb.height / 2 }
+                         : net.getBoundingBox(id);
+            const frame = container.getBoundingClientRect();
+            const a = net.canvasToDOM({ x: b.left, y: b.top }), z = net.canvasToDOM({ x: b.right, y: b.bottom });
+            return { left: frame.left + a.x, top: frame.top + a.y, width: z.x - a.x, height: z.y - a.y };
+          },
+        };
         chartWindow.__pedimapChart = probe;
         removeProbe = () => { if (chartWindow.__pedimapChart === probe) delete chartWindow.__pedimapChart; };
       }

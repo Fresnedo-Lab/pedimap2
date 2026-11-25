@@ -254,7 +254,7 @@ export default function IndividualPanel({
   };
 
   return (
-    <div style={{
+    <div role="complementary" aria-label="Details" style={{
       position: "absolute", right: 12, top: 52, bottom: 12,
       width: 300, background: "#161b27",
       border: "1px solid #2e3a52", borderRadius: 10,

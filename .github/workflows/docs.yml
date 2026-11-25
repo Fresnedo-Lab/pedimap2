@@ -4,6 +4,8 @@
 #
 # Triggers:
 #   • push to main that touches docs/ or CHANGELOG.md → build, upload artifact
+#   • pull request that touches docs/, CHANGELOG.md or this file → the same,
+#     so the PDF (with its images) can be reviewed before merging
 #   • workflow_call from release.yml                 → same build; the release
 #     workflow's publish job downloads the artifact and attaches it to the
 #     release as Pedimap2-VERSION-User-Manual.pdf
@@ -21,6 +23,11 @@ on:
     paths:
       - 'docs/**'
       - 'CHANGELOG.md'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'CHANGELOG.md'
+      - '.github/workflows/docs.yml'
   workflow_call:
 
 permissions:
@@ -46,6 +53,11 @@ jobs:
 
       # ── Build PDF ──────────────────────────────────────────────────────────
       # Chapters are concatenated in order; README.md is used as the title page.
+      # Images are referenced from the chapters as images/…, relative to docs/;
+      # pdf-links.lua turns links between chapter files into links within the
+      # one document; pdf-symbols.lua writes the few symbols the fonts lack
+      # (⚙, 🖼, ⓘ) as words; pdf-changelog.lua leaves out the CHANGELOG's
+      # paragraph for maintainers about the release workflow.
       - name: Build pedimap2-manual.pdf
         run: |
           pandoc \
@@ -60,6 +72,10 @@ jobs:
             docs/08_advanced.md \
             docs/09_faq.md \
             CHANGELOG.md \
+            --resource-path=.:docs \
+            --lua-filter=docs/pdf-links.lua \
+            --lua-filter=docs/pdf-symbols.lua \
+            --lua-filter=docs/pdf-changelog.lua \
             --pdf-engine=xelatex \
             --toc \
             --toc-depth=2 \
