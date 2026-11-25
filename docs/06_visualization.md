@@ -138,9 +138,25 @@ position.
 ### Colors: which founder allele
 
 Across its width, a band is split into **segments**, one for each founder
-allele with a probability, as wide as its probability. Segments come in
-founder-allele order, so a change of color from one band to the next shows a
-recombination, not a reshuffle.
+allele with a probability, as wide as its probability.
+
+**A split band shows uncertainty, not a mixture.** At any point, a homologue
+descends from exactly one founder allele; the segments show how likely each
+one is. A band split 0.78 and 0.22 between IngridM's and GoldenD's alleles
+means "probably IngridM's", not "a blend of the two".
+
+Segments come in founder-allele order, so a change of color from one band to
+the next stands for a change of founder allele along the homologue, not a
+reshuffle of the drawing.
+
+- A **clear change** from one founder allele to another (a band of one
+  color followed by a band of another) marks a **recombination** in the line
+  of descent: in the meiosis of the parent that passed this homologue on, or
+  in an earlier generation.
+- A band whose segments only **shift in proportion** from the band before
+  (0.9 and 0.1 becoming 0.6 and 0.4, say) means that a recombination **may**
+  have occurred in that interval: the analysis cannot place it with
+  certainty.
 
 Where the bar is a single color, the homologue descends from that founder
 allele with certainty. A founder's own bars are one color each: a founder
@@ -171,7 +187,7 @@ Choose the palette under **Settings → IBD bars → Palette**:
 Colors are shared out over the founders whose alleles occur in the
 individuals shown. A subpopulation with few founders therefore gets colors
 that differ more than the whole population's. The colors were chosen to stay
-apart for the three common kinds of color blindness as well. With dozens of
+apart for the three main kinds of color blindness as well. With dozens of
 founders, some colors are still alike; hold the mouse over a segment, or
 look at the details panel, to be sure.
 

@@ -109,7 +109,10 @@ individual on them:
   founder allele.
 
 `NALLELES` must then be the number of founder alleles: two per founder in a
-diploid population. IBD probabilities are supported for diploids only.
+diploid population. IBD probabilities are supported for diploids only: a
+file with IBD probabilities and a `PLOIDY` other than 2 is refused ("IBD data
+for ploidy 4 is not supported yet"). Displaying IBD probabilities for
+polyploids is not available yet.
 
 Files with markers or IBD probabilities are usually written by software, such
 as FlexQTL or Binko.jl, not by hand. The [format

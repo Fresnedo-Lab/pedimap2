@@ -114,9 +114,13 @@ available yet:
 | An **information panel** that follows the mouse | A hover box, and the details panel on a click |
 | **Marker scores** and **most probable alleles** inside the boxes | Shown in the details panel, not yet in the boxes |
 | **IBD probabilities** inside the boxes | **IBD bars**, with two palettes and an adjustable width |
+| An **on-screen legend** of the IBD colors | In exported images only; not yet on screen |
+| **IBD probabilities for polyploids** | Diploids only; a file with IBD data and another ploidy is refused |
+| A sortable **table of individuals** with their data | A list of names with a search box, and the details panel |
 | Adjustable **spacing** between generations and individuals | Not adjustable yet |
 | **Projects** (`.pmp`) saved and opened | `.pmp` opened for the population name only; not saved |
 | The FlexQTL tools **Add semifounder parents** and **Impute missing founder alleles** | Not available |
+| **Export to FlexQTL's input format**, with semifounder handling | Not available |
 | Printing | Save a PDF and print it |
 | Windows only | macOS, Windows and Linux |
 
@@ -166,7 +170,8 @@ at a marker: 0, 1 or 2 in a diploid.
 **Band** — the stretch of an IBD bar colored by the probabilities at one IBD
 position.
 
-**cM (centimorgan)** — the unit of the positions on a linkage group's map.
+**cM (centimorgan)** — the unit of map distance on a linkage group: over a
+short distance, 1 cM corresponds to about 1% recombination between two loci.
 
 **Continuous trait** — a trait with measured values (`105`, `7.4`).
 
@@ -185,7 +190,9 @@ parent, named for example `DUMMY_G1_007_F`.
 **FACTOR0** — a column in FlexQTL and Binko files giving each individual's
 place in the pedigree: 0 founder, 1 with offspring, 2 without.
 
-**Founder** — an individual whose parents are both unknown.
+**Founder** — an individual whose parents are both unknown. Founders are
+assumed to be unrelated, so each founder's alleles count as distinct founder
+alleles, even where two of them are the same marker allele.
 
 **Founder allele** — one of the founders' alleles, numbered across all
 founders: founder 1 has founder alleles 1 and 2, founder 2 has 3 and 4, and so
@@ -201,18 +208,27 @@ parents' generations.
 file. In FlexQTL and Binko files it says how the genotype was obtained
 (Appendix B); otherwise it is a color code.
 
+**Haplotype** — the combination of alleles along one homologue. An IBD bar
+shows a homologue's haplotype in terms of founder alleles.
+
 **Homologue** — one of an individual's two copies of a chromosome (linkage
 group), one from each parent.
 
-**IBD (identity by descent)** — the inheritance of a chromosome segment from a
-common ancestor. IBD probabilities give, for each position and homologue, the
-probability of descending from each founder allele.
+**IBD (identity by descent)** — two alleles are identical by descent when they
+are copies of the same ancestral allele. Pedimap's IBD probabilities give, for
+each position and homologue, the probability that the homologue's allele there
+is a copy of each founder allele.
 
 **IBD bar** — the drawing of one homologue's IBD probabilities along a
 linkage group, inside an individual's box.
 
 **IBD position** — a position on a linkage group at which the file gives IBD
 probabilities.
+
+**Identical by state (IBS)** — alleles that are the same marker allele,
+whether or not they are copies of the same ancestral allele. In the example
+pedigree, GoldenD's founder allele 1 and IngridM's founder allele 3 are both
+SSR1 allele 180: identical by state, but distinct founder alleles.
 
 **Linkage group** — a group of markers on one chromosome, with their map
 positions.
@@ -223,6 +239,18 @@ pixels.
 
 **Palette** — the set of colors for founder alleles: **By founder** or **By
 founder allele**.
+
+**Recombination (crossover)** — the exchange of segments between the two
+homologues of a parent during meiosis, so that the homologue it passes on
+combines pieces of both. Along an IBD bar, a clear change from one founder
+allele to another marks a recombination in the line of descent; a band whose
+proportions only shift from the band before means that a recombination may
+have occurred in that interval, which the analysis cannot place with
+certainty.
+
+**Semifounder** — an individual with one known and one unknown parent. For an
+IBD analysis, the unknown parent is usually stood in for by a founder without
+data, such as Binko.jl's dummy founders.
 
 **Single-parent descent** — an individual from one parent: selfing (`*SELF`),
 a doubled haploid (`*DH`), a mutant (`*MUT`) or vegetative propagation

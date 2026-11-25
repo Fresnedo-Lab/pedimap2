@@ -12,6 +12,8 @@ Click **Load Example Data** in the toolbar.
 This is the apple pedigree that came with the original Pedimap: 8 plants in
 4 generations, two traits (`Color`, with values such as Red and Green, and
 `Length`, a number), 5 markers on 3 linkage groups, and IBD probabilities.
+The cultivar names are real, but the relationships, trait values and
+genotypes in this example are fictitious.
 
 ![The example pedigree, just opened](images/window-overview.png)
 
@@ -101,8 +103,11 @@ bottom:
   copy from the second parent;
 - each founder has its own color, in a light and a dark shade for its two
   alleles: GoldenD orange, IngridM purple, Jonathan green, Cox pink;
-- where the founder is uncertain, the bar is split across its width in
-  proportion to the probabilities.
+- where the data cannot tell which founder allele a segment comes from, the
+  bar is split across its width in proportion to the probabilities. A split
+  shows **uncertainty, not a mixture**: each segment of a homologue descends
+  from exactly one founder allele, and the split shows how likely each one
+  is.
 
 The founders' own bars are a single color each: a founder carries its own
 two alleles.
@@ -115,10 +120,17 @@ orange stripe:
 The tooltip reads "LG A, 0 cM · homologue from female parent · founder
 allele 1 (GoldenD) · 0.22". Move the mouse right, onto the purple part, and
 it reads founder allele 3 (IngridM), 0.78. So at 0 cM, the chromosome copy
-that 81015-045 received from Elstar descends from IngridM with probability
-0.78 and from GoldenD with probability 0.22. That fits the pedigree: Elstar
-is a cross of GoldenD and IngridM, and the data cannot tell for certain
-which of the two passed this segment on.
+that 81015-045 received from Elstar descends either from IngridM's allele 3
+or from GoldenD's allele 1: probably IngridM's (0.78), possibly GoldenD's
+(0.22). It is one or the other, not a blend of both.
+
+Why can the data not tell? Elstar is a cross of GoldenD and IngridM, so this
+segment came from one of them. The marker at 0 cM is SSR1, and on this
+homologue 81015-045 carries SSR1 allele 180. Both GoldenD's founder allele 1
+and IngridM's founder allele 3 are allele 180 (the file's `FOUNDERALLELES`
+line for SSR1 says so): they are **identical by state**, so SSR1 cannot tell
+them apart. The probabilities themselves come from the analysis that
+produced the file.
 
 The same numbers are in the details panel. Click 81015-045, scroll to
 **IBD**, and choose linkage group **A** and position **0 cM**:
@@ -126,7 +138,8 @@ The same numbers are in the details panel. Click 81015-045, scroll to
 ![The IBD section of the details panel](images/details-ibd.png)
 
 The copy from the second parent, Elise, is Jonathan's allele 6 with
-probability 1.00 at this position.
+probability 1.00 at this position. This homologue carries SSR1 allele 202,
+and among the eight founder alleles only Jonathan's allele 6 is 202.
 
 To make the bars wider or to change the colors, click the **Settings**
 button (the gear at the top right) and use its **IBD bars** section
