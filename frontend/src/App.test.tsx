@@ -165,6 +165,33 @@ describe("exported file names", () => {
   });
 });
 
+describe("Save as JSON", () => {
+  it("saves the whole population's JSON, as the backend writes it, under the population's name", async () => {
+    const json = '{"format": "pedimap2-json", "format_version": 1, "population": "Synthetic"}';
+    serve(pedigreeOf(4), undefined, "Synthetic", {
+      "/api/export/json": () => new Response(json, { headers: { "Content-Type": "application/json" } }),
+    });
+    const url = URL as unknown as Record<string, unknown>;   // jsdom has no object URLs
+    const blobs: Blob[] = [];
+    url.createObjectURL = (b: Blob) => { blobs.push(b); return "blob:x"; };
+    url.revokeObjectURL = () => {};
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) { names.push(this.download); });
+    render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    const button = screen.getByRole("button", { name: "Save as JSON" });
+    expect(button.getAttribute("title")).toMatch(/^Save the whole population/);
+    fireEvent.click(button);
+    await vi.waitFor(() => expect(names).toEqual(["Synthetic.json"]));
+    expect(await blobs[0].text()).toBe(json);
+    expect(blobs[0].type).toMatch(/^application\/json/);
+    click.mockRestore();
+    delete url.createObjectURL;
+    delete url.revokeObjectURL;
+  });
+});
+
 describe("color by a marker", () => {
   it("by genotype code or copies of an allele, with a legend", async () => {
     const marker = { name: "M1", linkage_group: "1", position_cM: 0 };

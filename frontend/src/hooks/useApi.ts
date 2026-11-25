@@ -224,6 +224,8 @@ export interface ApiClient {
   listDemo():                              Promise<{datasets: {name: string; description: string}[]}>;
   loadDemo(name: string):                  Promise<LoadResult>;
   exportDat(req?: DatExportRequest):       Promise<string>;
+  /** The whole population as Pedimap 2 JSON (docs/reference/json-format.md). */
+  exportJson():                            Promise<string>;
   reset():                                 Promise<void>;
 }
 
@@ -301,6 +303,7 @@ const client: ApiClient = {
   },
   listDemo: ()     => apiFetch("/api/demo/list"),
   loadDemo: (name) => apiFetch(`/api/demo/load/${encodeURIComponent(name)}`),
+  exportJson: () => apiFetchText("/api/export/json"),
   exportDat: (req = {}) => apiFetchText("/api/export/dat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

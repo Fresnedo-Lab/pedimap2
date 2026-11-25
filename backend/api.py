@@ -327,10 +327,9 @@ async def load_file(
     files = [{"name": fname, "encoding": dat_encoding}]
 
     if fname.lower().endswith(".json"):
-        data = json.loads(dat_text)
-        _engine = PedigreeEngine.from_dict(data)
+        _engine, warnings = _read_json(dat_text)
         return {"loaded": "json", "individuals": _engine.count(),
-                "encoding": dat_encoding, "files": files}
+                "encoding": dat_encoding, "files": files, "warnings": warnings}
 
     # .dat / .pmp path — needs pmp_parser
     try:
@@ -426,9 +425,40 @@ def demo_load(name: str):
             "encoding": dat_encoding, "files": files, "warnings": result.warnings}
 
 
+# Pedimap 2's JSON format (docs/reference/json-format.md). The version rises
+# only when a reader of the previous version would misread the file.
+JSON_FORMAT = "pedimap2-json"
+JSON_FORMAT_VERSION = 1
+
+
 @app.get("/api/export/json")
 def export_json():
-    return JSONResponse(_engine.to_dict())
+    """The whole population, with all of its data, as Pedimap 2 JSON."""
+    return JSONResponse({"format": JSON_FORMAT, "format_version": JSON_FORMAT_VERSION,
+                         **_engine.to_dict()})
+
+
+def _read_json(text: str) -> tuple:
+    """(engine, warnings) from Pedimap 2 JSON. A file without "format" is
+    the JSON of Pedimap 2.4 and earlier, read as version 1. A file of a later
+    version is read as far as this version understands it, with a warning."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(400, f"Not a JSON file: {exc.msg} (line {exc.lineno}).")
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Not a Pedimap 2 JSON file: it does not hold a pedigree.")
+    fmt = data.get("format", JSON_FORMAT)
+    if fmt != JSON_FORMAT:
+        raise HTTPException(400, f"Not a Pedimap 2 JSON file (its format is {fmt!r}).")
+    warnings = []
+    version = data.get("format_version", JSON_FORMAT_VERSION)
+    if isinstance(version, int) and version > JSON_FORMAT_VERSION:
+        warnings.append(
+            f"This file is in Pedimap 2 JSON format version {version}, from a newer Pedimap 2; "
+            f"this version reads version {JSON_FORMAT_VERSION}, so some of its data may not be "
+            "shown. Update Pedimap 2 to see all of it.")
+    return PedigreeEngine.from_dict(data), warnings
 
 
 class DatExportRequest(BaseModel):

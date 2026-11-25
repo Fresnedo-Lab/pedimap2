@@ -579,6 +579,17 @@ export default function App() {
     }
   }, [api, subpop, graphData, replaceOutside, pedigree]);
 
+  // ── Save as JSON: always the whole population, with all of its data ──────
+  const saveJson = useCallback(async () => {
+    try {
+      const text = await api.exportJson();
+      await saveTextFile(`${exportBaseName(pedigree?.population)}.json`, text, "application/json");
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [api, pedigree]);
+
   // ── Chart model, drawing limit, image export ─────────────────────────────
   const chartModel = useMemo(
     () => (graphData ? buildChartModel(graphData, showCrossSymbols) : null),
@@ -781,6 +792,13 @@ export default function App() {
             </div>
           )}
         </div>
+
+        <button onClick={() => void saveJson()}
+          title={"Save the whole population, with all of its data, as a Pedimap 2 JSON file" +
+            (subpop ? ". To save the displayed subpopulation, use Export subpopulation (.dat)." : ".")}
+          style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
+          Save as JSON
+        </button>
 
         <button onClick={() => setImageDialogOpen(true)}
           disabled={!chartModel || tooLargeToDraw || graphLoading}
