@@ -46,6 +46,7 @@ import { markerColoring, type MarkerColoringChoice, type MarkerColoringMode } fr
 import { BAR_WIDTH, DEFAULT_HAPLOTYPE_SETTINGS, founderAlleleLegend, palette, type HaplotypeData } from "./lib/haplotype";
 import { THEMES } from "./chart/style";
 import ChartLegend from "./components/ChartLegend";
+import IbdLegend from "./components/IbdLegend";
 import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
 import { exportBaseName } from "./lib/fileNames";
 import { isEditableTarget } from "./lib/keyboard";
@@ -90,7 +91,12 @@ export interface ViewSettings {
   haplotype:        HaplotypeViewSettings;
 }
 
-export interface HaplotypeViewSettings { barWidth: number; colorScheme: IbdColorScheme }
+export interface HaplotypeViewSettings {
+  barWidth:        number;
+  colorScheme:     IbdColorScheme;
+  /** The on-screen legend of the founder alleles is collapsed to its title. */
+  legendCollapsed: boolean;
+}
 /** The palettes offered (design §2.1); the highlight scheme comes later. */
 export type IbdColorScheme = "founder" | "allele";
 const IBD_COLOR_SCHEMES: IbdColorScheme[] = ["founder", "allele"];
@@ -114,7 +120,8 @@ function defaultViewSettings(): ViewSettings {
     ibdLinkageGroup:   null,
     selectedMarkers:   [],
     traitColors:       {},
-    haplotype:         { barWidth: DEFAULT_HAPLOTYPE_SETTINGS.barWidth, colorScheme: "founder" },
+    haplotype:         { barWidth: DEFAULT_HAPLOTYPE_SETTINGS.barWidth, colorScheme: "founder",
+                         legendCollapsed: false },
   };
 }
 
@@ -123,12 +130,13 @@ function defaultViewSettings(): ViewSettings {
 function validHaplotype(stored: unknown): HaplotypeViewSettings {
   const d = defaultViewSettings().haplotype;
   if (!stored || typeof stored !== "object") return d;
-  const { barWidth, colorScheme } = stored as Partial<HaplotypeViewSettings>;
+  const { barWidth, colorScheme, legendCollapsed } = stored as Partial<HaplotypeViewSettings>;
   const width = Number(barWidth);
   return {
     barWidth: Number.isFinite(width) && barWidth !== null
       ? Math.min(BAR_WIDTH.max, Math.max(BAR_WIDTH.min, Math.round(width))) : d.barWidth,
     colorScheme: IBD_COLOR_SCHEMES.includes(colorScheme as IbdColorScheme) ? colorScheme as IbdColorScheme : d.colorScheme,
+    legendCollapsed: legendCollapsed === true,
   };
 }
 
@@ -650,27 +658,30 @@ export default function App() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const closeImageDialog = useCallback(() => setImageDialogOpen(false), []);
 
+  // The IBD bars' boxes as the chart draws them, and the legend of exactly the
+  // founder alleles they draw, in the chart's colors: one computation for the
+  // on-screen legend and the exported image alike.
+  const shownBoxes = useMemo(() => (chartModel && haplotypeView
+    ? haplotypeBoxes(chartModel, haplotypeView, THEMES[displayStyle], chartColors,
+                     new Set(coloring?.hatched ?? []))
+    : null), [chartModel, haplotypeView, displayStyle, chartColors, coloring]);
+  const founderLegend = useMemo(() => (shownBoxes && haplotypeView
+    ? founderAlleleLegend(haplotypeView.data, Object.values(shownBoxes), haplotypeView.settings)
+    : null), [shownBoxes, haplotypeView]);
+
   const buildImageInput = useCallback(() => {
     const geometry = canvasRef.current?.geometry();
     if (!chartModel || !geometry) return null;
     const meta = pedigree?.traits.find(t => t.name === activeTrait);
     const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
-    // The bars as on screen, and the legend of exactly the founder alleles
-    // they draw, in the screen's colors.
-    const boxes = haplotypeView
-      ? haplotypeBoxes(chartModel, haplotypeView, THEMES[displayStyle], chartColors,
-                       new Set(coloring?.hatched ?? []))
-      : null;
     return {
       model: chartModel, ...geometry, colorMap: chartColors, hatched: coloring?.hatched,
-      haplotypeBoxes: boxes,
-      founderLegend: boxes && haplotypeView
-        ? founderAlleleLegend(haplotypeView.data, Object.values(boxes), haplotypeView.settings)
-        : null,
+      haplotypeBoxes: shownBoxes,
+      founderLegend,
       style: displayStyle, orientation, crossSymbolSize,
       legend: coloring?.legend ?? buildLegend(meta, chartModel.individuals, colorMap, colors),
     };
-  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, haplotypeView, displayStyle, orientation, crossSymbolSize]);
+  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, shownBoxes, founderLegend, displayStyle, orientation, crossSymbolSize]);
 
   const handleLoadExample = useCallback(async () => {
     try {
@@ -1103,7 +1114,19 @@ export default function App() {
                 haplotype={haplotypeView}
               />
             )}
-          {coloring && !tooLargeToDraw && <ChartLegend legend={coloring.legend} />}
+          {/* The legends, as in an exported image: the coloring's at the bottom,
+              the founder alleles of the IBD bars above it. */}
+          {!tooLargeToDraw && (founderLegend || coloring) && (
+            <div style={{ position: "absolute", left: 12, bottom: 12, zIndex: 5, pointerEvents: "none",
+              display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+              {founderLegend && (
+                <IbdLegend legend={founderLegend} collapsed={view.haplotype.legendCollapsed}
+                  onToggle={() => updateView({ haplotype: { ...view.haplotype,
+                    legendCollapsed: !view.haplotype.legendCollapsed } })} />
+              )}
+              {coloring && <ChartLegend legend={coloring.legend} />}
+            </div>
+          )}
         </div>
 
         {/* Detail panel */}
