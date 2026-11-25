@@ -1289,7 +1289,9 @@ class _DatWriter:
 
         labels = list(meta.get("parent_columns") or [])
         if len(labels) != 2 or (labels[0].upper(), labels[1].upper()) not in _PARENT_ALIASES:
-            labels = ["FEMALE", "MALE"]
+            # No recorded columns (demo data, JSON without them): the sexes
+            # are not known, so neither column is labeled by sex.
+            labels = ["PARENT1", "PARENT2"]
         self.parent_labels = labels
         self.female_first = _PARENT_ALIASES[(labels[0].upper(), labels[1].upper())]
 

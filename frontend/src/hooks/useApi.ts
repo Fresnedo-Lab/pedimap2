@@ -130,9 +130,10 @@ export interface PedigreeData {
   marker_summary?: MarkerSummary;
 }
 
-/** Labels for files without a caption (demo data, JSON). */
+/** Labels for data without recorded parent columns (demo data, JSON without
+ *  them), which do not state the parents' sex. */
 export const DEFAULT_PARENT_LABELS: ParentLabels =
-  { female: "Female parent", male: "Male parent", columns: ["Female parent", "Male parent"] };
+  { female: "Parent 1", male: "Parent 2", columns: ["Parent 1", "Parent 2"] };
 
 // ── Backend URL resolution ────────────────────────────────────────────────────
 

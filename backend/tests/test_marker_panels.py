@@ -56,6 +56,46 @@ def test_parent_labels_of_the_fixtures(loaded):
             "female": "Parent 1", "male": "Parent 2", "columns": ["Parent 1", "Parent 2"]}
 
 
+PARENTS_1_2 = {"female": "Parent 1", "male": "Parent 2", "columns": ["Parent 1", "Parent 2"]}
+
+
+def test_data_without_parent_columns_has_parent_1_and_2(monkeypatch):
+    """The demo data and JSON without recorded columns do not state sex."""
+    from sample_data import load_sample_data
+    from pedigree_engine import PedigreeEngine
+    demo = load_sample_data()
+    assert marker_data.parent_labels(demo) == PARENTS_1_2
+    plain = PedigreeEngine.from_dict({"population": "P", "individuals": {
+        "A": {"name": "A"}, "B": {"name": "B"}, "C": {"name": "C", "female_parent": "A", "male_parent": "B"}}})
+    assert marker_data.parent_labels(plain) == PARENTS_1_2
+
+
+def test_dat_export_of_such_data_reads_back_as_parent_1_and_2():
+    """Its .dat export writes PARENT1 PARENT2, so reading it back keeps the
+    labels, and the parents stay in their places."""
+    from sample_data import load_sample_data
+    from pmp_parser import DatExporter
+    demo = load_sample_data()
+    text = DatExporter.to_dat_text(demo)
+    caption = text.split("PEDIGREE", 1)[1].strip().splitlines()[0].split()
+    assert caption[:3] == ["NAME", "PARENT1", "PARENT2"]
+    back = PmpParser.from_dat_text(text).engine
+    assert marker_data.parent_labels(back) == PARENTS_1_2
+    # A .dat file names individuals by name; each keeps its parents in place.
+    name = {iid: demo.get(iid).name for iid in demo._individuals}
+    for iid in demo._individuals:
+        a, b = demo.get(iid), back.get(name[iid])
+        assert (name.get(a.female_parent), name.get(a.male_parent)) == (b.female_parent, b.male_parent), iid
+
+
+def test_json_keeps_recorded_parent_columns(loaded):
+    """A JSON file saved from a FEMALE/MALE file keeps its columns."""
+    from pedigree_engine import PedigreeEngine
+    eng = loaded("Example.dat")
+    again = PedigreeEngine.from_dict(eng.to_dict())
+    assert marker_data.parent_labels(again)["female"] == "Female parent"
+
+
 # ── Genotypes ─────────────────────────────────────────────────────────────────
 
 def test_genotypes_in_map_order_with_codes(loaded):

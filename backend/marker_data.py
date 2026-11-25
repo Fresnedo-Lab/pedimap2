@@ -26,8 +26,11 @@ _SEXED = {"FEMALE": "Female parent", "MOTHER": "Female parent",
 
 
 def _caption(eng: PedigreeEngine) -> List[str]:
+    """The caption's two parent columns. Data without recorded columns (the
+    demo data, JSON without them) does not state the parents' sex, so its
+    parents are "Parent 1" and "Parent 2"."""
     labels = list((eng.dat_meta or {}).get("parent_columns") or [])
-    return labels if len(labels) == 2 else ["FEMALE", "MALE"]
+    return labels if len(labels) == 2 else ["PARENT1", "PARENT2"]
 
 
 def parent_labels(eng: PedigreeEngine) -> Dict[str, Any]:

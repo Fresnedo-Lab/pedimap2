@@ -39,6 +39,15 @@ describe("parent labels follow the caption", () => {
     expect(parentRow("Male parent")).toBe("Male parentIngridM");
   });
 
+  it("no labels with the data (demo data, JSON without parent columns): Parent 1 and Parent 2", () => {
+    const { pedigree, details } = panels.example;
+    render(<IndividualPanel individual={details.Elstar as IndividualDetail} traits={pedigree.traits}
+      markerSummary={pedigree.marker_summary} onSelectId={() => {}} onClose={() => {}} />);
+    expect(parentRow("Parent 1")).toBe("Parent 1GoldenD");
+    expect(parentRow("Parent 2")).toBe("Parent 2IngridM");
+    expect(screen.queryByText("Female parent")).toBeNull();
+  });
+
   it("in the chart's tooltip too", () => {
     const tip = buildTooltip({ id: "X", label: "X", x: 0, y: 0, generation: 1, cross_type: "cross",
       female_parent: "P", male_parent: null }, panels.flexqtl.pedigree.parent_labels);
