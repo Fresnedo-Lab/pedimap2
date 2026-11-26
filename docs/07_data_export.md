@@ -58,6 +58,11 @@ keywords, the pedigree with every trait column, single-parent descent
 IBD probabilities. Opened again, it gives the same data. A parent that had no
 line of its own in the original file gets one.
 
+Every locus gets the sections Pedimap 1.x needs: a `LOCUS` line with its
+`ALLELENAMES`, and an `ALLELES` section, empty where no individual has data.
+For data without allele names, such as the demo data or a JSON file, the
+`ALLELENAMES` line lists the alleles found at the locus.
+
 Pedimap also writes a few comment lines that start with `; PEDIMAP2`. They
 record, for example, whether each trait is discrete or continuous, so that a
 part of a population keeps its traits' types. Pedimap 1.x and other programs

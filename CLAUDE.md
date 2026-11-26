@@ -148,3 +148,6 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   configuration. Example.pmp defines a "Septer relatives" subpopulation with
   "Length" and "Color" views — a ready-made demo once the engine has a
   subpopulation model and the UI has a Population panel.
+- The backlog is kept as GitHub issues labeled "enhancement", or
+  "compatibility" where it concerns Pedimap 1.x files (#34–#45), e.g. #34:
+  unmapped markers exported as trailing ALLELES sections, which 1.x rejects.
