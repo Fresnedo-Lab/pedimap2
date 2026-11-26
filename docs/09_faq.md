@@ -11,7 +11,8 @@ Right-click the app in Applications and choose **Open**. On macOS 15
 Mark it as executable first: `chmod +x Pedimap2-*-Linux-x86_64.AppImage`.
 
 **The window says "Cannot reach the Pedimap backend service".**
-Pedimap's calculation service did not start. Click **Retry**. If that does
+Pedimap's calculation service stopped, could not start, or did not answer
+within a minute. Click **Retry**. If that does
 not help, quit Pedimap and open it again. If the message stays, report it
 with the version number (**About**, at the top right of the window).
 

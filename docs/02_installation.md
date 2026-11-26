@@ -78,9 +78,10 @@ or with `sudo dnf install ./Pedimap2-X.Y.Z-Linux-x86_64.rpm` (on openSUSE,
 ## The first start
 
 Pedimap 2 starts a small calculation service of its own in the background.
-For a few seconds the window says "Starting Pedimap backend…"; then it
-shows a small made-up demo pedigree, "Apple Breeding Program – Demo". You
-can open your own file at once (see [Chapter 3](03_quickstart.md)).
+For about ten seconds the window says "Starting Pedimap…" (longer the first
+time, or while the computer is busy); then it shows a small made-up demo
+pedigree, "Apple Breeding Program – Demo". You can open your own file at
+once (see [Chapter 3](03_quickstart.md)).
 
 If the window keeps saying **Cannot reach the Pedimap backend service**,
 click **Retry**. If that does not help, see

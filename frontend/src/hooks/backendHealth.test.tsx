@@ -3,7 +3,7 @@
 // identifies Pedimap's backend, and explains failures in plain words.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 
 const tauri = vi.hoisted(() => ({ desktop: true, invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({
@@ -12,8 +12,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
-  REINSTALL_HINT, explainBackendFailure, forgetBackendUrl, isPedimapHealth, useBackendHealth,
-  type BackendReport,
+  HEALTH_SLOW_MS, HEALTH_TIMEOUT_MS, REINSTALL_HINT, explainBackendFailure, forgetBackendUrl,
+  isPedimapHealth, useBackendHealth, type BackendReport,
 } from "./useApi";
 
 const report = (r: Partial<BackendReport>): BackendReport => ({
@@ -27,7 +27,7 @@ function serveHealth(body: unknown) {
   return fetch;
 }
 
-afterEach(() => { vi.unstubAllGlobals(); tauri.invoke.mockReset(); forgetBackendUrl(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); tauri.invoke.mockReset(); forgetBackendUrl(); });
 
 describe("the desktop app's backend", () => {
   it("is reached at the port the shell picked, not 8765", async () => {
@@ -130,5 +130,93 @@ describe("the Show details link", () => {
     link.dispatchEvent(click);
     expect(opened).toHaveBeenCalledWith("https://github.com/Fresnedo-Lab/pedimap2/releases/latest");
     expect(click.defaultPrevented).toBe(true);                // not opened inside the app window
+  });
+});
+
+// The onefile sidecar takes 9–12 s to answer, more on a busy machine: the
+// window waits while the shell reports it running, and gives up only when it
+// exits, cannot start, or has not answered in HEALTH_TIMEOUT_MS.
+describe("a backend that is slow to start", () => {
+  const URL = "http://127.0.0.1:54321";
+  let shell: BackendReport;
+  let listening: boolean;
+
+  function start(initial: Partial<BackendReport> = {}) {
+    vi.useFakeTimers();
+    shell = report(initial);
+    listening = false;
+    tauri.invoke.mockImplementation(async (cmd: string) =>
+      cmd === "get_backend_url" ? shell.url : cmd === "backend_report" ? shell : null);
+    const fetch = vi.fn(async () => {
+      if (!listening) throw new TypeError("Load failed");     // connection refused
+      return new Response(JSON.stringify({ status: "ok", app: "pedimap2" }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetch);
+    return { fetch, hook: renderHook(() => useBackendHealth()) };
+  }
+  const wait = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("keeps starting past 15 s, says it can take longer, then is ready", async () => {
+    const { hook } = start();
+    await wait(HEALTH_SLOW_MS - 1000);
+    expect([hook.result.current.status, hook.result.current.slow]).toEqual(["starting", false]);
+    await wait(2000);
+    expect([hook.result.current.status, hook.result.current.slow]).toEqual(["starting", true]);
+    listening = true;                                          // 20 s: Uvicorn running
+    await wait(4000);
+    expect(hook.result.current.status).toBe("ready");
+  });
+
+  it("gives up at once when the backend exits or cannot start", async () => {
+    const { hook } = start();
+    await wait(3000);
+    shell = { ...shell, running: false, exitCode: 1 };
+    await wait(1000);
+    expect(hook.result.current.status).toBe("error");
+    expect(explainBackendFailure(hook.result.current.failure)[0])
+      .toBe("The backend service stopped with exit code 1.");
+
+    hook.unmount(); forgetBackendUrl();
+    const second = start({ running: false, spawnError: "could not start the backend program: x" });
+    await wait(1000);
+    expect(second.hook.result.current.status).toBe("error");
+  });
+
+  it("gives up after 60 s on a backend that runs but never answers", async () => {
+    const { hook } = start();
+    await wait(HEALTH_TIMEOUT_MS - 1000);
+    expect(hook.result.current.status).toBe("starting");
+    await wait(2000);
+    expect(hook.result.current.status).toBe("error");
+    expect(explainBackendFailure(hook.result.current.failure).join("\n"))
+      .toContain(`The backend service is running but did not answer at ${URL}.`);
+  });
+
+  it("waits for the address before the shell has started the backend", async () => {
+    const { fetch, hook } = start({ port: 0, url: "", running: false });
+    await wait(2000);                                         // setup has not run yet
+    expect(fetch).not.toHaveBeenCalled();                     // never the page's own server
+    expect(hook.result.current.status).toBe("starting");
+    shell = report({});                                       // spawned
+    listening = true;
+    await wait(1000);
+    expect(hook.result.current.status).toBe("ready");
+    expect(fetch).toHaveBeenCalledWith(`${URL}/api/health`);
+  });
+});
+
+describe("the starting screen", () => {
+  it("says Pedimap is starting, and after 15 s that it can take longer", async () => {
+    const { BackendGate } = await import("../App");
+    const failure = { url: null, lastError: null, foreign: false, report: null };
+    const { rerender } = render(<BackendGate status="starting" failure={failure}
+      onRetry={() => {}} onOpenLink={() => {}} />);
+    expect(screen.getByRole("status").textContent).toBe("Starting Pedimap…");
+    expect(screen.queryByText(/take longer/)).toBeNull();
+    rerender(<BackendGate status="starting" slow failure={failure} onRetry={() => {}} onOpenLink={() => {}} />);
+    expect(screen.getByText(/can take longer the first time Pedimap starts/)).toBeTruthy();
+    expect(screen.queryByText(/Cannot reach/)).toBeNull();
   });
 });

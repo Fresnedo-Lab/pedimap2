@@ -208,9 +208,11 @@ function Spinner() {
 // The top bar / toolbar is always rendered by App, so it stays usable even
 // while this is on screen — the user is never trapped.
 export function BackendGate({
-  status, failure, onRetry, onOpenLink,
+  status, slow = false, failure, onRetry, onOpenLink,
 }: {
   status: "starting" | "error";
+  /** Still starting after HEALTH_SLOW_MS. */
+  slow?: boolean;
   failure: BackendFailure;
   onRetry: () => void;
   onOpenLink: (url: string) => void;
@@ -225,9 +227,14 @@ export function BackendGate({
           borderTopColor: "#4f9cf9", borderRadius: "50%",
           animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <span style={{ color: "#a0aec0", fontSize: 13 }}>
-          Starting Pedimap backend…
+        <span role="status" style={{ color: "#a0aec0", fontSize: 13 }}>
+          Starting Pedimap…
         </span>
+        {slow && (
+          <span style={{ color: "#64748b", fontSize: 12, maxWidth: 360, textAlign: "center" }}>
+            This can take longer the first time Pedimap starts, or while the computer is busy.
+          </span>
+        )}
       </div>
     );
   }
@@ -283,8 +290,8 @@ export default function App() {
   const api = useApi();
 
   // ── Backend readiness gate (Issue 2) ──────────────────────────────────────
-  const { status: backendStatus, failure: backendFailure, retry: retryBackend } =
-    useBackendHealth();
+  const { status: backendStatus, slow: backendSlow, failure: backendFailure,
+          retry: retryBackend } = useBackendHealth();
   const ready = backendStatus === "ready";
 
   // Update check: once after the backend is ready, plus manual via About.
@@ -1042,6 +1049,7 @@ export default function App() {
         {!ready ? (
           <BackendGate
             status={backendStatus === "error" ? "error" : "starting"}
+            slow={backendSlow}
             failure={backendFailure}
             onRetry={retryBackend}
             onOpenLink={updater.openExternal}
