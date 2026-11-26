@@ -34,9 +34,10 @@ test("the demo data's individuals are named by name, never by id", async ({ page
   const subpop = page.getByRole("button", { name: /Subpop:/ });
   await expect(subpop).toHaveText(/Subpop: SEL-204$/);
   await subpop.click();
-  await expect(page.getByText(/individuals$/).last()).toBeVisible();
-
-  await page.getByRole("button", { name: /Export \.dat/ }).click();
+  // Shown once the subpopulation is: the export button then says so.
+  const exportSubpop = page.getByRole("button", { name: /Export subpopulation \(\.dat\)/ });
+  await expect(exportSubpop).toBeVisible();
+  await exportSubpop.click();
   const panel = page.getByRole("dialog", { name: "Export subpopulation" });
   await expect(panel).toContainText(/individuals around SEL-204/);
   const [dat] = await Promise.all([page.waitForEvent("download"),

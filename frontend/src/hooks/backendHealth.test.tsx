@@ -12,7 +12,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
-  HEALTH_SLOW_MS, HEALTH_TIMEOUT_MS, REINSTALL_HINT, explainBackendFailure, forgetBackendUrl,
+  HEALTH_ATTEMPT_MS, HEALTH_INTERVAL_MS, HEALTH_SLOW_MS, HEALTH_TIMEOUT_MS, REINSTALL_HINT, explainBackendFailure, forgetBackendUrl,
   isPedimapHealth, useBackendHealth, type BackendReport,
 } from "./useApi";
 
@@ -22,7 +22,8 @@ const report = (r: Partial<BackendReport>): BackendReport => ({
 });
 
 function serveHealth(body: unknown) {
-  const fetch = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
+  const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
+    new Response(JSON.stringify(body), { status: 200 }));
   vi.stubGlobal("fetch", fetch);
   return fetch;
 }
@@ -36,8 +37,8 @@ describe("the desktop app's backend", () => {
     const fetch = serveHealth({ status: "ok", app: "pedimap2", version: "2.2.2" });
     const { result } = renderHook(() => useBackendHealth());
     await waitFor(() => expect(result.current.status).toBe("ready"));
-    expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:54321/api/health");
-    expect(fetch.mock.calls.flat().join(" ")).not.toContain("8765");
+    expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:54321/api/health", expect.anything());
+    expect(fetch.mock.calls.map(c => String(c[0])).join(" ")).not.toContain("8765");
   });
 
   it("is never another program answering on the port", async () => {
@@ -203,7 +204,37 @@ describe("a backend that is slow to start", () => {
     listening = true;
     await wait(1000);
     expect(hook.result.current.status).toBe("ready");
-    expect(fetch).toHaveBeenCalledWith(`${URL}/api/health`);
+    expect(fetch).toHaveBeenCalledWith(`${URL}/api/health`, expect.anything());
+  });
+
+  it("stops polling once the backend answers", async () => {
+    const { fetch, hook } = start();
+    listening = true;
+    await wait(1000);
+    expect(hook.result.current.status).toBe("ready");
+    const calls = [fetch.mock.calls.length, tauri.invoke.mock.calls.length];
+    await wait(10_000);
+    expect([fetch.mock.calls.length, tauri.invoke.mock.calls.length]).toEqual(calls);
+  });
+
+  it("aborts the health check in flight when it stops, and one that never answers", async () => {
+    vi.useFakeTimers();
+    tauri.invoke.mockImplementation(async (cmd: string) =>
+      cmd === "get_backend_url" ? URL : cmd === "backend_report" ? report({}) : null);
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => {
+      signals.push(init!.signal!);                            // accepted, never answered
+      init!.signal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    })));
+    const hook = renderHook(() => useBackendHealth());
+    await wait(HEALTH_ATTEMPT_MS + HEALTH_INTERVAL_MS + 100);
+    expect(signals[0].aborted).toBe(true);                    // given up after 3 s …
+    expect(signals.length).toBe(2);                           // … and asked again
+    expect(hook.result.current.status).toBe("starting");
+    hook.unmount();
+    expect(signals[1].aborted).toBe(true);                    // nothing left in flight
+    await wait(10_000);
+    expect(signals.length).toBe(2);                           // and no more checks
   });
 });
 

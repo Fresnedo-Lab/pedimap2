@@ -370,6 +370,8 @@ export const HEALTH_INTERVAL_MS = 500;
 export const HEALTH_SLOW_MS     = 15_000;
 /** Give up waiting for a backend that is still starting. */
 export const HEALTH_TIMEOUT_MS  = 60_000;
+/** One health check that gets no answer in this time counts as failed. */
+export const HEALTH_ATTEMPT_MS  = 3_000;
 
 /** What the desktop shell knows about the backend process (Rust BackendReport). */
 export interface BackendReport {
@@ -412,6 +414,9 @@ export function useBackendHealth(): {
   useEffect(() => {
     let canceled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // The health check in flight, aborted when the hook stops (unmount,
+    // Retry) and after HEALTH_ATTEMPT_MS, so none outlives the polling.
+    let attempt: AbortController | undefined;
     const started = Date.now();
     let url: string | null = null;
     let lastError: string | null = null;
@@ -441,7 +446,20 @@ export function useBackendHealth(): {
           forgetBackendUrl();
           throw new Error("The backend's address is not known yet.");
         }
-        const res = await fetch(`${url}/api/health`);
+        attempt = new AbortController();
+        const ownAttempt = attempt;
+        const limit = setTimeout(() => ownAttempt.abort(), HEALTH_ATTEMPT_MS);
+        let res: Response;
+        try {
+          res = await fetch(`${url}/api/health`, { signal: ownAttempt.signal });
+        } catch (e) {
+          if (ownAttempt.signal.aborted && !canceled) {
+            throw new Error(`No answer within ${HEALTH_ATTEMPT_MS / 1000} s.`);
+          }
+          throw e;
+        } finally {
+          clearTimeout(limit);
+        }
         if (canceled) return;
         if (res.ok) {
           const body = await res.json().catch(() => null);
@@ -476,7 +494,7 @@ export function useBackendHealth(): {
     };
 
     void poll();
-    return () => { canceled = true; if (timer) clearTimeout(timer); };
+    return () => { canceled = true; if (timer) clearTimeout(timer); attempt?.abort(); };
   }, [attempt]);
 
   // Retry restarts the backend if it has stopped (possibly on a new port).
