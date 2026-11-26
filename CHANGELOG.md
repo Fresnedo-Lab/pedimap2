@@ -10,21 +10,24 @@ release notes, so every release needs its own section here before it is tagged.
 
 ## [Unreleased]
 
+## [2.5.1] — 2026-11-26
+
 ### Fixed
-- `.dat` export writes every locus as Pedimap 1.x requires: a `LOCUS` line
-  with `ALLELENAMES` for every locus of the map, and an `ALLELES` section for
-  every locus, empty where no individual has data (a subpopulation lost the
-  sections of loci where none of its individuals had data). Data without
-  allele names, such as the demo data and JSON files, gets them from the
-  alleles found at each locus. Coloring by a marker of such data orders its
-  alleles the same way, so its colors stay the same in the exported file.
-- A slow start of the calculation service no longer ends in "Cannot reach
-  the Pedimap backend service". The service takes about ten seconds to start,
-  longer on a busy computer, and Pedimap gave up after 15. It now shows
-  "Starting Pedimap…" for as long as the service is still starting (after
-  15 seconds with a note that this can take longer), and reports a problem
-  only when the service stops, cannot start, or has not answered within a
-  minute.
+- **Pedimap no longer gives up while it is starting.** Its calculation
+  service takes about ten seconds to start, longer on a busy computer, and
+  Pedimap showed "Cannot reach the Pedimap backend service" after 15 seconds.
+  It now shows "Starting Pedimap…" for as long as the service is starting,
+  with a note after 15 seconds that this can take longer, and reports a
+  problem only when the service stops, cannot start, or has not answered
+  within a minute.
+- **Exported `.dat` files now include what Pedimap 1.x requires.** Pedimap 1.x
+  needs, for every marker, a list of its allele names and a section of
+  genotypes, even where no individual has data. Exports of the demo data and
+  of JSON files had no allele names, and an exported subpopulation lost the
+  genotype sections of markers where none of its individuals had data. Every
+  marker now gets both; for data without allele names, Pedimap lists the
+  alleles found at each marker. Coloring by such a marker keeps its colors
+  when the exported file is opened again.
 
 ## [2.5.0] — 2026-11-25
 
@@ -354,7 +357,8 @@ _2.1.1 was built but never released (macOS backend failed to start)._
 - Demo apple breeding dataset.
 - Windows installers (`.exe` and `.msi`).
 
-[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.5.1...HEAD
+[2.5.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/Fresnedo-Lab/pedimap2/compare/v2.3.0...v2.3.1
