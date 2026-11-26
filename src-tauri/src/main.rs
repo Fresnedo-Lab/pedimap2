@@ -26,8 +26,9 @@ use tauri_plugin_shell::ShellExt;
 // ─────────────────────────────────────────────────────────────────────────────
 struct BackendProcess(Mutex<Option<CommandChild>>);
 
-/// Port of the backend in development (`cargo tauri dev`, where it is started
-/// by hand with uvicorn) and the e2e tests; also used if no free port is found.
+/// The backend's traditional port: the one the browser-only dev setup (Vite
+/// with a uvicorn started by hand) uses, and the last resort if no free port
+/// is found. The app itself, release or `npm run app:dev`, picks a free port.
 const DEV_PORT: u16 = 8765;
 
 /// Stderr lines kept for the "Show details" view.
@@ -52,15 +53,13 @@ struct BackendReport {
 #[derive(Default)]
 struct BackendState(Arc<Mutex<BackendReport>>);
 
-/// The port to start the backend on. PEDIMAP_PORT wins; development builds use
-/// DEV_PORT so the developer workflow is unchanged; otherwise `previous` if it
-/// is still free (so the frontend's URL survives a restart), else any free port.
-fn choose_port(env_port: Option<&str>, dev: bool, previous: Option<u16>) -> u16 {
+/// The port to start the backend on, in release and development builds alike
+/// (`npm run app:dev`), so another program on 8765 never blocks the app:
+/// PEDIMAP_PORT if it is set; otherwise `previous` if it is still free (so the
+/// frontend's URL survives a restart), else any free port.
+fn choose_port(env_port: Option<&str>, previous: Option<u16>) -> u16 {
     if let Some(port) = env_port.and_then(|p| p.trim().parse().ok()) {
         return port;
-    }
-    if dev {
-        return DEV_PORT;
     }
     if let Some(port) = previous.filter(|&p| p != 0 && port_is_free(p)) {
         return port;
@@ -328,8 +327,7 @@ async fn start_backend(app: AppHandle) {
 fn spawn_backend(app: &AppHandle) {
     let report = app.state::<BackendState>().0.clone();
     let previous = report.lock().unwrap().port;
-    let port = choose_port(std::env::var("PEDIMAP_PORT").ok().as_deref(),
-                           cfg!(debug_assertions), Some(previous));
+    let port = choose_port(std::env::var("PEDIMAP_PORT").ok().as_deref(), Some(previous));
     *report.lock().unwrap() = BackendReport {
         port,
         url: format!("http://127.0.0.1:{port}"),
@@ -472,10 +470,12 @@ mod tests {
     }
 
     #[test]
-    fn release_builds_pick_another_port_when_8765_is_taken() {
+    fn another_port_is_picked_when_8765_is_taken() {
+        // Release and development builds alike: another program on 8765 (a
+        // local http.server, a backend left running) never blocks the app.
         let _held = occupy_dev_port();
         assert!(TcpListener::bind(("127.0.0.1", DEV_PORT)).is_err(), "8765 must be taken");
-        let port = choose_port(None, false, None);
+        let port = choose_port(None, None);
         assert_ne!(port, DEV_PORT);
         // The chosen port is really free: the backend can bind it.
         let backend = TcpListener::bind(("127.0.0.1", port)).expect("chosen port is free");
@@ -484,18 +484,17 @@ mod tests {
 
     #[test]
     fn a_restart_keeps_the_port_while_it_is_free() {
-        let previous = choose_port(None, false, None);
-        assert_eq!(choose_port(None, false, Some(previous)), previous);
+        let previous = choose_port(None, None);
+        assert_eq!(choose_port(None, Some(previous)), previous);
         let _taken = TcpListener::bind(("127.0.0.1", previous)).unwrap();
-        assert_ne!(choose_port(None, false, Some(previous)), previous);
+        assert_ne!(choose_port(None, Some(previous)), previous);
     }
 
     #[test]
-    fn development_and_pedimap_port_keep_their_fixed_ports() {
-        assert_eq!(choose_port(None, true, None), DEV_PORT);
-        assert_eq!(choose_port(Some("9123"), false, None), 9123);
-        assert_eq!(choose_port(Some("9123"), true, None), 9123);
-        assert_ne!(choose_port(Some("not a port"), false, None), 0);
+    fn pedimap_port_keeps_its_fixed_port() {
+        assert_eq!(choose_port(Some("9123"), None), 9123);
+        assert_eq!(choose_port(Some("9123"), Some(9200)), 9123);
+        assert_ne!(choose_port(Some("not a port"), None), 0);
     }
 
     #[test]

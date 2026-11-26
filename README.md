@@ -221,8 +221,8 @@ cd frontend && npm install && cd ..
 npm run app:dev     # builds and stages the sidecar, then launches Tauri
 ```
 
-The Python backend runs as a sidecar on `127.0.0.1`: on 8765 in development,
-and on a free port the app picks when installed. The frontend polls
+The Python backend runs as a sidecar on `127.0.0.1`, on a free port the app
+picks (in development as when installed). The frontend polls
 `/api/health`, accepts only Pedimap's own backend there, and will not issue
 other requests until it is ready.
 
