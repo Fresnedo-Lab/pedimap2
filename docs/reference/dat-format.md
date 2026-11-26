@@ -379,6 +379,15 @@ Other text is ignored.
   (FlexQTL, Binko); the index is kept and written back on export.
 - `FOUNDERALLELES` requires `NALLELES` and lists exactly `NALLELES` names
   (`-` for unknown).
+- A reader accepts a locus without a `LOCUS` line, and a `LOCUS` without an
+  `ALLELENAMES` line (or with an empty one: no names, so no restriction,
+  §6.4). Pedimap 1.x requires both for every locus of the map, so a `.dat`
+  export writes a `LOCUS` line with `ALLELENAMES` for each. Data without
+  allele names (the demo data, JSON files) gets them from its alleles: the
+  alleles observed at the locus and its founder alleles, without the
+  `UNKNOWN`, `NULLHOMOZ` and `CONFIRMEDNULL` symbols, numbers in numeric
+  order before other names. A locus without data gets an empty
+  `ALLELENAMES` line.
 
 ### 6.4 `ALLELES` rows
 
@@ -389,8 +398,11 @@ written. The individual MUST be in the pedigree (or be a parent without a row,
 be a symbol the file declares: one of its `UNKNOWN` strings (`-` when there is
 no `UNKNOWN` line), or the symbol of its `NULLHOMOZ` or `CONFIRMEDNULL` line
 when it has one. An
-individual without a row in a section has unknown genotypes there; a locus
-MAY have an `ALLELES` section without a `MAP` entry.
+individual without a row in a section has unknown genotypes there, and a
+section MAY have no rows at all. A locus MAY have an `ALLELES` section
+without a `MAP` entry. Pedimap 1.x requires an `ALLELES` section for every
+locus of the map, so a `.dat` export writes one for each, without rows
+where no exported individual has data there.
 
 ---
 
@@ -575,6 +587,8 @@ specification.
 - [ ] `FACTOR0` kept as metadata, checked against the pedigree, not a trait (§3.1.1).
 - [ ] A parent without a row is a founder without data, with a warning naming the closest individual (§3.4).
 - [ ] `MAP`, `LOCUS (index)`, `FOUNDERALLELES` and `ALLELES` rows checked; codes any non-negative integer (§6).
+- [ ] An `ALLELES` section without rows, and an empty `ALLELENAMES` line, parse (§6.3–6.4).
+- [ ] A `.dat` export writes `LOCUS` and `ALLELENAMES` for every locus of the map and an `ALLELES` section for every locus; missing allele names are taken from the alleles (§6.3–6.4).
 - [ ] LG annotation delimiter accepts both `;` and `/`; the annotation only cross-checks the group, with a warning (§6.2).
 - [ ] IBD sections assigned to groups by their order against the `IBDPOSITIONS` lines (§7.5).
 - [ ] IBD: no missing data, values 0–1; sums within their rounding or a warning; every non-founder in every section; founders without a row supplied; any order (§7.2–7.3).

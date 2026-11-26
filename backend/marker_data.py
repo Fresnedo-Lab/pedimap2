@@ -53,6 +53,37 @@ def _unknown(eng: PedigreeEngine) -> set:
     return set((eng.dat_meta or {}).get("unknown") or ["-"])
 
 
+def allele_symbols(eng: PedigreeEngine) -> set:
+    """The strings that stand for no allele name in ALLELES rows: the UNKNOWN
+    strings, the NULLHOMOZ symbol and, when there is one, CONFIRMEDNULL."""
+    meta = eng.dat_meta or {}
+    return _unknown(eng) | {meta.get("nullhomoz") or "$"} | ({meta["confirmednull"]}
+                                                           if meta.get("confirmednull") else set())
+
+
+def _natural_key(name: str) -> Tuple[int, float, str]:
+    """Numbers (fragment sizes) in numeric order before other names."""
+    try:
+        return (0, float(name), name)
+    except ValueError:
+        return (1, 0.0, name)
+
+
+def allele_names(eng: PedigreeEngine, marker: str) -> List[str]:
+    """The allele names of a locus: its ALLELENAMES as read or, for data
+    without them (the demo data, JSON files), the names of the alleles
+    observed at the locus and of its founder alleles, in natural order and
+    without the symbols of allele_symbols. Empty when no individual has data
+    there. A .dat export writes them on the locus's ALLELENAMES line."""
+    meta = next((m for m in eng.markers if m.name == marker), None)
+    if meta is not None and meta.allele_names:
+        return list(meta.allele_names)
+    symbols = allele_symbols(eng)
+    names = {str(a) for ind in eng._individuals.values() for a in ind.markers.get(marker, ())}
+    names |= set(meta.founder_alleles if meta is not None else ())
+    return sorted(names - symbols, key=_natural_key)
+
+
 def _marker_order(eng: PedigreeEngine) -> List[str]:
     """Loci in map order, then any locus that only has genotype rows."""
     order = [m.name for m in eng.markers]
@@ -143,9 +174,8 @@ def marker_values(eng: PedigreeEngine, marker: str) -> Dict[str, Any]:
     """Every individual's genotype at ``marker`` (for coloring by it), and the
     marker's allele names."""
     unknown = _unknown(eng)
-    meta = next((m for m in eng.markers if m.name == marker), None)
     values = {}
-    names: List[str] = list(meta.allele_names) if meta else []
+    names = allele_names(eng, marker)
     for iid, ind in eng._individuals.items():
         alleles = ind.markers.get(marker)
         if alleles is None:
