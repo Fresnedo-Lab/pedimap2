@@ -28,6 +28,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import networkx as nx
 
+import marker_data
 from pedigree_engine import (
     CrossType,
     Individual,  # noqa: F401  (kept for API parity / typing intent)
@@ -1504,15 +1505,15 @@ class _DatWriter:
             out += ["", self._lg_line(lg), "", "MAP"]
             out += _table([[_quote(m.name, "Marker name"), _fmt_compact(m.position_cM)]
                            for m in markers])
+            # Every locus of the map gets a LOCUS line with its ALLELENAMES, as
+            # Pedimap 1.x requires; data without allele names (the demo data,
+            # JSON files) gets them from its alleles (marker_data.allele_names).
             for m in markers:
-                if not (m.allele_names or m.founder_alleles):
-                    continue
                 index = self.locus_index.get(m.name)
                 out += ["", f"LOCUS {_quote(m.name, 'Marker name')}"
                             + (f" ({index})" if index is not None else "")]
-                if m.allele_names:
-                    out.append("ALLELENAMES " + " ".join(
-                        _quote(a, "Allele name") for a in m.allele_names))
+                out.append(" ".join(["ALLELENAMES"] + [
+                    _quote(a, "Allele name") for a in marker_data.allele_names(eng, m.name)]))
                 if m.founder_alleles:
                     out.append("FOUNDERALLELES " + " ".join(
                         _quote(a, "Allele name") for a in m.founder_alleles))
@@ -1530,9 +1531,10 @@ class _DatWriter:
     def _observed_alleles(self) -> List[str]:
         eng = self.eng
         individuals = [eng.get(i) for i in self.order]
-        present = {mk for ind in individuals for mk in ind.markers}
-        # Map order first, then any marker that only appears in ALLELES data.
-        markers = [m.name for m in eng.markers if m.name in present]
+        # An ALLELES section for every locus of the map, as Pedimap 1.x
+        # requires, without rows where no exported individual has data; then
+        # any marker that only appears in ALLELES data.
+        markers = [m.name for m in eng.markers]
         for ind in individuals:
             markers += [mk for mk in ind.markers if mk not in markers]
         lg_of = {m.name: m.linkage_group for m in eng.markers}

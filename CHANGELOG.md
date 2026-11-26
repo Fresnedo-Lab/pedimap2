@@ -11,6 +11,13 @@ release notes, so every release needs its own section here before it is tagged.
 ## [Unreleased]
 
 ### Fixed
+- `.dat` export writes every locus as Pedimap 1.x requires: a `LOCUS` line
+  with `ALLELENAMES` for every locus of the map, and an `ALLELES` section for
+  every locus, empty where no individual has data (a subpopulation lost the
+  sections of loci where none of its individuals had data). Data without
+  allele names, such as the demo data and JSON files, gets them from the
+  alleles found at each locus. Coloring by a marker of such data orders its
+  alleles the same way, so its colors stay the same in the exported file.
 - A slow start of the calculation service no longer ends in "Cannot reach
   the Pedimap backend service". The service takes about ten seconds to start,
   longer on a busy computer, and Pedimap gave up after 15. It now shows
