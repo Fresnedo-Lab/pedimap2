@@ -20,17 +20,20 @@ docs/             User manual source (Markdown)
 
 ## Key conventions
 - American English throughout
-- Backend sidecar runs on 127.0.0.1: on a free port the Rust shell picks
-  (PEDIMAP_PORT, get_backend_url) in release builds, on 8765 in development
-  and the e2e tests. /api/health carries "app": "pedimap2"; the frontend
-  accepts no other reply.
+- Backend sidecar runs on 127.0.0.1 on a free port the Rust shell picks
+  (PEDIMAP_PORT, get_backend_url), in release builds and `npm run app:dev`
+  alike, so a busy 8765 never blocks the app. Only the frontend outside Tauri
+  (Vite in a browser, the e2e tests) looks for it at 8765; the e2e tests run
+  their backend on 8799 and redirect 8765 there. /api/health carries
+  "app": "pedimap2"; the frontend accepts no other reply.
 - Sidecar binary naming: pedimap-backend-{rust-triple} in src-tauri/binaries/
 - Semver: bump package.json, Cargo.toml, and tauri.conf.json together
 - All backend routes prefixed /api/
 
 ## Build commands
-Dev:   cd backend && uvicorn api:app --port 8765   (terminal A)
-       cargo tauri dev                              (terminal B)
+Dev:   npm run app:dev    (stages the sidecar; Tauri starts it on a free port)
+       Browser only: cd backend && uvicorn api:app --port 8765   (terminal A)
+                     cd frontend && npm run dev                  (terminal B)
 Prod:  cd backend && pyinstaller pedimap_backend.spec --distpath dist --noconfirm
        cargo tauri build --target aarch64-apple-darwin
 
@@ -38,7 +41,8 @@ Prod:  cd backend && pyinstaller pedimap_backend.spec --distpath dist --noconfir
 Backend:  cd backend && python -m pytest tests/ -v
 Frontend: cd frontend && npm run typecheck && npm test && npm run build
 WebKit:   cd frontend && npm run test:e2e   (after the build; starts the backend on
-          8765, so quit the desktop app first or set E2E_BACKEND_PORT)
+          8799, or E2E_BACKEND_PORT, and stops it with the run, even when the
+          run fails or is killed: e2e/backend.mjs, e2e/lifetime.mjs)
 Rust:     cd src-tauri && cargo test
 
 ## Tauri 2.x migration checklist
