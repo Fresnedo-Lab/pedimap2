@@ -357,13 +357,21 @@ export function useFetch<T>(
 }
 
 // ── Backend readiness gate ──────────────────────────────────────────────────
-// The PyInstaller sidecar takes 1–3 s to unpack and start. Poll /api/health
-// until it answers before any other request is allowed to fire.
+// The PyInstaller onefile sidecar unpacks itself on every launch: it measured
+// 9–12 s until /api/health answers, more on a busy machine or a first launch.
+// Poll /api/health until it answers before any other request is allowed to
+// fire. While the desktop shell reports the process running, keep waiting
+// (up to HEALTH_TIMEOUT_MS); give up at once if it exits or cannot start.
 
 export type BackendStatus = "starting" | "ready" | "error";
 
-const HEALTH_INTERVAL_MS = 500;
-const HEALTH_TIMEOUT_MS  = 15_000;
+export const HEALTH_INTERVAL_MS = 500;
+/** After this long, the "Starting Pedimap…" screen says a first launch can take longer. */
+export const HEALTH_SLOW_MS     = 15_000;
+/** Give up waiting for a backend that is still starting. */
+export const HEALTH_TIMEOUT_MS  = 60_000;
+/** One health check that gets no answer in this time counts as failed. */
+export const HEALTH_ATTEMPT_MS  = 3_000;
 
 /** What the desktop shell knows about the backend process (Rust BackendReport). */
 export interface BackendReport {
@@ -385,12 +393,20 @@ export interface BackendFailure {
   report:     BackendReport | null;
 }
 
+/** The shell started the backend, and it has exited or never started. */
+export function backendStopped(r: BackendReport | null): boolean {
+  return !!r && (r.spawnError !== null || (r.port !== 0 && !r.running));
+}
+
 export function useBackendHealth(): {
   status: BackendStatus;
+  /** Still starting after HEALTH_SLOW_MS. */
+  slow: boolean;
   failure: BackendFailure;
   retry: () => void;
 } {
   const [status,  setStatus]  = useState<BackendStatus>("starting");
+  const [slow,    setSlow]    = useState(false);
   const [failure, setFailure] = useState<BackendFailure>(
     { url: null, lastError: null, foreign: false, report: null });
   const [attempt, setAttempt] = useState(0);
@@ -398,17 +414,23 @@ export function useBackendHealth(): {
   useEffect(() => {
     let canceled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // The health check in flight, aborted when the hook stops (unmount,
+    // Retry) and after HEALTH_ATTEMPT_MS, so none outlives the polling.
+    let attempt: AbortController | undefined;
     const started = Date.now();
     let url: string | null = null;
     let lastError: string | null = null;
 
     setStatus("starting");
+    setSlow(false);
     setFailure({ url: null, lastError: null, foreign: false, report: null });
 
+    const shellReport = () => isTauri()
+      ? invoke<BackendReport>("backend_report").catch(() => null) : Promise.resolve(null);
+
     // Give up: keep what the desktop shell knows, for "Show details".
-    const fail = async (foreign: boolean) => {
-      const report = isTauri()
-        ? await invoke<BackendReport>("backend_report").catch(() => null) : null;
+    const fail = async (foreign: boolean, known?: BackendReport | null) => {
+      const report = known !== undefined ? known : await shellReport();
       if (canceled) return;
       setFailure({ url, lastError, foreign, report });
       setStatus("error");
@@ -418,7 +440,26 @@ export function useBackendHealth(): {
       if (canceled) return;
       try {
         url = await resolveBackendUrl();
-        const res = await fetch(`${url}/api/health`);
+        if (!url) {
+          // The shell has not started the backend yet: never ask the page's
+          // own server instead.
+          forgetBackendUrl();
+          throw new Error("The backend's address is not known yet.");
+        }
+        attempt = new AbortController();
+        const ownAttempt = attempt;
+        const limit = setTimeout(() => ownAttempt.abort(), HEALTH_ATTEMPT_MS);
+        let res: Response;
+        try {
+          res = await fetch(`${url}/api/health`, { signal: ownAttempt.signal });
+        } catch (e) {
+          if (ownAttempt.signal.aborted && !canceled) {
+            throw new Error(`No answer within ${HEALTH_ATTEMPT_MS / 1000} s.`);
+          }
+          throw e;
+        } finally {
+          clearTimeout(limit);
+        }
         if (canceled) return;
         if (res.ok) {
           const body = await res.json().catch(() => null);
@@ -434,16 +475,26 @@ export function useBackendHealth(): {
         if (canceled) return;
         lastError = e instanceof Error ? e.message : String(e);
       }
-      // Still not ready: give up after the timeout, otherwise poll again.
-      if (Date.now() - started >= HEALTH_TIMEOUT_MS) {
-        await fail(false);
+      // Still not ready. A backend that exited or could not start will not
+      // answer: say so at once. One that is still starting gets until the
+      // timeout; after HEALTH_SLOW_MS the screen says it can take longer.
+      const report = await shellReport();
+      if (canceled) return;
+      if (backendStopped(report)) {
+        await fail(false, report);
         return;
       }
+      const waited = Date.now() - started;
+      if (waited >= HEALTH_TIMEOUT_MS) {
+        await fail(false, report);
+        return;
+      }
+      if (waited >= HEALTH_SLOW_MS) setSlow(true);
       timer = setTimeout(poll, HEALTH_INTERVAL_MS);
     };
 
     void poll();
-    return () => { canceled = true; if (timer) clearTimeout(timer); };
+    return () => { canceled = true; if (timer) clearTimeout(timer); attempt?.abort(); };
   }, [attempt]);
 
   // Retry restarts the backend if it has stopped (possibly on a new port).
@@ -454,7 +505,7 @@ export function useBackendHealth(): {
       setAttempt(a => a + 1);
     })();
   }, []);
-  return { status, failure, retry };
+  return { status, slow, failure, retry };
 }
 
 /** Last line of "Show details" when the backend program is missing. */

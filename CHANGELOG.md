@@ -18,6 +18,13 @@ release notes, so every release needs its own section here before it is tagged.
   allele names, such as the demo data and JSON files, gets them from the
   alleles found at each locus. Coloring by a marker of such data orders its
   alleles the same way, so its colors stay the same in the exported file.
+- A slow start of the calculation service no longer ends in "Cannot reach
+  the Pedimap backend service". The service takes about ten seconds to start,
+  longer on a busy computer, and Pedimap gave up after 15. It now shows
+  "Starting Pedimap…" for as long as the service is still starting (after
+  15 seconds with a note that this can take longer), and reports a problem
+  only when the service stops, cannot start, or has not answered within a
+  minute.
 
 ## [2.5.0] — 2026-11-25
 

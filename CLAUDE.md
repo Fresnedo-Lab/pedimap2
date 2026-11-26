@@ -42,7 +42,8 @@ Backend:  cd backend && python -m pytest tests/ -v
 Frontend: cd frontend && npm run typecheck && npm test && npm run build
 WebKit:   cd frontend && npm run test:e2e   (after the build; starts the backend on
           8799, or E2E_BACKEND_PORT, and stops it with the run, even when the
-          run fails or is killed: e2e/backend.mjs, e2e/lifetime.mjs)
+          run fails or is killed: e2e/backend.mjs, e2e/lifetime.mjs). Project
+          "webkit-dev" runs e2e/startup.spec.ts on Vite's dev server (5199).
 Rust:     cd src-tauri && cargo test
 
 ## Tauri 2.x migration checklist
@@ -89,6 +90,13 @@ APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
   independently. Never copy, port, or transliterate its code into this
   MIT-licensed repo. The examples/ folder contains .dat data files usable as
   additional parser test fixtures.
+- The PyInstaller onefile sidecar unpacks itself on every launch: 9–12 s
+  until /api/health answers, 17–21 s under heavy load (#46: onedir). The
+  window shows "Starting Pedimap…" while backend_report says the process is
+  running, and gives up only when it exits, cannot start, or after 60 s
+  (useBackendHealth). Never shorten that wait without measuring a cold start;
+  e2e/startup.spec.ts starts its backend after the 15 s mark, in the dev
+  configuration and in the production build.
 - Cross (×) nodes and link waypoints exist only in the frontend chart model
   (frontend/src/chart/model.ts). Never send them to the backend or list them
   as individuals; the backend's individual ids are the authority.
