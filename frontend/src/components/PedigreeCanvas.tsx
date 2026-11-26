@@ -207,11 +207,14 @@ const UNKNOWN_PARENT = "-";
 // element. We build every text node with textContent (never innerHTML), so an
 // individual or trait value containing "<" or "&" cannot break the markup or
 // inject content.
+/** A parent as the tooltip names it: its name (its id if it has none). */
+const parentName = (id?: string | null, name?: string | null) =>
+  id && id.length > 0 ? (name || id) : UNKNOWN_PARENT;
+
 /** The lines of an individual's tooltip: name, parents, generation, traits. */
 export function tooltipLines(ind: GraphNode, labels: ParentLabels): string[] {
-  const parent = (p?: string | null) => (p && p.length > 0 ? p : UNKNOWN_PARENT);
-  return [ind.label, `${labels.female}: ${parent(ind.female_parent)}`,
-          `${labels.male}: ${parent(ind.male_parent)}`, `Generation: ${ind.generation}`,
+  return [ind.label, `${labels.female}: ${parentName(ind.female_parent, ind.female_parent_name)}`,
+          `${labels.male}: ${parentName(ind.male_parent, ind.male_parent_name)}`, `Generation: ${ind.generation}`,
           ...Object.entries(ind.traits ?? {}).map(([t, v]) => `${t}: ${v}`)];
 }
 
@@ -229,10 +232,8 @@ export function buildTooltip(ind: GraphNode, labels: ParentLabels): HTMLElement 
     el.appendChild(row);
   };
 
-  const parent = (p?: string | null) => (p && p.length > 0 ? p : UNKNOWN_PARENT);
-
-  addRow(labels.female, parent(ind.female_parent));
-  addRow(labels.male,   parent(ind.male_parent));
+  addRow(labels.female, parentName(ind.female_parent, ind.female_parent_name));
+  addRow(labels.male,   parentName(ind.male_parent, ind.male_parent_name));
   addRow("Generation",    String(ind.generation));
 
   for (const [trait, value] of Object.entries(ind.traits ?? {})) {

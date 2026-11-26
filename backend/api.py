@@ -169,6 +169,9 @@ def get_individual(ind_id: str):
         "name":          ind.name,
         "female_parent": ind.female_parent,
         "male_parent":   ind.male_parent,
+        # The parents as the interface names them (ids stay the key).
+        "female_parent_name": marker_data.display_name(eng, ind.female_parent),
+        "male_parent_name":   marker_data.display_name(eng, ind.male_parent),
         "cross_type":    ind.cross_type.value,
         "ploidy":        ind.ploidy,
         "generation":    ind.generation,
@@ -225,9 +228,12 @@ def get_graph():
             "generation":    ind.generation,
             "cross_type":    ind.cross_type.value,
             # Included so the frontend can build node hover tooltips without a
-            # second round-trip. Parents are None for founders/unknown parents.
+            # second round-trip. Parents are None for founders/unknown parents;
+            # the tooltip shows their names.
             "female_parent": ind.female_parent,
             "male_parent":   ind.male_parent,
+            "female_parent_name": marker_data.display_name(eng, ind.female_parent),
+            "male_parent_name":   marker_data.display_name(eng, ind.male_parent),
             "traits":        ind.traits,
         })
     edges = [
@@ -285,6 +291,8 @@ def build_subpop(req: SubpopRequest):
             "cross_type":    ind.cross_type.value if ind else "unknown",
             "female_parent": ind.female_parent if ind else None,
             "male_parent":   ind.male_parent if ind else None,
+            "female_parent_name": marker_data.display_name(eng, ind.female_parent) if ind else None,
+            "male_parent_name":   marker_data.display_name(eng, ind.male_parent) if ind else None,
             "traits":        ind.traits if ind else {},
             "is_focal":      ind_id == req.focal_id,
         })
@@ -474,14 +482,16 @@ class DatExportRequest(BaseModel):
     replace_outside_parents: bool = False
 
 
-def _dat_response(ids=None, outside_parents: str = "include", notes=()) -> PlainTextResponse:
+def _dat_response(ids=None, outside_parents: str = "include", notes=(),
+                  focal_id: Optional[str] = None) -> PlainTextResponse:
     try:
         from pmp_parser import DatExporter, DatExportError
     except ImportError:
         raise HTTPException(501, "DatExporter not available.")
     try:
         text = DatExporter.to_dat_text(_engine, ids,
-                                       outside_parents=outside_parents, notes=notes)
+                                       outside_parents=outside_parents, notes=notes,
+                                       focal_id=focal_id)
     except DatExportError as exc:
         raise HTTPException(409, f"Cannot export as .dat: {exc}")
     return PlainTextResponse(text, media_type="text/plain")
@@ -500,14 +510,12 @@ def export_dat_subset(req: DatExportRequest):
         if unknown:
             raise HTTPException(400, f"Unknown individual(s): {', '.join(unknown)}")
     notes = []
-    if req.focal_id:
-        notes.append(f"Focal individual: {req.focal_id}")
     criteria = [k for k in ("ancestors", "descendants", "siblings") if getattr(req, k)]
     if req.focal_id or criteria:
         notes.append("Selection: " + " + ".join(["focal", *criteria]))
     return _dat_response(req.ids,
                          "unknown" if req.replace_outside_parents else "include",
-                         notes)
+                         notes, req.focal_id)
 
 
 @app.post("/api/individual")

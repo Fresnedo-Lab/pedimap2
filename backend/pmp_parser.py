@@ -1252,6 +1252,7 @@ class DatExporter:
         *,
         outside_parents: str = OUTSIDE_PARENTS_INCLUDE,
         notes: Iterable[str] = (),
+        focal_id: Optional[str] = None,
     ) -> str:
         """Write ``engine`` (or just the individuals in ``ids``) as ``.dat`` text.
 
@@ -1267,21 +1268,24 @@ class DatExporter:
         no pedigree link is lost; "unknown" writes them as UNKNOWN instead. The
         header comment then records the source population and these counts.
         ``notes`` are extra header-comment lines (e.g. the selection criteria).
+        ``focal_id`` names the subset's focal individual in the header comment,
+        as the file names it (its name, or its id where names are not unique).
 
         Raises DatExportError if the data cannot be represented in the format.
         """
-        return _DatWriter(engine, ids, outside_parents, notes).write()
+        return _DatWriter(engine, ids, outside_parents, notes, focal_id).write()
 
 
 class _DatWriter:
     def __init__(self, engine: PedigreeEngine, ids: Optional[Iterable[str]],
                  outside_parents: str = OUTSIDE_PARENTS_INCLUDE,
-                 notes: Iterable[str] = ()) -> None:
+                 notes: Iterable[str] = (), focal_id: Optional[str] = None) -> None:
         if outside_parents not in (OUTSIDE_PARENTS_INCLUDE, OUTSIDE_PARENTS_UNKNOWN):
             raise ValueError(f"outside_parents must be 'include' or 'unknown', "
                              f"not {outside_parents!r}")
         self.eng = engine
         self.notes = [" ".join(str(n).split()) for n in notes]   # one line each
+        self.focal_id = focal_id
         meta = engine.dat_meta or {}
         self.unknown: List[str] = list(meta.get("unknown") or ["-"])
         self.missing = self.unknown[0]          # first symbol is the display form
@@ -1363,6 +1367,13 @@ class _DatWriter:
         self.ibd_format: Optional[Dict[str, Any]] = meta.get("ibd_format")
 
     # -- cells --
+    def _label(self, iid: str) -> str:
+        """How the file (and its messages) name an individual."""
+        if iid in self.label:
+            return self.label[iid]
+        ind = self.eng.get(iid)
+        return ind.name if ind and ind.name else iid
+
     def _name(self, iid: str) -> str:
         return _quote(self.label[iid], "Individual name")
 
@@ -1389,14 +1400,14 @@ class _DatWriter:
                 text = _fmt_number(value)
             except (TypeError, ValueError, ArithmeticError):
                 raise DatExportError(
-                    f"{ind.id}: value {value!r} of continuous trait {trait.name!r} "
+                    f"{self._label(ind.id)}: value {value!r} of continuous trait {trait.name!r} "
                     "is not a number."
                 ) from None
         else:
             text = str(value)
         if text in self.unknown:
             raise DatExportError(
-                f"{ind.id}: value {text!r} of trait {trait.name!r} is an UNKNOWN "
+                f"{self._label(ind.id)}: value {text!r} of trait {trait.name!r} is an UNKNOWN "
                 "symbol and would read back as missing."
             )
         return _quote(text, f"Value of trait {trait.name!r}")
@@ -1406,6 +1417,8 @@ class _DatWriter:
         lines = ["Exported by Pedimap 2"]
         if self.subset is not None:
             lines.append(f"Subpopulation of: {self.eng.population_name or '(unnamed population)'}")
+        if self.focal_id:
+            lines.append("Focal individual: " + " ".join(self._label(self.focal_id).split()))
         lines += self.notes
         if self.subset is not None:
             s = self.subset
@@ -1580,7 +1593,7 @@ class _DatWriter:
             if absent:
                 raise DatExportError(
                     f"IBD data for LG {lg} position {pos} is missing for "
-                    f"{len(absent)} individual(s) (e.g. {absent[0]!r}); every "
+                    f"{len(absent)} individual(s) (e.g. {self._label(absent[0])!r}); every "
                     "exported individual must appear in every IBD section."
                 )
             supplied = set(self.supplied.get(lg, {}).get(pos, []))
@@ -1591,7 +1604,7 @@ class _DatWriter:
                 if (len(homologues) != eng.ploidy
                         or any(len(h) != self.nalleles for h in homologues)):
                     raise DatExportError(
-                        f"IBD data for {iid!r} (LG {lg}, pos {pos}) is not "
+                        f"IBD data for {self._label(iid)!r} (LG {lg}, pos {pos}) is not "
                         f"{eng.ploidy} x {self.nalleles} probabilities."
                     )
                 values = [v for h in homologues for v in h]

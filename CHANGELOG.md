@@ -30,6 +30,15 @@ release notes, so every release needs its own section here before it is tagged.
   its parents "Parent 1" and "Parent 2" instead of "Female parent" and "Male
   parent", since it does not state their sex. Its `.dat` export writes the
   columns as `PARENT1` and `PARENT2`.
+- About Pedimap 2 reads "© 2025–2026 Fresnedo-Lab".
+
+### Fixed
+- Individuals are named by their names wherever Pedimap names them, never by
+  their ids, which differ in data such as the demo data and JSON files: the
+  parents in the details panel and in the chart's tooltips, the Subpop
+  button, the subpopulation's export panel and suggested file names, the
+  "Focal individual" comment of an exported subpopulation, and the founders
+  of the IBD bars and their legends.
 
 ## [2.4.0] — 2026-11-24
 

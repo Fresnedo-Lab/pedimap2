@@ -442,6 +442,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Color": "Red",
      "Length": 18.0
@@ -456,6 +458,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Color": "Yellow",
      "Length": 20.1
@@ -470,6 +474,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Color": "Red",
      "Length": 11.4
@@ -484,6 +490,8 @@
     "cross_type": "cross",
     "female_parent": "GoldenD",
     "male_parent": "IngridM",
+    "female_parent_name": "GoldenD",
+    "male_parent_name": "IngridM",
     "traits": {
      "Color": "Red",
      "Length": 17.6
@@ -498,6 +506,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Color": "Yellow",
      "Length": 14.8
@@ -512,6 +522,8 @@
     "cross_type": "cross",
     "female_parent": "Jonathan",
     "male_parent": "GoldenD",
+    "female_parent_name": "Jonathan",
+    "male_parent_name": "GoldenD",
     "traits": {
      "Color": "Green",
      "Length": 22.0
@@ -526,6 +538,8 @@
     "cross_type": "cross",
     "female_parent": "Septer",
     "male_parent": "Cox",
+    "female_parent_name": "Septer",
+    "male_parent_name": "Cox",
     "traits": {
      "Color": "Red",
      "Length": 23.9
@@ -540,6 +554,8 @@
     "cross_type": "cross",
     "female_parent": "Elstar",
     "male_parent": "Elise",
+    "female_parent_name": "Elstar",
+    "male_parent_name": "Elise",
     "traits": {
      "Color": "Green",
      "Length": 12.3

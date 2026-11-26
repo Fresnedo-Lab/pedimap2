@@ -131,8 +131,8 @@ def test_ibd_most_probable_founder_alleles(loaded):
     # Spec 5.5: G1_001 has [23] 0.95 [24] 0.05 from F003 (founder 12), and
     # [38] 1.0 from F010 (founder 19). 0.05 is not above 0.10, so not shown.
     assert first["homologues"] == [
-        [{"allele": 23, "founder": "F003", "probability": 0.95}],
-        [{"allele": 38, "founder": "F010", "probability": 1.0}],
+        [{"allele": 23, "founder": "F003", "founder_name": "F003", "probability": 0.95}],
+        [{"allele": 38, "founder": "F010", "founder_name": "F010", "probability": 1.0}],
     ]
 
 
@@ -140,8 +140,8 @@ def test_ibd_shows_the_next_allele_above_a_tenth(loaded):
     loaded("flexqtl_routeB_sim_small.ped")
     h1, h2 = api.get_individual("G1_007")["ibd"][0]["homologues"]
     # A founder without data splits its offspring's homologue evenly (spec 5.9).
-    assert h1 == [{"allele": 1, "founder": "DUMMY_G1_007_M", "probability": 0.5},
-                  {"allele": 2, "founder": "DUMMY_G1_007_M", "probability": 0.5}]
+    dummy = {"founder": "DUMMY_G1_007_M", "founder_name": "DUMMY_G1_007_M", "probability": 0.5}
+    assert h1 == [{"allele": 1, **dummy}, {"allele": 2, **dummy}]
     assert [a["allele"] for a in h2] == [45]
     loaded("Example.dat")
     h1, h2 = api.get_individual("81015-045")["ibd"][1]["homologues"]
@@ -167,8 +167,9 @@ def test_flexqtl_groups_show_their_own_positions(loaded):
 def test_supplied_founder_rows_and_unnamed_founders(loaded):
     eng = loaded("binko_ibd.ped")
     h1, h2 = api.get_individual("DUMMY_G1_007_F")["ibd"][0]["homologues"]
-    assert h1 == [{"allele": 13, "founder": "DUMMY_G1_007_F", "probability": 1.0}]
-    assert h2 == [{"allele": 14, "founder": "DUMMY_G1_007_F", "probability": 1.0}]
+    own = {"founder": "DUMMY_G1_007_F", "founder_name": "DUMMY_G1_007_F", "probability": 1.0}
+    assert h1 == [{"allele": 13, **own}]
+    assert h2 == [{"allele": 14, **own}]
     del eng.dat_meta["founder_order"]          # as in an exported subset
     assert api.get_individual("G1_001")["ibd"][0]["homologues"][0][0]["founder"] is None
 

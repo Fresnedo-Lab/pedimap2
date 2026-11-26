@@ -299,6 +299,10 @@ export default function App() {
 
   const { data: indList, reload: reloadIndividuals } =
     useFetch<IndividualSummary[]>(() => api.listIndividuals(), [], ready);
+  // How the interface names an individual: its name, never its id (ids are
+  // the key; they differ from the names in e.g. the demo data and JSON files).
+  const names = useMemo(() => new Map((indList ?? []).map(i => [i.id, i.name || i.id])), [indList]);
+  const nameOf = useCallback((id: string) => names.get(id) ?? id, [names]);
 
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
@@ -580,12 +584,12 @@ export default function App() {
             replace_outside_parents: replaceOutside }
         : {};
       const text = await api.exportDat(req);
-      await saveTextFile(`${exportBaseName(pedigree?.population, subpop?.focal_id)}.dat`, text);
+      await saveTextFile(`${exportBaseName(pedigree?.population, subpop && nameOf(subpop.focal_id))}.dat`, text);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-  }, [api, subpop, graphData, replaceOutside, pedigree]);
+  }, [api, subpop, graphData, replaceOutside, pedigree, nameOf]);
 
   // ── Save as JSON: always the whole population, with all of its data ──────
   const saveJson = useCallback(async () => {
@@ -775,7 +779,7 @@ export default function App() {
                 border: "1px solid #2e3a52", borderRadius: 8,
                 boxShadow: "0 8px 32px rgba(0,0,0,.5)", userSelect: "text" }}>
               <div style={{ fontSize: 12, color: "#e8ecf4", marginBottom: 10 }}>
-                {graphData?.nodes.length ?? 0} individuals around {subpop.focal_id}
+                {graphData?.nodes.length ?? 0} individuals around {nameOf(subpop.focal_id)}
               </div>
               <label style={{ display: "flex", gap: 8, alignItems: "flex-start",
                 fontSize: 12, color: "#e8ecf4", cursor: "pointer" }}>
@@ -950,7 +954,7 @@ export default function App() {
         {selectedId && (
           <button onClick={() => handleSubpop()}
             style={{ background: "#1d3a6e", color: "#4f9cf9", padding: "5px 12px" }}>
-            🔍 Subpop: {selectedId}
+            🔍 Subpop: {nameOf(selectedId)}
           </button>
         )}
 
@@ -1148,8 +1152,8 @@ export default function App() {
       {imageDialogOpen && (
         <ExportImageDialog
           buildInput={buildImageInput}
-          baseName={exportBaseName(pedigree?.population, subpop?.focal_id)}
-          scope={subpop ? `the subpopulation around ${subpop.focal_id}` : "the whole population"}
+          baseName={exportBaseName(pedigree?.population, subpop && nameOf(subpop.focal_id))}
+          scope={subpop ? `the subpopulation around ${nameOf(subpop.focal_id)}` : "the whole population"}
           onClose={closeImageDialog}
         />
       )}
