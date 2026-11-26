@@ -83,8 +83,9 @@ to **By founder allele**, or show a subpopulation, which has fewer founders.
 
 **The colors of a founder changed.**
 Colors are shared out over the founders of the individuals shown, so they
-change when you show a subpopulation or open another file. The exported
-image's legend always gives the colors of that image.
+change when you show a subpopulation or open another file. The legend at the
+lower left of the chart always gives the colors shown, and an exported
+image's legend those of that image.
 
 ## Exporting
 
@@ -97,7 +98,8 @@ Very large charts are saved at a lower resolution, to stay within 16,000
 pixels per side. Save an SVG or PDF instead.
 
 **Can I save a JSON file?**
-Not yet. Save the pedigree as a `.dat` file ([Chapter 7](07_data_export.md)).
+Yes: **Save as JSON** saves the whole population with all of its data. For a
+subpopulation, use **Export subpopulation (.dat)** ([Chapter 7](07_data_export.md)).
 
 ## Appendix A: Pedimap 2 and the original Pedimap
 
@@ -106,7 +108,7 @@ colors and IBD probabilities and shows the marker data, in a classic display
 style like Pedimap 1.x's and a modern one. Several features of Pedimap 1.x are not
 available yet:
 
-| Pedimap 1.x | Pedimap 2.4 |
+| Pedimap 1.x | Pedimap 2.5 |
 |------------------------------------------|-----------------------------------|
 | Several **views** of a population, each with its own options | One view. Its settings are remembered. |
 | A **population panel** with a tree of named subpopulations, which can be combined | One subpopulation at a time: an individual's ancestors and descendants |
@@ -114,7 +116,7 @@ available yet:
 | An **information panel** that follows the mouse | A hover box, and the details panel on a click |
 | **Marker scores** and **most probable alleles** inside the boxes | Shown in the details panel, not yet in the boxes |
 | **IBD probabilities** inside the boxes | **IBD bars**, with two palettes and an adjustable width |
-| An **on-screen legend** of the IBD colors | In exported images only; not yet on screen |
+| An **on-screen legend** of the IBD colors | On screen at the lower left of the chart (it can be collapsed), and in exported images |
 | **IBD probabilities for polyploids** | Diploids only; a file with IBD data and another ploidy is refused |
 | A sortable **table of individuals** with their data | A list of names with a search box, and the details panel |
 | Adjustable **spacing** between generations and individuals | Not adjustable yet |
@@ -127,8 +129,8 @@ available yet:
 What Pedimap 2 adds: the Modern display style, lines routed so that they
 never pass through a box, image export as PNG, SVG and PDF with legends, the
 reading of FlexQTL and Binko.jl files as their specification describes, IBD
-bars with color-blind-aware palettes, coloring by marker, and automatic
-updates.
+bars with color-blind-aware palettes, coloring by marker, saving a whole
+population with all of its data as JSON, and automatic updates.
 
 ## Appendix B: FlexQTL genotype codes
 

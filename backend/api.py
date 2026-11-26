@@ -169,6 +169,9 @@ def get_individual(ind_id: str):
         "name":          ind.name,
         "female_parent": ind.female_parent,
         "male_parent":   ind.male_parent,
+        # The parents as the interface names them (ids stay the key).
+        "female_parent_name": marker_data.display_name(eng, ind.female_parent),
+        "male_parent_name":   marker_data.display_name(eng, ind.male_parent),
         "cross_type":    ind.cross_type.value,
         "ploidy":        ind.ploidy,
         "generation":    ind.generation,
@@ -225,9 +228,12 @@ def get_graph():
             "generation":    ind.generation,
             "cross_type":    ind.cross_type.value,
             # Included so the frontend can build node hover tooltips without a
-            # second round-trip. Parents are None for founders/unknown parents.
+            # second round-trip. Parents are None for founders/unknown parents;
+            # the tooltip shows their names.
             "female_parent": ind.female_parent,
             "male_parent":   ind.male_parent,
+            "female_parent_name": marker_data.display_name(eng, ind.female_parent),
+            "male_parent_name":   marker_data.display_name(eng, ind.male_parent),
             "traits":        ind.traits,
         })
     edges = [
@@ -285,6 +291,8 @@ def build_subpop(req: SubpopRequest):
             "cross_type":    ind.cross_type.value if ind else "unknown",
             "female_parent": ind.female_parent if ind else None,
             "male_parent":   ind.male_parent if ind else None,
+            "female_parent_name": marker_data.display_name(eng, ind.female_parent) if ind else None,
+            "male_parent_name":   marker_data.display_name(eng, ind.male_parent) if ind else None,
             "traits":        ind.traits if ind else {},
             "is_focal":      ind_id == req.focal_id,
         })
@@ -327,10 +335,9 @@ async def load_file(
     files = [{"name": fname, "encoding": dat_encoding}]
 
     if fname.lower().endswith(".json"):
-        data = json.loads(dat_text)
-        _engine = PedigreeEngine.from_dict(data)
+        _engine, warnings = _read_json(dat_text)
         return {"loaded": "json", "individuals": _engine.count(),
-                "encoding": dat_encoding, "files": files}
+                "encoding": dat_encoding, "files": files, "warnings": warnings}
 
     # .dat / .pmp path — needs pmp_parser
     try:
@@ -426,9 +433,40 @@ def demo_load(name: str):
             "encoding": dat_encoding, "files": files, "warnings": result.warnings}
 
 
+# Pedimap 2's JSON format (docs/reference/json-format.md). The version rises
+# only when a reader of the previous version would misread the file.
+JSON_FORMAT = "pedimap2-json"
+JSON_FORMAT_VERSION = 1
+
+
 @app.get("/api/export/json")
 def export_json():
-    return JSONResponse(_engine.to_dict())
+    """The whole population, with all of its data, as Pedimap 2 JSON."""
+    return JSONResponse({"format": JSON_FORMAT, "format_version": JSON_FORMAT_VERSION,
+                         **_engine.to_dict()})
+
+
+def _read_json(text: str) -> tuple:
+    """(engine, warnings) from Pedimap 2 JSON. A file without "format" is
+    the JSON of Pedimap 2.4 and earlier, read as version 1. A file of a later
+    version is read as far as this version understands it, with a warning."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(400, f"Not a JSON file: {exc.msg} (line {exc.lineno}).")
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Not a Pedimap 2 JSON file: it does not hold a pedigree.")
+    fmt = data.get("format", JSON_FORMAT)
+    if fmt != JSON_FORMAT:
+        raise HTTPException(400, f"Not a Pedimap 2 JSON file (its format is {fmt!r}).")
+    warnings = []
+    version = data.get("format_version", JSON_FORMAT_VERSION)
+    if isinstance(version, int) and version > JSON_FORMAT_VERSION:
+        warnings.append(
+            f"This file is in Pedimap 2 JSON format version {version}, from a newer Pedimap 2; "
+            f"this version reads version {JSON_FORMAT_VERSION}, so some of its data may not be "
+            "shown. Update Pedimap 2 to see all of it.")
+    return PedigreeEngine.from_dict(data), warnings
 
 
 class DatExportRequest(BaseModel):
@@ -444,14 +482,16 @@ class DatExportRequest(BaseModel):
     replace_outside_parents: bool = False
 
 
-def _dat_response(ids=None, outside_parents: str = "include", notes=()) -> PlainTextResponse:
+def _dat_response(ids=None, outside_parents: str = "include", notes=(),
+                  focal_id: Optional[str] = None) -> PlainTextResponse:
     try:
         from pmp_parser import DatExporter, DatExportError
     except ImportError:
         raise HTTPException(501, "DatExporter not available.")
     try:
         text = DatExporter.to_dat_text(_engine, ids,
-                                       outside_parents=outside_parents, notes=notes)
+                                       outside_parents=outside_parents, notes=notes,
+                                       focal_id=focal_id)
     except DatExportError as exc:
         raise HTTPException(409, f"Cannot export as .dat: {exc}")
     return PlainTextResponse(text, media_type="text/plain")
@@ -470,14 +510,12 @@ def export_dat_subset(req: DatExportRequest):
         if unknown:
             raise HTTPException(400, f"Unknown individual(s): {', '.join(unknown)}")
     notes = []
-    if req.focal_id:
-        notes.append(f"Focal individual: {req.focal_id}")
     criteria = [k for k in ("ancestors", "descendants", "siblings") if getattr(req, k)]
     if req.focal_id or criteria:
         notes.append("Selection: " + " + ".join(["focal", *criteria]))
     return _dat_response(req.ids,
                          "unknown" if req.replace_outside_parents else "include",
-                         notes)
+                         notes, req.focal_id)
 
 
 @app.post("/api/individual")

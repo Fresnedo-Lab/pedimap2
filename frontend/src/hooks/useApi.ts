@@ -28,6 +28,9 @@ export interface IndividualDetail {
   name:          string;
   female_parent: string | null;
   male_parent:   string | null;
+  /** The parents' names, for display; the ids above are the key. */
+  female_parent_name?: string | null;
+  male_parent_name?:   string | null;
   cross_type:    string;
   ploidy:        number;
   generation:    number;
@@ -55,7 +58,8 @@ export interface GenotypeRow {
 /** A likely founder allele of a homologue: its number (1-based), the founder
  *  that owns it (null when the file does not say, e.g. an exported subset),
  *  and the probability. */
-export interface IbdAllele { allele: number; founder: string | null; probability: number }
+/** `founder` is the founder's id, `founder_name` its name, for display. */
+export interface IbdAllele { allele: number; founder: string | null; founder_name?: string | null; probability: number }
 
 /** The likely founder alleles of each homologue at one IBD position. */
 export interface IbdPosition {
@@ -100,6 +104,9 @@ export interface GraphNode {
   cross_type:     string;
   female_parent?: string | null;
   male_parent?:   string | null;
+  /** The parents' names, for display; the ids above are the key. */
+  female_parent_name?: string | null;
+  male_parent_name?:   string | null;
   traits?:        Record<string, number | string>;
   is_focal?:      boolean;
 }
@@ -130,9 +137,10 @@ export interface PedigreeData {
   marker_summary?: MarkerSummary;
 }
 
-/** Labels for files without a caption (demo data, JSON). */
+/** Labels for data without recorded parent columns (demo data, JSON without
+ *  them), which do not state the parents' sex. */
 export const DEFAULT_PARENT_LABELS: ParentLabels =
-  { female: "Female parent", male: "Male parent", columns: ["Female parent", "Male parent"] };
+  { female: "Parent 1", male: "Parent 2", columns: ["Parent 1", "Parent 2"] };
 
 // ── Backend URL resolution ────────────────────────────────────────────────────
 
@@ -223,6 +231,8 @@ export interface ApiClient {
   listDemo():                              Promise<{datasets: {name: string; description: string}[]}>;
   loadDemo(name: string):                  Promise<LoadResult>;
   exportDat(req?: DatExportRequest):       Promise<string>;
+  /** The whole population as Pedimap 2 JSON (docs/reference/json-format.md). */
+  exportJson():                            Promise<string>;
   reset():                                 Promise<void>;
 }
 
@@ -300,6 +310,7 @@ const client: ApiClient = {
   },
   listDemo: ()     => apiFetch("/api/demo/list"),
   loadDemo: (name) => apiFetch(`/api/demo/load/${encodeURIComponent(name)}`),
+  exportJson: () => apiFetchText("/api/export/json"),
   exportDat: (req = {}) => apiFetchText("/api/export/dat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

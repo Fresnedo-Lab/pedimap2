@@ -14,8 +14,8 @@ export function safeFileName(name: string): string {
 
 /** The base of a suggested file name, without extension: the population name
  *  (less a data-file extension, so "pm_small.dat" gives "pm_small", not
- *  "pm_small.dat.png"), plus the focal individual of a subpopulation. */
-export function exportBaseName(population: string | undefined, focalId?: string): string {
+ *  "pm_small.dat.png"), plus the name of a subpopulation's focal individual. */
+export function exportBaseName(population: string | undefined, focalName?: string | null): string {
   const base = (population ?? "").trim().replace(DATA_FILE_EXTENSION, "") || "pedigree";
-  return safeFileName(focalId ? `${base}_${focalId}_subpop` : base);
+  return safeFileName(focalName ? `${base}_${focalName}_subpop` : base);
 }

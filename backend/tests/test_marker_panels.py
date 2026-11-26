@@ -56,6 +56,46 @@ def test_parent_labels_of_the_fixtures(loaded):
             "female": "Parent 1", "male": "Parent 2", "columns": ["Parent 1", "Parent 2"]}
 
 
+PARENTS_1_2 = {"female": "Parent 1", "male": "Parent 2", "columns": ["Parent 1", "Parent 2"]}
+
+
+def test_data_without_parent_columns_has_parent_1_and_2(monkeypatch):
+    """The demo data and JSON without recorded columns do not state sex."""
+    from sample_data import load_sample_data
+    from pedigree_engine import PedigreeEngine
+    demo = load_sample_data()
+    assert marker_data.parent_labels(demo) == PARENTS_1_2
+    plain = PedigreeEngine.from_dict({"population": "P", "individuals": {
+        "A": {"name": "A"}, "B": {"name": "B"}, "C": {"name": "C", "female_parent": "A", "male_parent": "B"}}})
+    assert marker_data.parent_labels(plain) == PARENTS_1_2
+
+
+def test_dat_export_of_such_data_reads_back_as_parent_1_and_2():
+    """Its .dat export writes PARENT1 PARENT2, so reading it back keeps the
+    labels, and the parents stay in their places."""
+    from sample_data import load_sample_data
+    from pmp_parser import DatExporter
+    demo = load_sample_data()
+    text = DatExporter.to_dat_text(demo)
+    caption = text.split("PEDIGREE", 1)[1].strip().splitlines()[0].split()
+    assert caption[:3] == ["NAME", "PARENT1", "PARENT2"]
+    back = PmpParser.from_dat_text(text).engine
+    assert marker_data.parent_labels(back) == PARENTS_1_2
+    # A .dat file names individuals by name; each keeps its parents in place.
+    name = {iid: demo.get(iid).name for iid in demo._individuals}
+    for iid in demo._individuals:
+        a, b = demo.get(iid), back.get(name[iid])
+        assert (name.get(a.female_parent), name.get(a.male_parent)) == (b.female_parent, b.male_parent), iid
+
+
+def test_json_keeps_recorded_parent_columns(loaded):
+    """A JSON file saved from a FEMALE/MALE file keeps its columns."""
+    from pedigree_engine import PedigreeEngine
+    eng = loaded("Example.dat")
+    again = PedigreeEngine.from_dict(eng.to_dict())
+    assert marker_data.parent_labels(again)["female"] == "Female parent"
+
+
 # ── Genotypes ─────────────────────────────────────────────────────────────────
 
 def test_genotypes_in_map_order_with_codes(loaded):
@@ -91,8 +131,8 @@ def test_ibd_most_probable_founder_alleles(loaded):
     # Spec 5.5: G1_001 has [23] 0.95 [24] 0.05 from F003 (founder 12), and
     # [38] 1.0 from F010 (founder 19). 0.05 is not above 0.10, so not shown.
     assert first["homologues"] == [
-        [{"allele": 23, "founder": "F003", "probability": 0.95}],
-        [{"allele": 38, "founder": "F010", "probability": 1.0}],
+        [{"allele": 23, "founder": "F003", "founder_name": "F003", "probability": 0.95}],
+        [{"allele": 38, "founder": "F010", "founder_name": "F010", "probability": 1.0}],
     ]
 
 
@@ -100,8 +140,8 @@ def test_ibd_shows_the_next_allele_above_a_tenth(loaded):
     loaded("flexqtl_routeB_sim_small.ped")
     h1, h2 = api.get_individual("G1_007")["ibd"][0]["homologues"]
     # A founder without data splits its offspring's homologue evenly (spec 5.9).
-    assert h1 == [{"allele": 1, "founder": "DUMMY_G1_007_M", "probability": 0.5},
-                  {"allele": 2, "founder": "DUMMY_G1_007_M", "probability": 0.5}]
+    dummy = {"founder": "DUMMY_G1_007_M", "founder_name": "DUMMY_G1_007_M", "probability": 0.5}
+    assert h1 == [{"allele": 1, **dummy}, {"allele": 2, **dummy}]
     assert [a["allele"] for a in h2] == [45]
     loaded("Example.dat")
     h1, h2 = api.get_individual("81015-045")["ibd"][1]["homologues"]
@@ -127,8 +167,9 @@ def test_flexqtl_groups_show_their_own_positions(loaded):
 def test_supplied_founder_rows_and_unnamed_founders(loaded):
     eng = loaded("binko_ibd.ped")
     h1, h2 = api.get_individual("DUMMY_G1_007_F")["ibd"][0]["homologues"]
-    assert h1 == [{"allele": 13, "founder": "DUMMY_G1_007_F", "probability": 1.0}]
-    assert h2 == [{"allele": 14, "founder": "DUMMY_G1_007_F", "probability": 1.0}]
+    own = {"founder": "DUMMY_G1_007_F", "founder_name": "DUMMY_G1_007_F", "probability": 1.0}
+    assert h1 == [{"allele": 13, **own}]
+    assert h2 == [{"allele": 14, **own}]
     del eng.dat_meta["founder_order"]          # as in an exported subset
     assert api.get_individual("G1_001")["ibd"][0]["homologues"][0][0]["founder"] is None
 

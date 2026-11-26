@@ -161,6 +161,8 @@
     "name": "G1_001",
     "female_parent": "F005",
     "male_parent": "F002",
+    "female_parent_name": "F005",
+    "male_parent_name": "F002",
     "cross_type": "cross",
     "ploidy": 2,
     "generation": 1,
@@ -434,6 +436,8 @@
     "name": "F003",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "cross_type": "unknown",
     "ploidy": 2,
     "generation": 0,
@@ -644,6 +648,8 @@
     "name": "DUMMY_G1_007_F",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "cross_type": "unknown",
     "ploidy": 2,
     "generation": 0,
@@ -1061,6 +1067,8 @@
     "name": "G1_007",
     "female_parent": "DUMMY_G1_007_F",
     "male_parent": "F004",
+    "female_parent_name": "DUMMY_G1_007_F",
+    "male_parent_name": "F004",
     "cross_type": "cross",
     "ploidy": 2,
     "generation": 1,
@@ -1304,11 +1312,13 @@
         {
          "allele": 14,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 0.5025
         },
         {
          "allele": 13,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 0.4975
         }
        ],
@@ -1316,6 +1326,7 @@
         {
          "allele": 7,
          "founder": "F004",
+         "founder_name": "F004",
          "probability": 0.904
         }
        ]
@@ -1330,11 +1341,13 @@
         {
          "allele": 13,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 0.5015
         },
         {
          "allele": 14,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 0.4985
         }
        ],
@@ -1342,6 +1355,7 @@
         {
          "allele": 7,
          "founder": "F004",
+         "founder_name": "F004",
          "probability": 0.981
         }
        ]
@@ -1356,11 +1370,13 @@
         {
          "allele": 13,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 0.52
         },
         {
          "allele": 14,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 0.48
         }
        ],
@@ -1368,11 +1384,13 @@
         {
          "allele": 7,
          "founder": "F004",
+         "founder_name": "F004",
          "probability": 0.5055
         },
         {
          "allele": 8,
          "founder": "F004",
+         "founder_name": "F004",
          "probability": 0.4945
         }
        ]
@@ -1385,6 +1403,8 @@
     "name": "DUMMY_G1_007_F",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "cross_type": "unknown",
     "ploidy": 2,
     "generation": 0,
@@ -1410,6 +1430,7 @@
         {
          "allele": 13,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 1.0
         }
        ],
@@ -1417,6 +1438,7 @@
         {
          "allele": 14,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 1.0
         }
        ]
@@ -1431,6 +1453,7 @@
         {
          "allele": 13,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 1.0
         }
        ],
@@ -1438,6 +1461,7 @@
         {
          "allele": 14,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 1.0
         }
        ]
@@ -1452,6 +1476,7 @@
         {
          "allele": 13,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 1.0
         }
        ],
@@ -1459,6 +1484,7 @@
         {
          "allele": 14,
          "founder": "DUMMY_G1_007_F",
+         "founder_name": "DUMMY_G1_007_F",
          "probability": 1.0
         }
        ]
@@ -1759,6 +1785,8 @@
     "name": "G1_001",
     "female_parent": "F003",
     "male_parent": "F010",
+    "female_parent_name": "F003",
+    "male_parent_name": "F010",
     "cross_type": "cross",
     "ploidy": 2,
     "generation": 1,
@@ -2565,6 +2593,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.95
         }
        ],
@@ -2572,6 +2601,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2586,6 +2616,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -2593,6 +2624,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2607,6 +2639,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.99
         }
        ],
@@ -2614,6 +2647,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2628,6 +2662,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.99
         }
        ],
@@ -2635,11 +2670,13 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.75
         },
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.25
         }
        ]
@@ -2654,6 +2691,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.99
         }
        ],
@@ -2661,11 +2699,13 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.5
         },
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.5
         }
        ]
@@ -2680,6 +2720,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -2687,11 +2728,13 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.75
         },
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.25
         }
        ]
@@ -2706,6 +2749,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -2713,6 +2757,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2727,6 +2772,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -2734,6 +2780,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2748,11 +2795,13 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.87
         },
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.13
         }
        ],
@@ -2760,6 +2809,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -2774,11 +2824,13 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.74
         },
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.26
         }
        ],
@@ -2786,6 +2838,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2800,11 +2853,13 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.62
         },
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.38
         }
        ],
@@ -2812,6 +2867,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2826,11 +2882,13 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.5
         },
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.5
         }
        ],
@@ -2838,6 +2896,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2852,11 +2911,13 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.62
         },
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.38
         }
        ],
@@ -2864,6 +2925,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2878,11 +2940,13 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.74
         },
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.26
         }
        ],
@@ -2890,6 +2954,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2904,11 +2969,13 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.87
         },
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.13
         }
        ],
@@ -2916,6 +2983,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2930,6 +2998,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -2937,6 +3006,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2951,6 +3021,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -2958,6 +3029,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2972,6 +3044,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -2979,6 +3052,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -2993,6 +3067,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3000,6 +3075,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3014,6 +3090,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.95
         }
        ],
@@ -3021,6 +3098,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3035,6 +3113,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.91
         }
        ],
@@ -3042,6 +3121,7 @@
         {
          "allele": 37,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3056,6 +3136,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3063,6 +3144,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.91
         }
        ]
@@ -3077,6 +3159,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.99
         }
        ],
@@ -3084,6 +3167,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.95
         }
        ]
@@ -3098,6 +3182,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.99
         }
        ],
@@ -3105,6 +3190,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3119,6 +3205,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.99
         }
        ],
@@ -3126,6 +3213,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3140,6 +3228,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3147,6 +3236,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3161,6 +3251,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3168,6 +3259,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3182,6 +3274,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3189,6 +3282,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3203,6 +3297,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3210,6 +3305,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3224,6 +3320,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3231,6 +3328,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3245,6 +3343,7 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3252,6 +3351,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3266,11 +3366,13 @@
         {
          "allele": 23,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.5
         },
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 0.5
         }
        ],
@@ -3278,6 +3380,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.98
         }
        ]
@@ -3292,6 +3395,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3299,6 +3403,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3313,6 +3418,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3320,6 +3426,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3334,6 +3441,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3341,6 +3449,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3355,6 +3464,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3362,6 +3472,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3376,6 +3487,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3383,6 +3495,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3397,6 +3510,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3404,6 +3518,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3418,6 +3533,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3425,6 +3541,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3439,6 +3556,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3446,6 +3564,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.99
         }
        ]
@@ -3460,6 +3579,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3467,6 +3587,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 1.0
         }
        ]
@@ -3481,6 +3602,7 @@
         {
          "allele": 24,
          "founder": "F003",
+         "founder_name": "F003",
          "probability": 1.0
         }
        ],
@@ -3488,6 +3610,7 @@
         {
          "allele": 38,
          "founder": "F010",
+         "founder_name": "F010",
          "probability": 0.95
         }
        ]
@@ -3500,6 +3623,8 @@
     "name": "G1_007",
     "female_parent": "DUMMY_G1_007_M",
     "male_parent": "F014",
+    "female_parent_name": "DUMMY_G1_007_M",
+    "male_parent_name": "F014",
     "cross_type": "cross",
     "ploidy": 2,
     "generation": 1,
@@ -4286,11 +4411,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4298,6 +4425,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4312,11 +4440,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4324,6 +4454,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4338,11 +4469,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4350,6 +4483,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4364,11 +4498,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4376,6 +4512,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4390,11 +4527,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4402,6 +4541,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4416,11 +4556,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4428,6 +4570,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4442,11 +4585,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4454,6 +4599,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4468,11 +4614,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4480,6 +4628,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4494,11 +4643,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4506,6 +4657,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4520,11 +4672,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4532,6 +4686,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4546,11 +4701,13 @@
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.51
         },
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.49
         }
        ],
@@ -4558,6 +4715,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4572,11 +4730,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4584,6 +4744,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4598,11 +4759,13 @@
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.51
         },
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.49
         }
        ],
@@ -4610,6 +4773,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4624,11 +4788,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4636,6 +4802,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4650,11 +4817,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4662,6 +4831,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4676,11 +4846,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4688,6 +4860,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4702,11 +4875,13 @@
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.51
         },
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.49
         }
        ],
@@ -4714,6 +4889,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4728,11 +4904,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4740,6 +4918,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4754,11 +4933,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4766,6 +4947,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.99
         }
        ]
@@ -4780,11 +4962,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4792,6 +4976,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4806,11 +4991,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4818,6 +5005,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4832,11 +5020,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4844,11 +5034,13 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.87
         },
         {
          "allele": 46,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.13
         }
        ]
@@ -4863,11 +5055,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4875,6 +5069,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.91
         }
        ]
@@ -4889,11 +5084,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4901,6 +5098,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.95
         }
        ]
@@ -4915,11 +5113,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4927,6 +5127,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4941,11 +5142,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4953,6 +5156,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4967,11 +5171,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -4979,6 +5185,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -4993,11 +5200,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5005,6 +5214,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5019,11 +5229,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5031,6 +5243,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5045,11 +5258,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5057,6 +5272,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5071,11 +5287,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5083,6 +5301,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5097,11 +5316,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5109,6 +5330,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5123,11 +5345,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5135,6 +5359,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5149,11 +5374,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5161,6 +5388,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5175,11 +5403,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5187,6 +5417,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5201,11 +5432,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5213,6 +5446,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5227,11 +5461,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5239,6 +5475,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5253,11 +5490,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5265,6 +5504,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5279,11 +5519,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5291,6 +5533,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5305,11 +5548,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5317,6 +5562,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 1.0
         }
        ]
@@ -5331,11 +5577,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5343,6 +5591,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.95
         }
        ]
@@ -5357,11 +5606,13 @@
         {
          "allele": 1,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         },
         {
          "allele": 2,
          "founder": "DUMMY_G1_007_M",
+         "founder_name": "DUMMY_G1_007_M",
          "probability": 0.5
         }
        ],
@@ -5369,6 +5620,7 @@
         {
          "allele": 45,
          "founder": "F014",
+         "founder_name": "F014",
          "probability": 0.91
         }
        ]
@@ -5491,6 +5743,8 @@
     "name": "Elstar",
     "female_parent": "GoldenD",
     "male_parent": "IngridM",
+    "female_parent_name": "GoldenD",
+    "male_parent_name": "IngridM",
     "cross_type": "cross",
     "ploidy": 2,
     "generation": 1,
@@ -5620,6 +5874,7 @@
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 1.0
         }
        ],
@@ -5627,6 +5882,7 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 1.0
         }
        ]
@@ -5641,6 +5897,7 @@
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 0.93
         }
        ],
@@ -5648,11 +5905,13 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.84
         },
         {
          "allele": 4,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.16
         }
        ]
@@ -5667,6 +5926,7 @@
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 0.93
         }
        ],
@@ -5674,11 +5934,13 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.78
         },
         {
          "allele": 4,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.22
         }
        ]
@@ -5693,6 +5955,7 @@
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 1.0
         }
        ],
@@ -5700,6 +5963,7 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 1.0
         }
        ]
@@ -5714,6 +5978,7 @@
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 1.0
         }
        ],
@@ -5721,6 +5986,7 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 1.0
         }
        ]
@@ -5733,6 +5999,8 @@
     "name": "81015-045",
     "female_parent": "Elstar",
     "male_parent": "Elise",
+    "female_parent_name": "Elstar",
+    "male_parent_name": "Elise",
     "cross_type": "cross",
     "ploidy": 2,
     "generation": 3,
@@ -5872,11 +6140,13 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.78
         },
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 0.22
         }
        ],
@@ -5884,6 +6154,7 @@
         {
          "allele": 6,
          "founder": "Jonathan",
+         "founder_name": "Jonathan",
          "probability": 1.0
         }
        ]
@@ -5898,11 +6169,13 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.77
         },
         {
          "allele": 4,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.15
         }
        ],
@@ -5910,11 +6183,13 @@
         {
          "allele": 7,
          "founder": "Cox",
+         "founder_name": "Cox",
          "probability": 0.58
         },
         {
          "allele": 6,
          "founder": "Jonathan",
+         "founder_name": "Jonathan",
          "probability": 0.26
         }
        ]
@@ -5929,11 +6204,13 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.78
         },
         {
          "allele": 4,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.22
         }
        ],
@@ -5941,11 +6218,13 @@
         {
          "allele": 7,
          "founder": "Cox",
+         "founder_name": "Cox",
          "probability": 0.78
         },
         {
          "allele": 8,
          "founder": "Cox",
+         "founder_name": "Cox",
          "probability": 0.22
         }
        ]
@@ -5960,11 +6239,13 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.78
         },
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 0.22
         }
        ],
@@ -5972,6 +6253,7 @@
         {
          "allele": 6,
          "founder": "Jonathan",
+         "founder_name": "Jonathan",
          "probability": 1.0
         }
        ]
@@ -5986,11 +6268,13 @@
         {
          "allele": 3,
          "founder": "IngridM",
+         "founder_name": "IngridM",
          "probability": 0.78
         },
         {
          "allele": 1,
          "founder": "GoldenD",
+         "founder_name": "GoldenD",
          "probability": 0.22
         }
        ],
@@ -5998,6 +6282,7 @@
         {
          "allele": 6,
          "founder": "Jonathan",
+         "founder_name": "Jonathan",
          "probability": 1.0
         }
        ]

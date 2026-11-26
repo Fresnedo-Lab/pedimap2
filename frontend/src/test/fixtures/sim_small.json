@@ -11,6 +11,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -22,6 +24,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -33,6 +37,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -44,6 +50,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -55,6 +63,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -66,6 +76,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -77,6 +89,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -88,6 +102,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -99,6 +115,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {}
    },
    {
@@ -110,6 +128,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 6.7993
@@ -124,6 +144,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 11.6548
@@ -138,6 +160,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 11.0303
@@ -152,6 +176,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 10.048
@@ -166,6 +192,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 9.3822
@@ -180,6 +208,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 9.1882
@@ -194,6 +224,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 8.7185
@@ -208,6 +240,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 10.312
@@ -222,6 +256,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 11.1857
@@ -236,6 +272,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 11.7129
@@ -250,6 +288,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 10.4743
@@ -264,6 +304,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 8.8072
@@ -278,6 +320,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 10.9129
@@ -292,6 +336,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 8.8764
@@ -306,6 +352,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 10.2713
@@ -320,6 +368,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 8.7595
@@ -334,6 +384,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 12.2342
@@ -348,6 +400,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 9.1519
@@ -362,6 +416,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 10.4681
@@ -376,6 +432,8 @@
     "cross_type": "unknown",
     "female_parent": null,
     "male_parent": null,
+    "female_parent_name": null,
+    "male_parent_name": null,
     "traits": {
      "Gwrite": "1",
      "y": 10.0932
@@ -390,6 +448,8 @@
     "cross_type": "cross",
     "female_parent": "F003",
     "male_parent": "F010",
+    "female_parent_name": "F003",
+    "male_parent_name": "F010",
     "traits": {
      "Gwrite": "1",
      "y": 11.605
@@ -404,6 +464,8 @@
     "cross_type": "cross",
     "female_parent": "F003",
     "male_parent": "F010",
+    "female_parent_name": "F003",
+    "male_parent_name": "F010",
     "traits": {
      "Gwrite": "1",
      "y": 9.2142
@@ -418,6 +480,8 @@
     "cross_type": "cross",
     "female_parent": "F003",
     "male_parent": "F010",
+    "female_parent_name": "F003",
+    "male_parent_name": "F010",
     "traits": {
      "Gwrite": "1",
      "y": 11.8018
@@ -432,6 +496,8 @@
     "cross_type": "cross",
     "female_parent": "F018",
     "male_parent": "F002",
+    "female_parent_name": "F018",
+    "male_parent_name": "F002",
     "traits": {
      "Gwrite": "1",
      "y": 9.8094
@@ -446,6 +512,8 @@
     "cross_type": "cross",
     "female_parent": "F018",
     "male_parent": "F002",
+    "female_parent_name": "F018",
+    "male_parent_name": "F002",
     "traits": {
      "Gwrite": "1",
      "y": 9.3211
@@ -460,6 +528,8 @@
     "cross_type": "cross",
     "female_parent": "F018",
     "male_parent": "F002",
+    "female_parent_name": "F018",
+    "male_parent_name": "F002",
     "traits": {
      "Gwrite": "1",
      "y": 12.4451
@@ -474,6 +544,8 @@
     "cross_type": "cross",
     "female_parent": "DUMMY_G1_007_M",
     "male_parent": "F014",
+    "female_parent_name": "DUMMY_G1_007_M",
+    "male_parent_name": "F014",
     "traits": {
      "Gwrite": "1",
      "y": 11.172
@@ -488,6 +560,8 @@
     "cross_type": "cross",
     "female_parent": "F019",
     "male_parent": "F014",
+    "female_parent_name": "F019",
+    "male_parent_name": "F014",
     "traits": {
      "Gwrite": "1",
      "y": 8.9101
@@ -502,6 +576,8 @@
     "cross_type": "cross",
     "female_parent": "F019",
     "male_parent": "F014",
+    "female_parent_name": "F019",
+    "male_parent_name": "F014",
     "traits": {
      "Gwrite": "1",
      "y": 12.089
@@ -516,6 +592,8 @@
     "cross_type": "cross",
     "female_parent": "F018",
     "male_parent": "F006",
+    "female_parent_name": "F018",
+    "male_parent_name": "F006",
     "traits": {
      "Gwrite": "1",
      "y": 10.5181
@@ -530,6 +608,8 @@
     "cross_type": "cross",
     "female_parent": "DUMMY_G1_011_M",
     "male_parent": "F006",
+    "female_parent_name": "DUMMY_G1_011_M",
+    "male_parent_name": "F006",
     "traits": {
      "Gwrite": "1",
      "y": 9.9164
@@ -544,6 +624,8 @@
     "cross_type": "cross",
     "female_parent": "F018",
     "male_parent": "F006",
+    "female_parent_name": "F018",
+    "male_parent_name": "F006",
     "traits": {
      "Gwrite": "1",
      "y": 8.1137
@@ -558,6 +640,8 @@
     "cross_type": "cross",
     "female_parent": "F016",
     "male_parent": "DUMMY_G1_013_F",
+    "female_parent_name": "F016",
+    "male_parent_name": "DUMMY_G1_013_F",
     "traits": {
      "Gwrite": "1",
      "y": 10.5448
@@ -572,6 +656,8 @@
     "cross_type": "cross",
     "female_parent": "DUMMY_G1_014_M",
     "male_parent": "F012",
+    "female_parent_name": "DUMMY_G1_014_M",
+    "male_parent_name": "F012",
     "traits": {
      "Gwrite": "1",
      "y": 8.5571
@@ -586,6 +672,8 @@
     "cross_type": "cross",
     "female_parent": "F016",
     "male_parent": "F012",
+    "female_parent_name": "F016",
+    "male_parent_name": "F012",
     "traits": {
      "Gwrite": "1",
      "y": 10.4971
@@ -600,6 +688,8 @@
     "cross_type": "cross",
     "female_parent": "G1_001",
     "male_parent": "G1_006",
+    "female_parent_name": "G1_001",
+    "male_parent_name": "G1_006",
     "traits": {
      "Gwrite": "1",
      "y": 10.0419
@@ -614,6 +704,8 @@
     "cross_type": "cross",
     "female_parent": "G1_001",
     "male_parent": "G1_006",
+    "female_parent_name": "G1_001",
+    "male_parent_name": "G1_006",
     "traits": {
      "Gwrite": "1",
      "y": 12.1822
@@ -628,6 +720,8 @@
     "cross_type": "cross",
     "female_parent": "G1_001",
     "male_parent": "DUMMY_G2_003_F",
+    "female_parent_name": "G1_001",
+    "male_parent_name": "DUMMY_G2_003_F",
     "traits": {
      "Gwrite": "1",
      "y": 9.9476
@@ -642,6 +736,8 @@
     "cross_type": "cross",
     "female_parent": "G1_006",
     "male_parent": "G1_013",
+    "female_parent_name": "G1_006",
+    "male_parent_name": "G1_013",
     "traits": {
      "Gwrite": "1",
      "y": 9.8329
@@ -656,6 +752,8 @@
     "cross_type": "cross",
     "female_parent": "G1_006",
     "male_parent": "G1_013",
+    "female_parent_name": "G1_006",
+    "male_parent_name": "G1_013",
     "traits": {
      "Gwrite": "1",
      "y": 10.2254
@@ -670,6 +768,8 @@
     "cross_type": "cross",
     "female_parent": "G1_006",
     "male_parent": "G1_013",
+    "female_parent_name": "G1_006",
+    "male_parent_name": "G1_013",
     "traits": {
      "Gwrite": "1",
      "y": 11.1231
@@ -684,6 +784,8 @@
     "cross_type": "cross",
     "female_parent": "G1_013",
     "male_parent": "G1_004",
+    "female_parent_name": "G1_013",
+    "male_parent_name": "G1_004",
     "traits": {
      "Gwrite": "1",
      "y": 13.039
@@ -698,6 +800,8 @@
     "cross_type": "cross",
     "female_parent": "G1_013",
     "male_parent": "DUMMY_G2_008_F",
+    "female_parent_name": "G1_013",
+    "male_parent_name": "DUMMY_G2_008_F",
     "traits": {
      "Gwrite": "1",
      "y": 10.6183
@@ -712,6 +816,8 @@
     "cross_type": "cross",
     "female_parent": "G1_013",
     "male_parent": "G1_004",
+    "female_parent_name": "G1_013",
+    "male_parent_name": "G1_004",
     "traits": {
      "Gwrite": "1",
      "y": 9.2341
@@ -726,6 +832,8 @@
     "cross_type": "cross",
     "female_parent": "G1_007",
     "male_parent": "G1_009",
+    "female_parent_name": "G1_007",
+    "male_parent_name": "G1_009",
     "traits": {
      "Gwrite": "1",
      "y": 11.5004
@@ -740,6 +848,8 @@
     "cross_type": "cross",
     "female_parent": "G1_007",
     "male_parent": "G1_009",
+    "female_parent_name": "G1_007",
+    "male_parent_name": "G1_009",
     "traits": {
      "Gwrite": "1",
      "y": 9.8745
@@ -754,6 +864,8 @@
     "cross_type": "cross",
     "female_parent": "G1_007",
     "male_parent": "G1_009",
+    "female_parent_name": "G1_007",
+    "male_parent_name": "G1_009",
     "traits": {
      "Gwrite": "1",
      "y": 9.4706
@@ -768,6 +880,8 @@
     "cross_type": "cross",
     "female_parent": "G1_004",
     "male_parent": "G1_006",
+    "female_parent_name": "G1_004",
+    "male_parent_name": "G1_006",
     "traits": {
      "Gwrite": "1",
      "y": 10.995
@@ -782,6 +896,8 @@
     "cross_type": "cross",
     "female_parent": "G1_004",
     "male_parent": "G1_006",
+    "female_parent_name": "G1_004",
+    "male_parent_name": "G1_006",
     "traits": {
      "Gwrite": "1",
      "y": 11.716
@@ -796,6 +912,8 @@
     "cross_type": "cross",
     "female_parent": "G1_004",
     "male_parent": "G1_006",
+    "female_parent_name": "G1_004",
+    "male_parent_name": "G1_006",
     "traits": {
      "Gwrite": "1",
      "y": 10.8302
@@ -810,6 +928,8 @@
     "cross_type": "cross",
     "female_parent": "G2_010",
     "male_parent": "G2_015",
+    "female_parent_name": "G2_010",
+    "male_parent_name": "G2_015",
     "traits": {
      "Gwrite": "1",
      "y": 11.3792
@@ -824,6 +944,8 @@
     "cross_type": "cross",
     "female_parent": "G2_010",
     "male_parent": "G2_015",
+    "female_parent_name": "G2_010",
+    "male_parent_name": "G2_015",
     "traits": {
      "Gwrite": "1",
      "y": 9.5765
@@ -838,6 +960,8 @@
     "cross_type": "cross",
     "female_parent": "DUMMY_G3_003_M",
     "male_parent": "G2_015",
+    "female_parent_name": "DUMMY_G3_003_M",
+    "male_parent_name": "G2_015",
     "traits": {
      "Gwrite": "1",
      "y": 10.1189
@@ -852,6 +976,8 @@
     "cross_type": "cross",
     "female_parent": "G2_014",
     "male_parent": "G2_001",
+    "female_parent_name": "G2_014",
+    "male_parent_name": "G2_001",
     "traits": {
      "Gwrite": "1",
      "y": 10.863
@@ -866,6 +992,8 @@
     "cross_type": "cross",
     "female_parent": "G2_014",
     "male_parent": "G2_001",
+    "female_parent_name": "G2_014",
+    "male_parent_name": "G2_001",
     "traits": {
      "Gwrite": "1",
      "y": 11.0732
@@ -880,6 +1008,8 @@
     "cross_type": "cross",
     "female_parent": "G2_014",
     "male_parent": "G2_001",
+    "female_parent_name": "G2_014",
+    "male_parent_name": "G2_001",
     "traits": {
      "Gwrite": "1",
      "y": 11.6263
@@ -894,6 +1024,8 @@
     "cross_type": "cross",
     "female_parent": "G2_013",
     "male_parent": "G2_011",
+    "female_parent_name": "G2_013",
+    "male_parent_name": "G2_011",
     "traits": {
      "Gwrite": "1",
      "y": 12.3082
@@ -908,6 +1040,8 @@
     "cross_type": "cross",
     "female_parent": "G2_013",
     "male_parent": "G2_011",
+    "female_parent_name": "G2_013",
+    "male_parent_name": "G2_011",
     "traits": {
      "Gwrite": "1",
      "y": 11.7799
@@ -922,6 +1056,8 @@
     "cross_type": "cross",
     "female_parent": "G2_013",
     "male_parent": "DUMMY_G3_009_F",
+    "female_parent_name": "G2_013",
+    "male_parent_name": "DUMMY_G3_009_F",
     "traits": {
      "Gwrite": "1",
      "y": 9.1435
@@ -936,6 +1072,8 @@
     "cross_type": "cross",
     "female_parent": "G2_001",
     "male_parent": "G2_002",
+    "female_parent_name": "G2_001",
+    "male_parent_name": "G2_002",
     "traits": {
      "Gwrite": "1",
      "y": 8.8409
@@ -950,6 +1088,8 @@
     "cross_type": "cross",
     "female_parent": "G2_001",
     "male_parent": "G2_002",
+    "female_parent_name": "G2_001",
+    "male_parent_name": "G2_002",
     "traits": {
      "Gwrite": "1",
      "y": 11.8945
@@ -964,6 +1104,8 @@
     "cross_type": "cross",
     "female_parent": "G2_001",
     "male_parent": "G2_002",
+    "female_parent_name": "G2_001",
+    "male_parent_name": "G2_002",
     "traits": {
      "Gwrite": "1",
      "y": 9.0226
@@ -978,6 +1120,8 @@
     "cross_type": "cross",
     "female_parent": "G2_001",
     "male_parent": "G2_004",
+    "female_parent_name": "G2_001",
+    "male_parent_name": "G2_004",
     "traits": {
      "Gwrite": "1",
      "y": 11.9788
@@ -992,6 +1136,8 @@
     "cross_type": "cross",
     "female_parent": "G2_001",
     "male_parent": "DUMMY_G3_014_F",
+    "female_parent_name": "G2_001",
+    "male_parent_name": "DUMMY_G3_014_F",
     "traits": {
      "Gwrite": "1",
      "y": 9.2976
@@ -1006,6 +1152,8 @@
     "cross_type": "cross",
     "female_parent": "G2_001",
     "male_parent": "G2_004",
+    "female_parent_name": "G2_001",
+    "male_parent_name": "G2_004",
     "traits": {
      "Gwrite": "1",
      "y": 11.6491

@@ -26,8 +26,11 @@ _SEXED = {"FEMALE": "Female parent", "MOTHER": "Female parent",
 
 
 def _caption(eng: PedigreeEngine) -> List[str]:
+    """The caption's two parent columns. Data without recorded columns (the
+    demo data, JSON without them) does not state the parents' sex, so its
+    parents are "Parent 1" and "Parent 2"."""
     labels = list((eng.dat_meta or {}).get("parent_columns") or [])
-    return labels if len(labels) == 2 else ["FEMALE", "MALE"]
+    return labels if len(labels) == 2 else ["PARENT1", "PARENT2"]
 
 
 def parent_labels(eng: PedigreeEngine) -> Dict[str, Any]:
@@ -96,13 +99,26 @@ def _founder_of(eng: PedigreeEngine, allele: int) -> Optional[str]:
     return order[k] if 0 <= k < len(order) else None
 
 
+def display_name(eng: PedigreeEngine, ind_id: Optional[str]) -> Optional[str]:
+    """How the interface names an individual: its name, or its id if it has
+    none or is not in the pedigree. Ids stay the key everywhere else."""
+    if ind_id is None:
+        return None
+    ind = eng.get(ind_id)
+    return ind.name if ind is not None and ind.name else ind_id
+
+
 def _likely(eng: PedigreeEngine, vec: List[float]) -> List[Dict[str, Any]]:
     """The most probable founder allele of a homologue, and the next most
     probable when its probability is above SECOND_ALLELE_THRESHOLD."""
     ranked = sorted(range(len(vec)), key=lambda j: (-vec[j], j))
     shown = ranked[:1] + [j for j in ranked[1:2] if vec[j] > SECOND_ALLELE_THRESHOLD]
-    return [{"allele": j + 1, "founder": _founder_of(eng, j + 1), "probability": vec[j]}
-            for j in shown]
+    out = []
+    for j in shown:
+        founder = _founder_of(eng, j + 1)
+        out.append({"allele": j + 1, "founder": founder,
+                    "founder_name": display_name(eng, founder), "probability": vec[j]})
+    return out
 
 
 def ibd_summary(eng: PedigreeEngine, ind_id: str) -> List[Dict[str, Any]]:
@@ -228,6 +244,8 @@ def haplotypes(eng: PedigreeEngine, group: str) -> Optional[Dict[str, Any]]:
         "markers":         markers,
         "nalleles":        nalleles,
         "founders":        meta.get("founder_order") or None,
+        "founder_names":   [display_name(eng, f) for f in meta["founder_order"]]
+                           if meta.get("founder_order") else None,
         "founder_alleles": founder_alleles,
         "rows":            rows,
     }

@@ -111,6 +111,15 @@ describe("palettes", () => {
     expect(p.colorOf(contributingAlleles(data, G3_010)[1])).toBe(NOT_HIGHLIGHTED);
   });
 
+  it("name founders by name, not id, in the legend and the hover text", () => {
+    const data = flexqtl("1");
+    const names = data.founders!.map((f, k) => (k === 0 ? "First founder" : f));
+    const named = { ...data, founder_names: names };
+    const whole = palette(named, Object.keys(data.rows), "founder");
+    expect(whole.legend[0].label).toBe("First founder");
+    expect(palette(named, Object.keys(data.rows), "allele").legend[0].label).toBe("First founder, founder allele 1");
+  });
+
   it("name founder alleles by number when the file does not name founders", () => {
     const data = { ...flexqtl("1"), founders: null };
     expect(palette(data, G3_010, "founder").legend[0].label).toMatch(/^Founder alleles \d+–\d+$/);

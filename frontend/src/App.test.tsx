@@ -5,9 +5,13 @@ import { syntheticGraph } from "./test/fixtures";
 
 // vis-network needs a real canvas; the drawing-limit decision happens before
 // the canvas is created, so a stand-in shows whether the graph was drawn.
-vi.mock("./components/PedigreeCanvas", async () => {
+vi.mock("./components/PedigreeCanvas", async (importOriginal) => {
   const { forwardRef } = await import("react");
+  // The boxes of the IBD bars are computed as the app does (they feed the
+  // founder-allele legend); only the drawing is replaced.
+  const { haplotypeBoxes } = await importOriginal<typeof import("./components/PedigreeCanvas")>();
   return {
+    haplotypeBoxes,
     default: forwardRef(function Canvas(props: { model: { individuals: unknown[]; crosses: unknown[] };
                                              colorMap: Record<string, string>;
                                              haplotype?: { data: { linkage_group: string };
@@ -165,6 +169,33 @@ describe("exported file names", () => {
   });
 });
 
+describe("Save as JSON", () => {
+  it("saves the whole population's JSON, as the backend writes it, under the population's name", async () => {
+    const json = '{"format": "pedimap2-json", "format_version": 1, "population": "Synthetic"}';
+    serve(pedigreeOf(4), undefined, "Synthetic", {
+      "/api/export/json": () => new Response(json, { headers: { "Content-Type": "application/json" } }),
+    });
+    const url = URL as unknown as Record<string, unknown>;   // jsdom has no object URLs
+    const blobs: Blob[] = [];
+    url.createObjectURL = (b: Blob) => { blobs.push(b); return "blob:x"; };
+    url.revokeObjectURL = () => {};
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) { names.push(this.download); });
+    render(<App />);
+    await screen.findByTestId("pedigree-canvas");
+    const button = screen.getByRole("button", { name: "Save as JSON" });
+    expect(button.getAttribute("title")).toMatch(/^Save the whole population/);
+    fireEvent.click(button);
+    await vi.waitFor(() => expect(names).toEqual(["Synthetic.json"]));
+    expect(await blobs[0].text()).toBe(json);
+    expect(blobs[0].type).toMatch(/^application\/json/);
+    click.mockRestore();
+    delete url.createObjectURL;
+    delete url.revokeObjectURL;
+  });
+});
+
 describe("color by a marker", () => {
   it("by genotype code or copies of an allele, with a legend", async () => {
     const marker = { name: "M1", linkage_group: "1", position_cM: 0 };
@@ -296,7 +327,7 @@ describe("IBD bars", () => {
     fireEvent.change(screen.getByLabelText("Palette"), { target: { value: "allele" } });
     const byAllele = canvas().getAttribute("data-allele-colors");
     expect(byAllele).not.toBe(byFounder);
-    expect(stored()).toEqual({ barWidth: 39, colorScheme: "allele" });
+    expect(stored()).toEqual({ barWidth: 39, colorScheme: "allele", legendCollapsed: false });
 
     // A new session (the app started again) keeps both.
     view.unmount();
@@ -309,11 +340,12 @@ describe("IBD bars", () => {
 
   it("takes the defaults for stored IBD settings that are missing or not valid", async () => {
     for (const [haplotype, expected] of [
-      [undefined, { barWidth: 20, colorScheme: "founder" }],                // saved before PR 4
-      [{ barWidth: 200, colorScheme: "highlight" }, { barWidth: 40, colorScheme: "founder" }],
-      [{ barWidth: 2.4 }, { barWidth: 6, colorScheme: "founder" }],
-      [{ barWidth: "wide", colorScheme: "allele" }, { barWidth: 20, colorScheme: "allele" }],
-      [{ barWidth: 13.6, colorScheme: null }, { barWidth: 14, colorScheme: "founder" }],
+      [undefined, { barWidth: 20, colorScheme: "founder", legendCollapsed: false }],   // saved before 2.4
+      [{ barWidth: 200, colorScheme: "highlight" }, { barWidth: 40, colorScheme: "founder", legendCollapsed: false }],
+      [{ barWidth: 2.4 }, { barWidth: 6, colorScheme: "founder", legendCollapsed: false }],
+      [{ barWidth: "wide", colorScheme: "allele" }, { barWidth: 20, colorScheme: "allele", legendCollapsed: false }],
+      [{ barWidth: 13.6, colorScheme: null, legendCollapsed: "yes" }, { barWidth: 14, colorScheme: "founder", legendCollapsed: false }],
+      [{ barWidth: 20, legendCollapsed: true }, { barWidth: 20, colorScheme: "founder", legendCollapsed: true }],
     ] as const) {
       localStorage.setItem("pedimap.viewSettings", JSON.stringify({ "view-1": { orientation: "UD", style: "modern", haplotype } }));
       const view = await showBars();
@@ -322,6 +354,31 @@ describe("IBD bars", () => {
       view.unmount();
       localStorage.clear();
     }
+  });
+
+  it("shows the founder-allele legend while IBD bars are on; collapsing it is kept", async () => {
+    const view = await showBars();
+    fireEvent.click(screen.getByTitle("Settings"));                          // close Settings again
+    const legend = screen.getByRole("group", { name: "Founder alleles" });
+    const toggle = within(legend).getByRole("button");
+    expect(toggle.textContent).toMatch(/Founder alleles, linkage group 1 \(below 0\.05 merged\)/);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");              // shown by default
+    // I0 is the first founder: its two founder alleles 1 and 2, in two columns.
+    expect(within(legend).getByText("I0").getAttribute("data-founder")).toBe("I0");
+    expect([...legend.querySelectorAll("[data-allele]")].map(e => e.getAttribute("data-allele"))).toEqual(["1", "2"]);
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(within(legend).queryByText("I0")).toBeNull();
+    expect(stored().legendCollapsed).toBe(true);
+
+    view.unmount();                                                          // a new session
+    await showBars();
+    const again = screen.getByRole("group", { name: "Founder alleles" });
+    expect(within(again).getByRole("button").getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.change(screen.getByLabelText("IBD bars"), { target: { value: "" } });   // bars off: no legend
+    await vi.waitFor(() => expect(screen.queryByRole("group", { name: "Founder alleles" })).toBeNull());
   });
 
   it("is not offered for a file without IBD positions", async () => {

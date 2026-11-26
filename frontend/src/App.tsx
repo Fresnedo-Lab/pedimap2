@@ -46,6 +46,7 @@ import { markerColoring, type MarkerColoringChoice, type MarkerColoringMode } fr
 import { BAR_WIDTH, DEFAULT_HAPLOTYPE_SETTINGS, founderAlleleLegend, palette, type HaplotypeData } from "./lib/haplotype";
 import { THEMES } from "./chart/style";
 import ChartLegend from "./components/ChartLegend";
+import IbdLegend from "./components/IbdLegend";
 import MarkerSummaryMenu from "./components/MarkerSummaryMenu";
 import { exportBaseName } from "./lib/fileNames";
 import { isEditableTarget } from "./lib/keyboard";
@@ -90,7 +91,12 @@ export interface ViewSettings {
   haplotype:        HaplotypeViewSettings;
 }
 
-export interface HaplotypeViewSettings { barWidth: number; colorScheme: IbdColorScheme }
+export interface HaplotypeViewSettings {
+  barWidth:        number;
+  colorScheme:     IbdColorScheme;
+  /** The on-screen legend of the founder alleles is collapsed to its title. */
+  legendCollapsed: boolean;
+}
 /** The palettes offered (design §2.1); the highlight scheme comes later. */
 export type IbdColorScheme = "founder" | "allele";
 const IBD_COLOR_SCHEMES: IbdColorScheme[] = ["founder", "allele"];
@@ -114,7 +120,8 @@ function defaultViewSettings(): ViewSettings {
     ibdLinkageGroup:   null,
     selectedMarkers:   [],
     traitColors:       {},
-    haplotype:         { barWidth: DEFAULT_HAPLOTYPE_SETTINGS.barWidth, colorScheme: "founder" },
+    haplotype:         { barWidth: DEFAULT_HAPLOTYPE_SETTINGS.barWidth, colorScheme: "founder",
+                         legendCollapsed: false },
   };
 }
 
@@ -123,12 +130,13 @@ function defaultViewSettings(): ViewSettings {
 function validHaplotype(stored: unknown): HaplotypeViewSettings {
   const d = defaultViewSettings().haplotype;
   if (!stored || typeof stored !== "object") return d;
-  const { barWidth, colorScheme } = stored as Partial<HaplotypeViewSettings>;
+  const { barWidth, colorScheme, legendCollapsed } = stored as Partial<HaplotypeViewSettings>;
   const width = Number(barWidth);
   return {
     barWidth: Number.isFinite(width) && barWidth !== null
       ? Math.min(BAR_WIDTH.max, Math.max(BAR_WIDTH.min, Math.round(width))) : d.barWidth,
     colorScheme: IBD_COLOR_SCHEMES.includes(colorScheme as IbdColorScheme) ? colorScheme as IbdColorScheme : d.colorScheme,
+    legendCollapsed: legendCollapsed === true,
   };
 }
 
@@ -291,6 +299,10 @@ export default function App() {
 
   const { data: indList, reload: reloadIndividuals } =
     useFetch<IndividualSummary[]>(() => api.listIndividuals(), [], ready);
+  // How the interface names an individual: its name, never its id (ids are
+  // the key; they differ from the names in e.g. the demo data and JSON files).
+  const names = useMemo(() => new Map((indList ?? []).map(i => [i.id, i.name || i.id])), [indList]);
+  const nameOf = useCallback((id: string) => names.get(id) ?? id, [names]);
 
   const [graphData,   setGraphData]   = useState<GraphData | null>(null);
   const [colorMap,    setColorMap]    = useState<Record<string, string>>({});
@@ -572,12 +584,23 @@ export default function App() {
             replace_outside_parents: replaceOutside }
         : {};
       const text = await api.exportDat(req);
-      await saveTextFile(`${exportBaseName(pedigree?.population, subpop?.focal_id)}.dat`, text);
+      await saveTextFile(`${exportBaseName(pedigree?.population, subpop && nameOf(subpop.focal_id))}.dat`, text);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-  }, [api, subpop, graphData, replaceOutside, pedigree]);
+  }, [api, subpop, graphData, replaceOutside, pedigree, nameOf]);
+
+  // ── Save as JSON: always the whole population, with all of its data ──────
+  const saveJson = useCallback(async () => {
+    try {
+      const text = await api.exportJson();
+      await saveTextFile(`${exportBaseName(pedigree?.population)}.json`, text, "application/json");
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [api, pedigree]);
 
   // ── Chart model, drawing limit, image export ─────────────────────────────
   const chartModel = useMemo(
@@ -639,27 +662,30 @@ export default function App() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const closeImageDialog = useCallback(() => setImageDialogOpen(false), []);
 
+  // The IBD bars' boxes as the chart draws them, and the legend of exactly the
+  // founder alleles they draw, in the chart's colors: one computation for the
+  // on-screen legend and the exported image alike.
+  const shownBoxes = useMemo(() => (chartModel && haplotypeView
+    ? haplotypeBoxes(chartModel, haplotypeView, THEMES[displayStyle], chartColors,
+                     new Set(coloring?.hatched ?? []))
+    : null), [chartModel, haplotypeView, displayStyle, chartColors, coloring]);
+  const founderLegend = useMemo(() => (shownBoxes && haplotypeView
+    ? founderAlleleLegend(haplotypeView.data, Object.values(shownBoxes), haplotypeView.settings)
+    : null), [shownBoxes, haplotypeView]);
+
   const buildImageInput = useCallback(() => {
     const geometry = canvasRef.current?.geometry();
     if (!chartModel || !geometry) return null;
     const meta = pedigree?.traits.find(t => t.name === activeTrait);
     const colors = meta ? traitColorsFor(meta, view.traitColors[meta.name]) : undefined;
-    // The bars as on screen, and the legend of exactly the founder alleles
-    // they draw, in the screen's colors.
-    const boxes = haplotypeView
-      ? haplotypeBoxes(chartModel, haplotypeView, THEMES[displayStyle], chartColors,
-                       new Set(coloring?.hatched ?? []))
-      : null;
     return {
       model: chartModel, ...geometry, colorMap: chartColors, hatched: coloring?.hatched,
-      haplotypeBoxes: boxes,
-      founderLegend: boxes && haplotypeView
-        ? founderAlleleLegend(haplotypeView.data, Object.values(boxes), haplotypeView.settings)
-        : null,
+      haplotypeBoxes: shownBoxes,
+      founderLegend,
       style: displayStyle, orientation, crossSymbolSize,
       legend: coloring?.legend ?? buildLegend(meta, chartModel.individuals, colorMap, colors),
     };
-  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, haplotypeView, displayStyle, orientation, crossSymbolSize]);
+  }, [chartModel, pedigree, activeTrait, view.traitColors, colorMap, chartColors, coloring, shownBoxes, founderLegend, displayStyle, orientation, crossSymbolSize]);
 
   const handleLoadExample = useCallback(async () => {
     try {
@@ -753,7 +779,7 @@ export default function App() {
                 border: "1px solid #2e3a52", borderRadius: 8,
                 boxShadow: "0 8px 32px rgba(0,0,0,.5)", userSelect: "text" }}>
               <div style={{ fontSize: 12, color: "#e8ecf4", marginBottom: 10 }}>
-                {graphData?.nodes.length ?? 0} individuals around {subpop.focal_id}
+                {graphData?.nodes.length ?? 0} individuals around {nameOf(subpop.focal_id)}
               </div>
               <label style={{ display: "flex", gap: 8, alignItems: "flex-start",
                 fontSize: 12, color: "#e8ecf4", cursor: "pointer" }}>
@@ -781,6 +807,13 @@ export default function App() {
             </div>
           )}
         </div>
+
+        <button onClick={() => void saveJson()}
+          title={"Save the whole population, with all of its data, as a Pedimap 2 JSON file" +
+            (subpop ? ". To save the displayed subpopulation, use Export subpopulation (.dat)." : ".")}
+          style={{ background: "#252e42", color: "#a0aec0", padding: "5px 12px" }}>
+          Save as JSON
+        </button>
 
         <button onClick={() => setImageDialogOpen(true)}
           disabled={!chartModel || tooLargeToDraw || graphLoading}
@@ -921,7 +954,7 @@ export default function App() {
         {selectedId && (
           <button onClick={() => handleSubpop()}
             style={{ background: "#1d3a6e", color: "#4f9cf9", padding: "5px 12px" }}>
-            🔍 Subpop: {selectedId}
+            🔍 Subpop: {nameOf(selectedId)}
           </button>
         )}
 
@@ -1085,7 +1118,19 @@ export default function App() {
                 haplotype={haplotypeView}
               />
             )}
-          {coloring && !tooLargeToDraw && <ChartLegend legend={coloring.legend} />}
+          {/* The legends, as in an exported image: the coloring's at the bottom,
+              the founder alleles of the IBD bars above it. */}
+          {!tooLargeToDraw && (founderLegend || coloring) && (
+            <div style={{ position: "absolute", left: 12, bottom: 12, zIndex: 5, pointerEvents: "none",
+              display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+              {founderLegend && (
+                <IbdLegend legend={founderLegend} collapsed={view.haplotype.legendCollapsed}
+                  onToggle={() => updateView({ haplotype: { ...view.haplotype,
+                    legendCollapsed: !view.haplotype.legendCollapsed } })} />
+              )}
+              {coloring && <ChartLegend legend={coloring.legend} />}
+            </div>
+          )}
         </div>
 
         {/* Detail panel */}
@@ -1107,8 +1152,8 @@ export default function App() {
       {imageDialogOpen && (
         <ExportImageDialog
           buildInput={buildImageInput}
-          baseName={exportBaseName(pedigree?.population, subpop?.focal_id)}
-          scope={subpop ? `the subpopulation around ${subpop.focal_id}` : "the whole population"}
+          baseName={exportBaseName(pedigree?.population, subpop && nameOf(subpop.focal_id))}
+          scope={subpop ? `the subpopulation around ${nameOf(subpop.focal_id)}` : "the whole population"}
           onClose={closeImageDialog}
         />
       )}

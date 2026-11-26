@@ -39,11 +39,36 @@ describe("parent labels follow the caption", () => {
     expect(parentRow("Male parent")).toBe("Male parentIngridM");
   });
 
+  it("no labels with the data (demo data, JSON without parent columns): Parent 1 and Parent 2", () => {
+    const { pedigree, details } = panels.example;
+    render(<IndividualPanel individual={details.Elstar as IndividualDetail} traits={pedigree.traits}
+      markerSummary={pedigree.marker_summary} onSelectId={() => {}} onClose={() => {}} />);
+    expect(parentRow("Parent 1")).toBe("Parent 1GoldenD");
+    expect(parentRow("Parent 2")).toBe("Parent 2IngridM");
+    expect(screen.queryByText("Female parent")).toBeNull();
+  });
+
+  it("names the parents by name, with the id on hover (demo data: G1_03 is WA-103)", () => {
+    const { pedigree, details } = panels.example;
+    const sel204 = { ...details.Elstar, name: "SEL-204", female_parent: "G1_03", male_parent: "G1_04",
+                     female_parent_name: "WA-103", male_parent_name: "WA-104" } as IndividualDetail;
+    render(<IndividualPanel individual={sel204} traits={pedigree.traits}
+      markerSummary={pedigree.marker_summary} onSelectId={() => {}} onClose={() => {}} />);
+    expect(parentRow("Parent 1")).toBe("Parent 1WA-103");
+    expect(screen.getByRole("button", { name: "WA-104" }).getAttribute("title")).toBe("G1_04");
+    expect(screen.queryByText(/G1_0\d/)).toBeNull();
+  });
+
   it("in the chart's tooltip too", () => {
     const tip = buildTooltip({ id: "X", label: "X", x: 0, y: 0, generation: 1, cross_type: "cross",
       female_parent: "P", male_parent: null }, panels.flexqtl.pedigree.parent_labels);
     expect([...tip.querySelectorAll("div")].map(d => d.textContent)).toEqual(
       ["Parent 1: P", "Parent 2: -", "Generation: 1"]);
+    const named = buildTooltip({ id: "G2_04", label: "SEL-204", x: 0, y: 0, generation: 2,
+      cross_type: "cross", female_parent: "G1_03", male_parent: "G1_04",
+      female_parent_name: "WA-103", male_parent_name: "WA-104" }, panels.flexqtl.pedigree.parent_labels);
+    expect([...named.querySelectorAll("div")].map(d => d.textContent).slice(0, 2)).toEqual(
+      ["Parent 1: WA-103", "Parent 2: WA-104"]);
   });
 });
 

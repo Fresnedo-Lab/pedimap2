@@ -104,7 +104,8 @@ function IbdAlleleLine({ a, second }: { a: IbdAllele; second?: boolean }) {
         {percent(a.probability)}
       </span>
       <span>
-        {a.founder ? <>{a.founder} · </> : null}
+        {a.founder ? <span title={a.founder_name && a.founder_name !== a.founder ? a.founder : undefined}>
+          {a.founder_name ?? a.founder} · </span> : null}
         <span style={{ color: "#64748b" }}>founder allele {a.allele}</span>
       </span>
     </div>
@@ -241,14 +242,17 @@ export default function IndividualPanel({
     </div>
   );
 
-  const parentLink = (id: string | null, role: string) => {
+  // Named as the relatives lists name them: the name, with the id on hover
+  // where it differs.
+  const parentLink = (id: string | null, name: string | null | undefined) => {
     if (!id) return <span style={{ color: "#4b5563" }}>unknown</span>;
+    const shown = name || id;
     return (
-      <button onClick={() => onSelectId(id)} style={{
+      <button onClick={() => onSelectId(id)} title={shown !== id ? id : undefined} style={{
         background: "none", padding: "0 4px", color: "#4f9cf9",
         fontSize: 12, textDecoration: "underline",
       }}>
-        {id}
+        {shown}
       </button>
     );
   };
@@ -285,8 +289,8 @@ export default function IndividualPanel({
           textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
           Parentage
         </div>
-        {row(parentLabels.female, parentLink(ind.female_parent, "female"))}
-        {row(parentLabels.male, parentLink(ind.male_parent, "male"))}
+        {row(parentLabels.female, parentLink(ind.female_parent, ind.female_parent_name))}
+        {row(parentLabels.male, parentLink(ind.male_parent, ind.male_parent_name))}
 
         {/* Traits — directly under the parents, above anything that can grow */}
         {Object.keys(ind.traits).length > 0 && (

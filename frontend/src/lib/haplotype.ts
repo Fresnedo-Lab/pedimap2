@@ -22,6 +22,8 @@ export interface HaplotypeData {
   /** The founder behind founder alleles 2k+1 and 2k+2 (index k); null when
    *  the file does not name them (an exported subset). */
   founders:        string[] | null;
+  /** The same founders' names, for display (the ids above are the key). */
+  founder_names?:  string[] | null;
   founder_alleles: Record<string, (string | null)[]>;
   /** rows[individual][homologue][position index]: the nonzero entries. */
   rows:            Record<string, AlleleProbability[][][]>;
@@ -143,8 +145,12 @@ export function founderShades(r: number, n: number): [string, string] {
   return pairs[r] ?? extraPair(r);
 }
 
+/** The name of founder k, for display: its name, else its id; none when the
+ *  file does not name its founders. */
+const founderName = (data: HaplotypeData, k: number): string | undefined =>
+  data.founders ? (data.founder_names?.[k] ?? data.founders[k]) : undefined;
 const founderLabel = (data: HaplotypeData, k: number) =>
-  data.founders?.[k] ?? `Founder alleles ${2 * k + 1}–${2 * k + 2}`;
+  founderName(data, k) ?? `Founder alleles ${2 * k + 1}–${2 * k + 2}`;
 
 /** The founder-allele colors for the individuals `ids`, over the contributing
  *  founders only, and the legend that lists exactly them. */
@@ -166,7 +172,7 @@ export function palette(data: HaplotypeData, ids: Iterable<string>, scheme: Colo
       const color = ALLELE_COLORS[q] ?? extraAllele(q);
       colors.set(a, color);
       const k = founderOf(a);
-      legend.push({ label: data.founders ? `${data.founders[k]}, founder allele ${a}` : `Founder allele ${a}`,
+      legend.push({ label: data.founders ? `${founderName(data, k)}, founder allele ${a}` : `Founder allele ${a}`,
                     swatches: [{ allele: a, color }] });
     });
   } else {
@@ -174,7 +180,7 @@ export function palette(data: HaplotypeData, ids: Iterable<string>, scheme: Colo
     highlighted.filter(a => present.has(a)).slice(0, MAX_HIGHLIGHTED).forEach((a, i) => {
       colors.set(a, HIGHLIGHT_COLORS[i]);
       const k = founderOf(a);
-      legend.push({ label: data.founders ? `${data.founders[k]}, founder allele ${a}` : `Founder allele ${a}`,
+      legend.push({ label: data.founders ? `${founderName(data, k)}, founder allele ${a}` : `Founder allele ${a}`,
                     swatches: [{ allele: a, color: HIGHLIGHT_COLORS[i] }] });
     });
     if (present.size > legend.length) {
@@ -354,7 +360,7 @@ export function describeSegment(item: SegmentItem, data: HaplotypeData, columns:
   const where = `LG ${data.linkage_group}, ${position.position} cM · homologue from ${
     (columns[item.homologue] ?? `parent ${item.homologue + 1}`).toLowerCase()}`;
   const allele = (a: number) => {
-    const founder = data.founders?.[founderOf(a)];
+    const founder = founderName(data, founderOf(a));
     return `founder allele ${a}${founder ? ` (${founder})` : ""}`;
   };
   const { segment } = item;
